@@ -1,8 +1,8 @@
 # The AI Operating System
 
-**A five-part research series formalizing the AI Operating System through category theory, with Erlang/Elixir prototypes.**
+**A five-part research series on functional design patterns for intelligent agent infrastructure, with Elixir/OTP reference implementations.**
 
-> An AI Operating System is not a new kernel — it is a software stack that manages AI agents, models, data, memory, and execution the same way a traditional OS manages processes, memory, files, and hardware.
+> An AI Operating System manages models, agents, knowledge, and tasks — the same way a traditional OS manages processes, memory, files, and hardware. We design each subsystem using functional programming principles and implement them in Elixir/OTP.
 
 ```
 Linux OS → manages hardware + programs
@@ -23,13 +23,13 @@ matthew@yonedaai.com · https://yonedaai.com
 
               ┌─────────────────────────────────────────┐
               │          IV. Planner Engine              │
-              │   Natural Transformation: F ⇒ G         │
-              │   Order Book · Escrow · Decomposition   │
+              │   Market Clearing · Escrow · Reputation  │
+              │   Order Book · DAG Decomposition         │
               └───────────────────┬─────────────────────┘
                                   │
               ┌───────────────────┴─────────────────────┐
               │          I. Agent Scheduler              │
-              │   Objects in Category A                  │
+              │   GenServer Lifecycle · Pipeline |>      │
               │   Supervision · Priority · Streaming     │
               └───────────────────┬─────────────────────┘
                                   │
@@ -37,61 +37,82 @@ matthew@yonedaai.com · https://yonedaai.com
         │                         │                         │
 ┌───────┴────────┐    ┌──────────┴──────────┐    ┌─────────┴────────┐
 │ II. Tools      │    │ III. Memory Layer   │    │  Model Runtime   │
-│ Morphisms      │    │ Functors            │    │  (LLM Inference) │
-│ Capability     │    │ Mem[S] Typed        │    │  GPU Orchestrate │
-│ MCP Protocol   │    │ Versioned · Graph   │    │                  │
+│ 3-Tier Registry│    │ Typed Schemas       │    │  (LLM Inference) │
+│ Capabilities   │    │ ETS · Mnesia · Graph│    │  GPU Orchestrate │
+│ MCP Protocol   │    │ Versioned · 24 Types│    │                  │
 └────────────────┘    └─────────────────────┘    └──────────────────┘
 ```
 
 ## Papers
 
-| Part | Title | Abstraction | PDF |
-|------|-------|-------------|-----|
-| I | Agent Scheduler: Complex Orchestration as Process Management | Agents = Objects | [PDF](papers/pdf/agent-scheduler.pdf) |
-| II | Tool Interface Layer: Morphisms, Security, and Capability Abstraction | Tools = Morphisms | [PDF](papers/pdf/tool-interface.pdf) |
-| III | Memory Layer: Typed Filesystem for Persistent Agent Cognition | Memory = Functor | [PDF](papers/pdf/memory-layer.pdf) |
-| IV | Planner Engine: Order Book Dynamics and Natural Transformation | Planner = Nat. Trans. | [PDF](papers/pdf/planner-engine.pdf) |
-| V | Synthesis: The AI Operating System as Categorical Framework | Unified Theory | [PDF](papers/pdf/synthesis.pdf) |
+| Part | Title | Design Focus | Read | PDF |
+|------|-------|-------------|------|-----|
+| I | Agent Scheduler: Composable Orchestration as Process Management | GenServer lifecycle, pipelines, supervision | [HTML](https://agentherowork.github.io/agent-os/papers/agent-scheduler.html) | [PDF](papers/latex/agent-scheduler.pdf) |
+| II | Tool Interface Layer: Capability Security and Composable Invocation | 3-tier registry, HMAC tokens, sandboxing | [HTML](https://agentherowork.github.io/agent-os/papers/tool-interface.html) | [PDF](papers/latex/tool-interface.pdf) |
+| III | Memory Layer: Typed Filesystem for Persistent Agent Cognition | ETS/Mnesia storage, versioning, graph | [HTML](https://agentherowork.github.io/agent-os/papers/memory-layer.html) | [PDF](papers/latex/memory-layer.pdf) |
+| IV | Planner Engine: Market Clearing and Order Book Dynamics | Escrow, reputation, task decomposition | [HTML](https://agentherowork.github.io/agent-os/papers/planner-engine.html) | [PDF](papers/latex/planner-engine.pdf) |
+| V | Synthesis: Composing Four Subsystems into an AI OS | Umbrella app, pairwise composition, lifecycle | [HTML](https://agentherowork.github.io/agent-os/papers/synthesis.html) | [PDF](papers/latex/synthesis.pdf) |
 
-## Categorical Mapping
+## Design Mapping
 
-| Resource | Traditional OS | AI OS | Category Theory |
-|----------|---------------|-------|-----------------|
-| Compute | CPU processes | Agents | Objects in **A** |
-| Operations | System calls | Tools (MCP) | Morphisms |
-| State | RAM + filesystem | Typed memory Mem[S] | Functors S → St |
-| Coordination | Scheduler | Planner (order book) | Natural transformations |
-| Fault tolerance | Process restart | OTP supervision | Limit preservation |
+| Resource | Traditional OS | AI OS | Elixir/OTP Pattern |
+|----------|---------------|-------|--------------------|
+| Compute | CPU processes | Agents | GenServer + DynamicSupervisor |
+| Operations | System calls | Tools (MCP, sandboxed) | Higher-order functions + closures |
+| State | RAM + filesystem | Typed memory Mem[S] | ETS (working) + Mnesia (persistent) |
+| Coordination | Scheduler | Planner (order book) | GenServer state + Mnesia transactions |
+| Composition | Pipes / IPC | Agent pipeline bus | Pipe operator `|>` + message passing |
+| Fault tolerance | Process restart | OTP supervision | `one_for_one` / `rest_for_one` strategies |
 
-## Why Erlang/Elixir
+## Why Elixir/OTP
 
 The BEAM VM was designed as a telecom operating system — its primitives map directly to AI OS requirements:
 
 - **Supervision trees** → Agent fault tolerance ("let it crash")
 - **Lightweight processes** → Massive agent concurrency (millions per node)
 - **ETS + Mnesia** → Working memory + persistent knowledge
+- **Pattern matching** → Type-safe message dispatch and state transitions
+- **Pipe operator** → Composable execution pipelines
 - **Hot code reload** → Zero-downtime agent updates
 - **Distribution** → Multi-node agent clustering
 - **Message passing** → Inter-agent communication without shared state
+
+## Quick Start
+
+```bash
+cd src/agent_os
+mix deps.get
+mix compile
+iex -S mix
+```
+
+```elixir
+# Start the AI Operating System
+AgentOS.start()
+
+# Check system status
+AgentOS.status()
+```
 
 ## Project Structure
 
 ```
 agent-os/
 ├── papers/
-│   ├── latex/          # Source .tex files
-│   └── pdf/            # Compiled PDFs
+│   └── latex/            # Source .tex + compiled PDFs
 ├── src/
-│   ├── agent_scheduler/  # Part I: OTP-based agent scheduling
-│   ├── tool_interface/   # Part II: Capability-based tool security
+│   ├── agent_scheduler/  # Part I: GenServer lifecycle + pipeline composition
+│   ├── tool_interface/   # Part II: 3-tier registry + capability tokens
 │   ├── memory_layer/     # Part III: Typed memory with ETS/Mnesia
-│   ├── planner_engine/   # Part IV: Order book + orchestration
+│   ├── planner_engine/   # Part IV: Order book + escrow + reputation
 │   └── agent_os/         # Unified umbrella application
-├── reviews/            # Peer review feedback
-├── posts/              # Social media posts
-├── images/             # Paper cover images
-├── docs/               # GitHub Pages site
-└── .github/workflows/  # CI/CD
+├── scripts/              # LaTeX→HTML conversion tools
+├── reviews/              # Gemini peer review feedback
+├── docs/                 # GitHub Pages site
+│   ├── index.html        # Landing page
+│   ├── og-image.png      # Open Graph social image
+│   └── papers/           # Readable HTML versions
+└── .github/workflows/    # GitHub Pages deployment
 ```
 
 ## Built on Production Systems

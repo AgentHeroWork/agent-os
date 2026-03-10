@@ -326,7 +326,7 @@ defmodule AgentScheduler.Agent do
   def handle_call({:respond_approval, :reject, feedback}, _from, %{state: :waiting_approval} = state) do
     if state.retry_count < state.max_retries do
       new_state = %{state | state: :pending, retry_count: state.retry_count + 1, checkpoint_data: nil}
-      Logger.warn("Agent #{state.id}: approval rejected (#{feedback}), retrying (#{new_state.retry_count}/#{state.max_retries})")
+      Logger.warning("Agent #{state.id}: approval rejected (#{feedback}), retrying (#{new_state.retry_count}/#{state.max_retries})")
       {:reply, :ok, new_state}
     else
       new_state = %{state | state: :failed, checkpoint_data: nil}
@@ -402,7 +402,7 @@ defmodule AgentScheduler.Agent do
   end
 
   def handle_cast(:cancel, state) do
-    Logger.warn("Agent #{state.id}: cancel ignored in #{state.state} state")
+    Logger.warning("Agent #{state.id}: cancel ignored in #{state.state} state")
     {:noreply, state}
   end
 

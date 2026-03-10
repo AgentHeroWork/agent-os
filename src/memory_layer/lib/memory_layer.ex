@@ -57,13 +57,6 @@ defmodule MemoryLayer do
     Supervisor.start_link(children, opts)
   end
 
-  @doc """
-  Initialize ETS tables for working memory.
-
-  Working memory provides microsecond access to the "hot" set of memories
-  currently relevant to the agent's active task. Analogous to working memory
-  in cognitive psychology.
-  """
   @spec init_ets_tables() :: :ok
   defp init_ets_tables do
     # Working memory: fast read/write for active memories
@@ -73,12 +66,8 @@ defmodule MemoryLayer do
     :ok
   end
 
-  @doc """
-  Initialize Mnesia tables for persistent knowledge.
-
-  Persistent knowledge survives process crashes and node restarts.
-  Uses disc_copies for durability (writes to both RAM and disk).
-  """
+  # Persistent knowledge survives process crashes and node restarts.
+  # Uses disc_copies for durability (writes to both RAM and disk).
   @spec init_mnesia_tables() :: :ok
   defp init_mnesia_tables do
     # Ensure Mnesia schema exists on this node

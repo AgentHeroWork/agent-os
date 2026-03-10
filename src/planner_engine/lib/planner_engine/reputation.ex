@@ -366,7 +366,7 @@ defmodule PlannerEngine.Reputation do
   end
 
   @spec detect_rapid_cycling(agent_history(), keyword()) :: boolean()
-  defp detect_rapid_cycling(%{scores: scores}, opts) when length(scores) < 3, do: false
+  defp detect_rapid_cycling(%{scores: scores}, _opts) when length(scores) < 3, do: false
 
   defp detect_rapid_cycling(%{scores: scores}, opts) do
     completion_seconds = Keyword.get(opts, :completion_seconds, nil)

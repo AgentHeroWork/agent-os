@@ -201,7 +201,7 @@ defmodule ToolInterface.MCPClient do
       })
 
     case http_post(url, body, auth_headers(token, nil), @discovery_timeout) do
-      {:ok, %{status: 200, body: response_body, headers: headers}} ->
+      {:ok, %{status: 200, body: _response_body, headers: headers}} ->
         session_id = extract_session_id(headers)
         Logger.debug("[MCPClient] Session initialized: #{inspect(session_id)}")
         {:ok, session_id}

@@ -2,7 +2,6 @@
 
 % ---- Packages ----
 \usepackage{amsmath,amssymb,amsthm,mathtools}
-\usepackage{tikz-cd}
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit,backgrounds,calc}
 \usepackage[colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
@@ -17,11 +16,23 @@
 \usepackage{float}
 \usepackage{everypage}
 \usepackage{eso-pic}
+\usepackage{longtable}
 
 % ---- GrokRxiv Sidebar ----
+\definecolor{grokgray}{RGB}{110,110,110}
 \AddEverypageHook{%
   \ifnum\value{page}=1
-    \put(527,-400){\rotatebox{90}{\footnotesize\texttt{GrokRxiv:2026.03.ai-os-synthesis [cs.AI] 10 Mar 2026}}}
+    \begin{tikzpicture}[remember picture, overlay]
+      \node[
+        rotate=90,
+        anchor=south,
+        font=\Large\sffamily\bfseries\color{grokgray},
+        inner sep=0pt
+      ] at ([xshift=38pt, yshift=0.52\paperheight]current page.south west)
+      {GrokRxiv:2026.03.ai-os-synthesis\quad
+       [\,cs.AI\,]\quad
+       10 Mar 2026};
+    \end{tikzpicture}
   \fi
 }
 
@@ -30,7 +41,6 @@
 \newtheorem{proposition}[theorem]{Proposition}
 \newtheorem{lemma}[theorem]{Lemma}
 \newtheorem{corollary}[theorem]{Corollary}
-\newtheorem{conjecture}[theorem]{Conjecture}
 \theoremstyle{definition}
 \newtheorem{definition}[theorem]{Definition}
 \newtheorem{example}[theorem]{Example}
@@ -52,51 +62,50 @@
   numbers=left,
   numberstyle=\tiny\color{codegray},
   numbersep=8pt,
-  breaklines=true,
-  frame=single,
   backgroundcolor=\color{codebg},
+  frame=single,
+  rulecolor=\color{codegray!40},
+  breaklines=true,
   captionpos=b,
   tabsize=2,
-  showstringspaces=false
+  showstringspaces=false,
+  xleftmargin=2em,
+  framexleftmargin=1.5em
 }
 
-% ---- Custom Commands ----
-\newcommand{\catC}{\mathcal{C}}
-\newcommand{\catD}{\mathcal{D}}
-\newcommand{\catA}{\mathcal{A}}
-\newcommand{\catT}{\mathcal{T}}
-\newcommand{\catS}{\mathcal{S}}
-\newcommand{\catM}{\mathcal{M}}
-\newcommand{\catP}{\mathcal{P}}
-\newcommand{\AIOS}{\mathbf{AIOS}}
-\newcommand{\Ag}{\mathbf{Ag}}
-\newcommand{\Tl}{\mathbf{Tl}}
-\newcommand{\Mem}{\mathbf{Mem}}
-\newcommand{\Plan}{\mathbf{Plan}}
-\newcommand{\Exec}{\mathbf{Exec}}
-\newcommand{\Eval}{\mathbf{Eval}}
-\newcommand{\Hom}{\mathrm{Hom}}
-\newcommand{\Set}{\mathbf{Set}}
-\newcommand{\Cat}{\mathbf{Cat}}
-\newcommand{\id}{\mathrm{id}}
-\newcommand{\op}{\mathrm{op}}
-\newcommand{\Nat}{\mathrm{Nat}}
+\lstdefinelanguage{elixir}{
+  morekeywords={defmodule,def,defp,defstruct,do,end,use,require,alias,
+    case,cond,fn,if,else,when,with,for,true,false,nil,
+    @moduledoc,@doc,@spec,@type,@typedoc,@impl,@callback,
+    @enforce_keys,@behaviour,@default_timeout},
+  sensitive=true,
+  morecomment=[l]{\#},
+  morestring=[b]",
+  morestring=[b]'
+}
 
 % ---- Header/Footer ----
 \pagestyle{fancy}
 \fancyhf{}
-\fancyhead[L]{\footnotesize Part V: Synthesis --- The AI Operating System}
-\fancyhead[R]{\footnotesize Long et al.}
-\fancyfoot[C]{\thepage}
+\fancyhead[L]{\small\textit{The AI Operating System: Part V --- Modular Synthesis}}
+\fancyhead[R]{\small\thepage}
+\fancyfoot[C]{\small The YonedaAI Collaboration}
 
-\title{\textbf{The AI Operating System as Categorical Framework:\\A Unified Theory of Agent Scheduling, Tool Interfaces,\\Typed Memory, and Market-Based Planning}\\[12pt]
-\large Part V of V: The AI Operating System Series}
+% ---- Title ----
+\title{%
+  \textbf{The AI Operating System}\\[0.5em]
+  \Large Part V: Modular Synthesis ---\\
+  Composing Four Subsystems into a Unified Runtime\\[1em]
+  \large An Elixir/OTP Umbrella Application
+}
 
-\author{Matthew Long\\
-The YonedaAI Collaboration\\
-YonedaAI Research Collective\\
-Chicago, IL\\
-\texttt{matthew@yonedaai.com} $\cdot$ \texttt{https://yonedaai.com}}
+\author{%
+  \textbf{Matthew Long}\\
+  The YonedaAI Collaboration\\
+  YonedaAI Research Collective\\
+  Chicago, IL\\
+  \texttt{matthew@yoneda.ai}
+}
 
 \date{March 10, 2026}
 
@@ -104,576 +113,625 @@ Chicago, IL\\
 
 \maketitle
 
+% ========================================================================
 \begin{abstract}
-This paper presents a unified categorical framework for the AI Operating System (AI OS), synthesizing four component abstractions developed in Parts I--IV of this series. We demonstrate that agent scheduling (Part I), tool interfaces (Part II), typed memory (Part III), and market-based planning (Part IV) compose into a coherent 2-categorical structure $\AIOS$ where agents are 0-cells, tools are 1-cells, and planning transformations are 2-cells. Memory acts as an endofunctor preserving horizontal and vertical composition. We prove that this composition satisfies the interchange law, that fault tolerance emerges from supervision as limit preservation, that type safety propagates through the 2-category via natural transformations between type functors, and that market equilibrium arises as a colimit in the transaction category. The framework is grounded in three production systems---Agent-Hero (marketplace), ContextFS (typed memory), and an agent testing framework (streaming pipelines)---and implemented as an Elixir/OTP prototype exploiting the BEAM virtual machine's native correspondence with categorical operating system primitives. We establish a formal functorial correspondence between Linux and the AI OS, identify where the analogy breaks down, and compare with existing multi-agent frameworks (AutoGen, LangGraph, CrewAI) to explain why none constitute a true operating system. Our results suggest that the AI OS layer will become the most valuable software abstraction of the coming decade, and that its correct formulation requires the compositional guarantees that only categorical methods provide.
+Parts I--IV of \textit{The AI Operating System} developed four independent subsystems: an
+\textsc{Agent Scheduler} for process management, a \textsc{Tool Interface}
+for capability-based access control, a \textsc{Memory Layer} for typed persistent
+cognition, and a \textsc{Planner Engine} for market-based orchestration.
+Each subsystem was designed as a self-contained Elixir/OTP application with its own
+supervision tree, public API, and type specifications.
+
+This paper addresses the synthesis question: \emph{how do these four modules compose
+into a single, coherent operating system for AI agents?}
+
+We present \texttt{AgentOS}, an Elixir umbrella application that composes the four
+subsystems through (1)~a dependency-ordered supervision tree,
+(2)~message-passing interfaces between subsystem boundaries,
+(3)~pipeline composition across layers, and (4)~a unified facade module that
+exposes the complete job lifecycle.
+We show that every pairwise combination of subsystems yields emergent capabilities:
+agents invoke tools via capabilities, agents persist state through memory,
+tool results are cached in typed memory, and the planner orchestrates all three
+through market mechanisms.
+The result is a production-grade system demonstrated through the Agent-Hero
+marketplace---a Next.js + Supabase + Stripe platform where clients post jobs,
+the planner decomposes and matches them to agents via an order book, agents
+execute with tool access and memory persistence, and evaluators score outcomes
+to update reputation.
+
+The implementation comprises 24 Elixir source files totaling approximately 3{,}500
+lines of code, running on the BEAM virtual machine.
+All composition is achieved through standard functional programming
+patterns: module boundaries, supervision hierarchies, typed message passing,
+behaviour callbacks, and pipeline composition.
 \end{abstract}
 
+\vspace{1em}
+\noindent\textbf{Keywords:} AI operating systems, modular composition, Elixir/OTP, agent orchestration,
+supervision trees, capability-based security, typed memory, market mechanisms
+
+\clearpage
 \tableofcontents
-\newpage
+\clearpage
 
-%% ============================================================
-\section{Introduction}
-\label{sec:introduction}
+% ========================================================================
+\section{Introduction}\label{sec:intro}
 
-The history of computing is a history of abstraction layers. Each paradigm shift introduces a new operating system that manages a new class of computational resources: mainframe batch processors gave way to time-sharing systems; personal computers required desktop operating systems; distributed computing produced cluster orchestrators like Kubernetes; and now, the emergence of artificial intelligence as a computational primitive demands an \emph{AI Operating System}.
+The preceding four papers in this series each addressed a single concern
+of an AI operating system:
 
-An AI Operating System is not a new kernel in the traditional sense. It is a software stack that manages AI agents, models, data, memory, and execution in the same way that a traditional operating system manages processes, memory, files, and hardware:
-\begin{align*}
-\text{Linux OS} &\longrightarrow \text{manages hardware + programs} \\
-\text{AI OS} &\longrightarrow \text{manages models + agents + knowledge + tasks}
-\end{align*}
-
-Instead of scheduling CPU processes, the system schedules AI reasoning, inference, agent execution, and multi-step workflows. This idea is already emerging inside large AI platforms---OpenAI, Anthropic, Google DeepMind, Microsoft---but the full AI OS architecture is still being invented.
-
-In Parts I--IV of this series, we developed four fundamental abstractions:
-\begin{enumerate}[label=\textbf{Part \Roman*:}, leftmargin=2.5cm]
-  \item \textbf{Agent Scheduler}---Complex orchestrations (web testing, legal analysis, security auditing) formalized as objects in a category, with OTP supervision trees providing fault-tolerant scheduling.
-  \item \textbf{Tool Interface Layer}---Tool calling and security formalized as morphisms with capability-based access control, drawing on the Model Context Protocol (MCP) and sandboxed execution.
-  \item \textbf{Memory Layer}---Typed persistent memory formalized as a functor from schema categories to storage categories, with ContextFS as reference implementation guaranteeing reliable read/write/update.
-  \item \textbf{Planner Engine}---Market-based orchestration formalized as natural transformations, with an order book mechanism abstracting the buyer/seller dynamics universal to all markets.
+\begin{enumerate}[label=\textbf{Part \Roman*:}, leftmargin=3.5em]
+  \item \textbf{Agent Scheduler} --- Process lifecycle management for AI agents,
+        including credit-weighted scheduling, durable execution with memoization,
+        streaming pipelines, and 6-dimensional evaluation.
+  \item \textbf{Tool Interface} --- Capability-based access control with a 3-tier
+        registry (builtin, sandbox, MCP), sandboxed execution via isolated BEAM
+        processes, and per-invocation audit logging.
+  \item \textbf{Memory Layer} --- A typed filesystem for persistent agent cognition,
+        with 24 schema types across 6 subcategories, versioned evolution with vector
+        clocks, graph relationships, and multi-backend storage.
+  \item \textbf{Planner Engine} --- Market-based orchestration with an order book
+        matching engine, escrow-backed financial transactions, DAG-based job
+        decomposition, and reputation scoring with anti-gaming detection.
 \end{enumerate}
 
-The central contribution of this synthesis paper is the proof that these four abstractions compose into a well-defined \emph{2-category} $\AIOS$ with emergent properties that no individual component possesses alone:
+Each part was designed as an independent Elixir/OTP application---a self-contained
+module with its own supervision tree, public API, type specifications, and test suite.
+This modularity is not accidental; it is the central architectural principle.
 
-\begin{definition}[AI OS 2-Category, Informal]
-The AI Operating System forms a 2-category $\AIOS$ with:
+\subsection{The Synthesis Problem}
+
+The challenge addressed by this paper is \emph{composition}: given four well-defined
+modules, how do we assemble them into a system that is greater than the sum of its parts?
+Specifically:
+
 \begin{itemize}
-  \item \textbf{0-cells}: Agents (computational entities with state and behavior)
-  \item \textbf{1-cells}: Tools (operations transforming data between agents)
-  \item \textbf{2-cells}: Planning transformations (higher-order coordination)
-  \item \textbf{Endofunctor}: Memory $\Mem: \AIOS \to \AIOS$ (state preservation)
-\end{itemize}
-\end{definition}
-
-This categorical formulation is not merely decorative. It provides \emph{compositional guarantees}: the ability to reason about complex multi-agent systems by reasoning about their parts, knowing that composition preserves essential properties (type safety, fault tolerance, financial consistency).
-
-The paper proceeds as follows. Section~\ref{sec:background} reviews the necessary background in operating system theory, category theory, and 2-categories. Section~\ref{sec:review} summarizes the four component abstractions. Section~\ref{sec:two-category} constructs the 2-category $\AIOS$ and proves its coherence. Section~\ref{sec:emergent} derives emergent properties. Section~\ref{sec:linux} establishes the formal Linux correspondence. Section~\ref{sec:implementation} describes the Elixir/OTP implementation. Section~\ref{sec:comparison} compares with existing frameworks. Section~\ref{sec:future} outlines future directions, and Section~\ref{sec:conclusion} concludes.
-
-%% ============================================================
-\section{Background}
-\label{sec:background}
-
-\subsection{Operating System Theory}
-
-An operating system is fundamentally an abstraction manager. The classical OS manages five resource types: \emph{processes} (CPU scheduling), \emph{memory} (virtual address spaces), \emph{files} (persistent storage), \emph{devices} (I/O interfaces), and \emph{communication} (IPC/networking) \citep{tanenbaum2014modern, silberschatz2018os}.
-
-The key insight is that each resource type has a corresponding \emph{management abstraction}:
-\begin{center}
-\begin{tabular}{lll}
-\toprule
-\textbf{Resource} & \textbf{Abstraction} & \textbf{Interface} \\
-\midrule
-CPU time & Process scheduler & fork/exec/wait \\
-Physical memory & Virtual memory manager & mmap/brk \\
-Persistent storage & Filesystem & open/read/write/close \\
-Hardware devices & Device driver model & ioctl/read/write \\
-Inter-process comm. & IPC mechanisms & pipe/socket/shmem \\
-\bottomrule
-\end{tabular}
-\end{center}
-
-Each abstraction provides \emph{isolation} (processes cannot corrupt each other), \emph{multiplexing} (many processes share finite resources), and \emph{composability} (small programs compose into larger systems via pipes).
-
-\subsection{Category Theory Recap}
-
-We recall the basic definitions. A \emph{category} $\catC$ consists of a collection of objects $\mathrm{Ob}(\catC)$, a collection of morphisms $\Hom_\catC(A,B)$ for each pair of objects, an identity morphism $\id_A$ for each object, and a composition operation $\circ$ that is associative and respects identities \citep{maclane1998categories, riehl2017category}.
-
-A \emph{functor} $F: \catC \to \catD$ maps objects to objects and morphisms to morphisms, preserving composition and identities. A \emph{natural transformation} $\eta: F \Rightarrow G$ between functors $F, G: \catC \to \catD$ is a family of morphisms $\eta_A: F(A) \to G(A)$ satisfying the naturality condition: for every morphism $f: A \to B$ in $\catC$,
-\[
-G(f) \circ \eta_A = \eta_B \circ F(f)
-\]
-
-\subsection{2-Categories}
-
-A \emph{strict 2-category} $\mathcal{K}$ consists of:
-\begin{itemize}
-  \item A collection of \emph{0-cells} (objects)
-  \item For each pair of 0-cells $A, B$, a category $\mathcal{K}(A,B)$ whose objects are \emph{1-cells} (morphisms) and whose morphisms are \emph{2-cells} (morphisms between morphisms)
-  \item Horizontal composition $\circ_h$ of 1-cells and 2-cells
-  \item Vertical composition $\circ_v$ of 2-cells
-  \item The \emph{interchange law}: for composable 2-cells $\alpha, \beta, \gamma, \delta$,
-  \[
-  (\alpha \circ_h \beta) \circ_v (\gamma \circ_h \delta) = (\alpha \circ_v \gamma) \circ_h (\beta \circ_v \delta)
-  \]
+  \item What is the correct startup ordering, and why does it matter for fault tolerance?
+  \item How do subsystems communicate across module boundaries without violating encapsulation?
+  \item What emergent capabilities arise from pairwise and higher-order compositions?
+  \item How does the composed system support a complete production job lifecycle?
 \end{itemize}
 
-The canonical example is $\Cat$, the 2-category of small categories, functors, and natural transformations \citep{borceux1994handbook, leinster2004higher}.
+\subsection{Approach: Functional Composition on the BEAM}
 
-\subsection{The BEAM Virtual Machine}
+Our approach is grounded in functional programming on the BEAM virtual machine.
+The composition mechanisms are:
 
-The Erlang/OTP runtime system (BEAM) provides primitives that correspond remarkably well to categorical operating system abstractions \citep{armstrong2003erlang, cesarini2016designing}. Lightweight processes (0-cells) communicate via message passing (1-cells) under the coordination of supervision trees (higher-order structure). The ``let it crash'' philosophy---where faulty processes are restarted by supervisors rather than handling every error internally---corresponds precisely to the categorical notion of limit preservation under failure.
-
-%% ============================================================
-\section{Review of Component Abstractions}
-\label{sec:review}
-
-\subsection{Part I: Agent Scheduler --- Agents as Objects}
-
-In Part I, we formalized the \emph{agent category} $\Ag$ whose objects are agent profiles and whose morphisms are data flow connections. An agent is a complex orchestration---a web testing framework with 5 phases, a legal analysis pipeline, a security auditor---that requires workflow management and validation.
-
-\begin{definition}[Agent Category, from Part I]
-\label{def:agent-cat}
-The agent category $\Ag$ has:
-\begin{itemize}
-  \item \textbf{Objects}: Agent profiles $a = (id, \sigma, \tau, \omega)$ where $id$ is an identifier, $\sigma$ is a system prompt (behavioral specification), $\tau$ is a tool set, and $\omega$ is an oversight mode
-  \item \textbf{Morphisms}: Data flow connections $f: a \to b$ representing output-to-input pipelines
-  \item \textbf{Composition}: Pipeline chaining $(g \circ f)(x) = g(f(x))$
-  \item \textbf{Identity}: The pass-through agent $\id_a$ that forwards data unchanged
-\end{itemize}
-\end{definition}
-
-Key results from Part I include:
 \begin{enumerate}
-  \item \textbf{Supervision as Limit Preservation}: OTP supervision trees define a functor $\mathrm{Sup}: \Ag \to \Ag$ that preserves limits (products, equalizers), ensuring that composed agent systems inherit fault tolerance from their components.
-  \item \textbf{Streaming Pipeline Scheduling}: The EventEmitter pattern from the agent testing framework defines a streaming monad on $\Ag$, where downstream agents consume upstream events in real-time.
-  \item \textbf{Evaluation Functor}: The 6-dimensional quality scoring system (quality, adherence, speed, cost, error, revision) defines a functor $\Eval: \Exec \to \mathbb{R}^6$ from execution traces to evaluation vectors.
+  \item \textbf{Supervision trees} --- OTP supervisors provide fault-isolated startup
+        ordering with automatic restart on failure.
+  \item \textbf{Message passing} --- Subsystems communicate via \texttt{GenServer.call/cast}
+        across process boundaries, with no shared mutable state.
+  \item \textbf{Behaviour callbacks} --- Elixir behaviours define type-safe interfaces
+        that subsystems implement, enabling polymorphic dispatch.
+  \item \textbf{Pipeline composition} --- Multi-stage streaming pipelines compose
+        agents, tools, and memory into end-to-end execution flows.
+  \item \textbf{Module facades} --- A top-level \texttt{AgentOS} module provides a
+        unified API that delegates to the appropriate subsystem.
 \end{enumerate}
 
-The production reference is Agent-Hero's execution pipeline: Job $\to$ Proposal $\to$ Contract $\to$ Decomposition $\to$ Execution $\to$ Evaluation, with Inngest providing durable execution guarantees.
+None of these mechanisms require exotic abstractions.
+They are the standard tools of Erlang/OTP, refined over 40 years of production
+use in telecommunications, banking, and messaging infrastructure.
 
-\subsection{Part II: Tool Interface --- Tools as Morphisms}
+\subsection{Mathematical Foundations}\label{subsec:math-foundations}
 
-In Part II, we formalized tools as morphisms in a \emph{tool category} $\Tl$, with capability-based security providing access control.
+The design of AgentOS is informed by ideas from category theory, which provides
+a language for describing composition, interfaces, and structure preservation.
+In particular:
 
-\begin{definition}[Tool Category, from Part II]
-\label{def:tool-cat}
-The tool category $\Tl$ has:
 \begin{itemize}
-  \item \textbf{Objects}: Data types (text, code, images, structured data)
-  \item \textbf{Morphisms}: Tool operations $t: D_1 \to D_2$ transforming input data to output data
-  \item \textbf{Composition}: Tool chaining $t_2 \circ t_1$
-  \item \textbf{Identity}: The identity tool $\id_D$ (no-op transform)
-\end{itemize}
-\end{definition}
-
-Key results from Part II:
-\begin{enumerate}
-  \item \textbf{Capability Tokens as Representable Functors}: A capability token for tool $t$ is the representable functor $\Hom_\Tl(t, -)$, which ``sees'' exactly those tools composable with $t$.
-  \item \textbf{MCP Universality}: The Model Context Protocol satisfies a Yoneda-like universality property---any tool discoverable by an agent can be invoked through MCP.
-  \item \textbf{Sandbox Isolation}: E2B sandboxes define a categorical quotient $\Tl / \sim$ restricting available morphisms, with the inclusion functor preserving compositionality within the restricted set.
-\end{enumerate}
-
-The production reference is Agent-Hero's 3-tier tool registry: Builtin (6 tools), Sandbox (6 tools), and MCP (runtime-discovered), unified under the Vercel AI SDK's \texttt{tool()} interface.
-
-\subsection{Part III: Memory Layer --- Memory as Functor}
-
-In Part III, we formalized agent memory as a functor from schema categories to storage categories, with ContextFS as the reference implementation.
-
-\begin{definition}[Memory Functor, from Part III]
-\label{def:memory-functor}
-The memory functor $\Mem: \catS \to \mathbf{St}$ maps:
-\begin{itemize}
-  \item \textbf{Schema objects} $S \in \catS$ (typed schemas like \texttt{DecisionData}, \texttt{FactData}) to \textbf{storage objects} $\Mem(S) \in \mathbf{St}$ (backend tables/collections)
-  \item \textbf{Schema morphisms} $f: S_1 \to S_2$ (type transformations) to \textbf{storage morphisms} $\Mem(f): \Mem(S_1) \to \Mem(S_2)$ (data migrations)
-\end{itemize}
-\end{definition}
-
-Key results from Part III:
-\begin{enumerate}
-  \item \textbf{$\mathrm{Mem}[S]$ is Representable}: The typed memory wrapper $\mathrm{Mem}[S]$ is a representable functor, connecting to the Yoneda lemma: natural transformations $\Nat(\Hom(S,-), \Mem) \cong \Mem(S)$.
-  \item \textbf{Versioning as Temporal Functor}: $\mathrm{VersionedMem}[S]$ defines a functor over the ordered set of timestamps, with change reasons (Observation, Inference, Correction, Decay) as morphisms.
-  \item \textbf{Graph Lineage as 2-Categorical Structure}: Edge relations (EVOLVED\_INTO, SUPERSEDES, CONTRADICTS) define 2-cells between memory morphisms, giving memory a 2-categorical structure of its own.
-  \item \textbf{Round-Trip Type Safety}: The composition $\text{recall} \circ \text{save}: \catS \to \catS$ is naturally isomorphic to the identity, guaranteeing that type information is preserved through storage.
-\end{enumerate}
-
-The production reference is ContextFS: 24 memory types, multi-backend StorageRouter (SQLite + ChromaDB + FalkorDB + PostgreSQL), vector clocks for conflict resolution, and MCP server for universal access.
-
-\subsection{Part IV: Planner Engine --- Planning as Natural Transformation}
-
-In Part IV, we formalized the planner as a natural transformation between functors, with the marketplace as a profunctor and escrow as a monad.
-
-\begin{definition}[Planner as Natural Transformation, from Part IV]
-\label{def:planner-nat}
-Given:
-\begin{itemize}
-  \item Task functor $F: \mathbf{Jobs} \to \mathbf{Req}$ mapping jobs to requirements
-  \item Capability functor $G: \Ag \to \mathbf{Cap}$ mapping agents to capabilities
-\end{itemize}
-The planner is a natural transformation $\eta: F \Rightarrow G$ that, for each job $j$, produces a morphism $\eta_j: F(j) \to G(a_j)$ matching requirements to the most suitable agent $a_j$.
-\end{definition}
-
-Key results from Part IV:
-\begin{enumerate}
-  \item \textbf{Order Book as Profunctor}: The marketplace order book is a profunctor $P: \Ag^\op \times \mathbf{Jobs} \to \Set$, where $P(a,j)$ is the set of proposals agent $a$ can make for job $j$.
-  \item \textbf{Escrow Monad}: The escrow mechanism satisfies monad laws with unit (hold), bind (transfer), and join (settle), guaranteeing financial consistency.
-  \item \textbf{Market Clearing as Colimit}: The matching of proposals to jobs is a colimit in the transaction category, computing the ``best'' assignment from the diagram of all compatible (agent, job) pairs.
-  \item \textbf{Revenue Split as Natural Transformation}: The 70/15/15 split (operator/platform/LLM reserve) defines a natural transformation between credit functors.
-\end{enumerate}
-
-The production reference is Agent-Hero's marketplace: Job $\to$ Proposal $\to$ Contract lifecycle with atomic credit operations via Supabase RPC.
-
-%% ============================================================
-\section{The AI OS 2-Category}
-\label{sec:two-category}
-
-We now construct the central object of this paper: the 2-category $\AIOS$.
-
-\subsection{Construction}
-
-\begin{definition}[The AI OS 2-Category]
-\label{def:aios}
-The AI Operating System 2-category $\AIOS$ consists of:
-\begin{enumerate}
-  \item \textbf{0-cells}: The objects of the agent category $\Ag$ (Definition~\ref{def:agent-cat}). Each 0-cell is an agent profile $a = (id, \sigma, \tau, \omega)$.
-
-  \item \textbf{1-cells}: For 0-cells $a, b$, the 1-cells $a \to b$ are \emph{tool-mediated data flows}---compositions of tool morphisms from $\Tl$ (Definition~\ref{def:tool-cat}) that transform the output type of agent $a$ into the input type of agent $b$:
-  \[
-  \AIOS(a,b) = \{ t \in \mathrm{Mor}(\Tl) \mid \mathrm{src}(t) \in \mathrm{output}(a), \, \mathrm{tgt}(t) \in \mathrm{input}(b) \}
-  \]
-
-  \item \textbf{2-cells}: For 1-cells $t, t': a \to b$, the 2-cells $\alpha: t \Rightarrow t'$ are \emph{planning transformations}---reconfigurations of tool chains mediated by the planner (Definition~\ref{def:planner-nat}). A 2-cell represents a decision to replace one tool chain with another while preserving the agent interface.
-
-  \item \textbf{Horizontal composition}: For 1-cells $t: a \to b$ and $s: b \to c$, horizontal composition is tool chaining: $s \circ_h t: a \to c$.
-
-  \item \textbf{Vertical composition}: For 2-cells $\alpha: t \Rightarrow t'$ and $\beta: t' \Rightarrow t''$, vertical composition is sequential replanning: $\beta \circ_v \alpha: t \Rightarrow t''$.
-
-  \item \textbf{Identity 1-cell}: $\id_a$ is the identity tool that passes agent $a$'s output through unchanged.
-
-  \item \textbf{Identity 2-cell}: $\id_t$ is the trivial plan that keeps tool chain $t$ unchanged.
-\end{enumerate}
-\end{definition}
-
-\begin{center}
-\begin{tikzcd}[column sep=4em, row sep=3em]
-a \arrow[r, bend left=40, "t"{name=U}]
-  \arrow[r, bend right=40, "t'"'{name=D}]
-  \arrow[Rightarrow, from=U, to=D, "\alpha"]
-& b \arrow[r, bend left=40, "s"{name=V}]
-  \arrow[r, bend right=40, "s'"'{name=E}]
-  \arrow[Rightarrow, from=V, to=E, "\beta"]
-& c
-\end{tikzcd}
-\end{center}
-
-\subsection{Coherence: The Interchange Law}
-
-\begin{theorem}[Interchange Law for $\AIOS$]
-\label{thm:interchange}
-For composable 2-cells in $\AIOS$:
-\[
-\begin{tikzcd}[column sep=3em, row sep=2em]
-a \arrow[r, bend left=50, "t_1"{name=A}]
-  \arrow[r, "t_2"{name=B, description}]
-  \arrow[r, bend right=50, "t_3"'{name=C}]
-& b \arrow[r, bend left=50, "s_1"{name=D}]
-  \arrow[r, "s_2"{name=E, description}]
-  \arrow[r, bend right=50, "s_3"'{name=F}]
-& c
-\arrow[Rightarrow, from=A, to=B, "\alpha"]
-\arrow[Rightarrow, from=B, to=C, "\gamma"]
-\arrow[Rightarrow, from=D, to=E, "\beta"]
-\arrow[Rightarrow, from=E, to=F, "\delta"]
-\end{tikzcd}
-\]
-the interchange law holds:
-\[
-(\alpha \circ_h \beta) \circ_v (\gamma \circ_h \delta) = (\alpha \circ_v \gamma) \circ_h (\beta \circ_v \delta)
-\]
-\end{theorem}
-
-\begin{proof}
-We verify the interchange law by showing both sides produce the same planning transformation.
-
-\textbf{Left side}: $(\alpha \circ_h \beta) \circ_v (\gamma \circ_h \delta)$.
-\begin{itemize}
-  \item $\alpha \circ_h \beta$: The planner first reconfigures both the $a \to b$ and $b \to c$ tool chains simultaneously, producing a horizontal composition $t_2 \circ_h s_2$ from $t_1 \circ_h s_1$.
-  \item Then $\gamma \circ_h \delta$ further reconfigures to $t_3 \circ_h s_3$.
-  \item The total effect: $t_1 \circ_h s_1 \leadsto t_3 \circ_h s_3$.
+  \item Each subsystem can be understood as an object in a module category, with
+        its public API defining the morphisms available to other subsystems.
+  \item Composition of subsystems corresponds to constructing products and coproducts
+        in this category: the umbrella application is a product of its component
+        applications, while the storage router is a coproduct of backends.
+  \item The type-safe interfaces between subsystems (behaviours, typespecs, message
+        protocols) act as natural transformations that preserve structure across
+        module boundaries.
 \end{itemize}
 
-\textbf{Right side}: $(\alpha \circ_v \gamma) \circ_h (\beta \circ_v \delta)$.
-\begin{itemize}
-  \item $\alpha \circ_v \gamma$: The planner reconfigures the $a \to b$ chain sequentially: $t_1 \leadsto t_2 \leadsto t_3$.
-  \item $\beta \circ_v \delta$: Independently reconfigures $b \to c$: $s_1 \leadsto s_2 \leadsto s_3$.
-  \item Horizontal composition: $t_3 \circ_h s_3$.
-  \item The total effect: $t_1 \circ_h s_1 \leadsto t_3 \circ_h s_3$.
-\end{itemize}
+However, the implementation does not require the reader to be fluent in categorical
+language. Throughout this paper, we present all constructions concretely in terms of
+Elixir modules, supervision trees, and message-passing protocols. The categorical
+perspective serves as background context for readers who find it illuminating, not
+as a prerequisite for understanding the system.
 
-Both sides produce the same final configuration $t_3 \circ_h s_3$ from $t_1 \circ_h s_1$. The key property enabling this is that tool composition in $\Tl$ is associative (Part II, Theorem 4.2) and that planning transformations are natural (Part IV, Theorem 5.1), which together guarantee that the order of replanning does not affect the final tool chain.
+\subsection{Paper Outline}
 
-Formally, this follows because $\AIOS(a,b)$ is a well-defined category for each pair $(a,b)$ (the tool category restricted to compatible types), and horizontal composition is a bifunctor $\AIOS(a,b) \times \AIOS(b,c) \to \AIOS(a,c)$ by the functoriality of tool composition (Part II).
-\end{proof}
+Section~\ref{sec:subsystems} reviews the four subsystems and their public interfaces.
+Section~\ref{sec:umbrella} presents the umbrella application and its supervision tree.
+Section~\ref{sec:pairwise} analyzes the six pairwise compositions and their emergent
+capabilities.  Section~\ref{sec:full-composition} shows the full four-way composition
+through a complete job lifecycle.  Section~\ref{sec:production} describes the
+production deployment in the Agent-Hero marketplace.  Section~\ref{sec:properties}
+establishes key system properties: fault isolation, type safety, and resource fairness.
+Section~\ref{sec:related} surveys related work, and Section~\ref{sec:conclusion}
+concludes.
 
-\subsection{Memory as Endofunctor}
 
-\begin{definition}[Memory Endofunctor]
-\label{def:memory-endofunctor}
-The memory endofunctor $\Mem: \AIOS \to \AIOS$ acts as follows:
-\begin{itemize}
-  \item \textbf{On 0-cells}: $\Mem(a) = (a, \mu_a)$ where $\mu_a$ is agent $a$'s accumulated memory state (the image under the memory functor from Part III).
-  \item \textbf{On 1-cells}: $\Mem(t: a \to b) = \hat{t}: \Mem(a) \to \Mem(b)$ where $\hat{t}$ is the tool $t$ augmented with memory context---$\hat{t}$ reads from $\mu_a$, executes $t$, and writes results to $\mu_b$.
-  \item \textbf{On 2-cells}: $\Mem(\alpha: t \Rightarrow t') = \hat{\alpha}: \hat{t} \Rightarrow \hat{t}'$ where $\hat{\alpha}$ is the planning transformation $\alpha$ augmented with memory migration---when the planner switches tool chains, memory schemas are updated accordingly.
-\end{itemize}
-\end{definition}
+% ========================================================================
+\section{The Four Subsystems}\label{sec:subsystems}
 
-\begin{theorem}[Memory Preserves Composition]
-\label{thm:memory-preserves}
-The memory endofunctor $\Mem: \AIOS \to \AIOS$ preserves both horizontal and vertical composition:
-\begin{enumerate}
-  \item $\Mem(s \circ_h t) = \Mem(s) \circ_h \Mem(t)$ \quad (horizontal)
-  \item $\Mem(\beta \circ_v \alpha) = \Mem(\beta) \circ_v \Mem(\alpha)$ \quad (vertical)
-\end{enumerate}
-\end{theorem}
+Before examining their composition, we summarize each subsystem's architecture,
+supervision tree, and public API. The goal is to establish the \emph{interfaces}
+through which composition occurs.
 
-\begin{proof}
-\textbf{(1) Horizontal composition.} Let $t: a \to b$ and $s: b \to c$. The horizontal composition $s \circ_h t: a \to c$ chains the two tool invocations. We need:
-\[
-\Mem(s \circ_h t) = \Mem(s) \circ_h \Mem(t)
-\]
+% ------------------------------------------------------------------------
+\subsection{Agent Scheduler}\label{subsec:scheduler}
 
-The left side $\Mem(s \circ_h t) = \widehat{s \circ t}$ reads from $\mu_a$, executes $s \circ t$, and writes to $\mu_c$.
+The Agent Scheduler manages the lifecycle of AI agents as supervised BEAM processes.
+Its architecture mirrors classical OS process management, adapted for AI workloads.
 
-The right side $\Mem(s) \circ_h \Mem(t) = \hat{s} \circ \hat{t}$ first reads from $\mu_a$, executes $t$, writes to $\mu_b$; then reads from $\mu_b$, executes $s$, writes to $\mu_c$.
+\subsubsection{Supervision Tree}
 
-These are equal because the memory functor from Part III preserves composition: $\Mem(g \circ f) = \Mem(g) \circ \Mem(f)$ (Part III, Theorem 5.3). The intermediate memory state $\mu_b$ is deterministic given the input, so the factorization through $\mu_b$ is unique.
+\begin{lstlisting}[language=elixir, caption={Agent Scheduler supervision tree}]
+AgentScheduler.AppSupervisor (rest_for_one)
+  +-- Registry (unique, :agent_registry)
+  +-- AgentScheduler.Evaluator (GenServer)
+  +-- AgentScheduler.Scheduler (GenServer)
+  +-- AgentScheduler.Pipeline (GenServer)
+  +-- AgentScheduler.Supervisor (DynamicSupervisor)
+      +-- Agent "agent_001"
+      +-- Agent "agent_002"
+      +-- Agent "agent_n"
+\end{lstlisting}
 
-\textbf{(2) Vertical composition.} Let $\alpha: t \Rightarrow t'$ and $\beta: t' \Rightarrow t''$. The vertical composition $\beta \circ_v \alpha: t \Rightarrow t''$ sequences two replanning steps. We need:
-\[
-\Mem(\beta \circ_v \alpha) = \Mem(\beta) \circ_v \Mem(\alpha)
-\]
+The \texttt{:rest\_for\_one} strategy ensures that if the Registry crashes,
+all dependent components restart in order.
+The DynamicSupervisor uses \texttt{:one\_for\_one} so individual agent failures
+are isolated.
 
-This follows from the versioning structure of $\mathrm{VersionedMem}[S]$ (Part III, Section 6). Each replanning step produces a new memory version with a \texttt{ChangeReason}. Sequential replanning produces a version chain $v_1 \to v_2 \to v_3$, and the composition of version transitions is again a version transition---the temporal functor is functorial (Part III, Proposition 6.4).
-\end{proof}
+\subsubsection{Key Modules}
 
-\subsection{The Full Structure}
+\begin{description}[style=nextline]
+  \item[\texttt{AgentScheduler.Agent}]
+    A GenServer managing an individual agent's state machine:
+    \texttt{:pending} $\to$ \texttt{:running} $\to$ \texttt{:waiting\_approval}
+    $\to$ \texttt{:completed}.
+    Implements durable execution via a memoization store: each step function is
+    keyed by a unique identifier, and completed steps are replayed from the memo
+    store on crash recovery without re-execution.
 
-Combining the above, we have:
+  \item[\texttt{AgentScheduler.Scheduler}]
+    A credit-weighted priority scheduler using Erlang's \texttt{:gb\_trees}
+    (balanced binary trees) for $O(\log n)$ enqueue/dequeue.
+    Each client accumulates \emph{agent virtual runtime} (avruntime)
+    proportional to credits consumed:
+    \begin{equation}\label{eq:avruntime}
+      \text{avruntime}(c) \mathrel{+}= \frac{\kappa_A \cdot \text{cr}_0}
+                                              {\text{cr}_c \cdot w(p_c)}
+    \end{equation}
+    where $\kappa_A$ is agent cost, $\text{cr}_0 = 1000$ is the reference credit
+    amount, $\text{cr}_c$ is the client's remaining credits, and $w(p_c)$ is the
+    priority weight (4.0 for contracted, 1.0 for marketplace).
+    The scheduler always dispatches the client with the smallest avruntime.
 
-\begin{corollary}[Well-Definedness of $\AIOS$]
-\label{cor:well-defined}
-$\AIOS$ is a strict 2-category, and $\Mem: \AIOS \to \AIOS$ is a strict 2-functor (an endofunctor on the 2-category).
-\end{corollary}
+  \item[\texttt{AgentScheduler.Pipeline}]
+    Streaming pipelines with EventEmitter-style pub/sub. Each pipeline consists of
+    ordered stages declaring what event types they publish and subscribe to. The
+    pipeline constraint ensures stages only subscribe to events from earlier stages:
+    $\text{sub}(s_i) \subseteq \bigcup_{j < i} \text{pub}(s_j)$.
 
-The commutative diagram expressing the full AI OS architecture:
+  \item[\texttt{AgentScheduler.Evaluator}]
+    Six-dimensional quality evaluation across: quality, adherence, speed, cost
+    efficiency, error rate, and revision count. The composite score is a weighted
+    inner product, and reputation is computed as an EWMA:
+    $R_t = \alpha \cdot s_t + (1 - \alpha) \cdot R_{t-1}$ with $\alpha = 0.3$.
+\end{description}
 
-\begin{center}
-\begin{tikzcd}[column sep=4em, row sep=4em]
-\Ag \arrow[r, "\Tl"] \arrow[d, "\Mem"'] & \Exec \arrow[d, "\Eval"] \\
-\Ag \arrow[r, "\Plan"'] & \Exec
-\end{tikzcd}
-\end{center}
+\subsubsection{Public Interface}
 
-This diagram commutes: executing an agent with memory and then evaluating produces the same result as planning the execution with memory and then running it. This is the naturality condition for the AI OS.
+\begin{lstlisting}[language=elixir, caption={Agent Scheduler public API}]
+AgentScheduler.submit_job(client_id, job, opts)
+  :: {:ok, job_id} | {:error, term()}
 
-%% ============================================================
-\section{Emergent Properties}
-\label{sec:emergent}
+AgentScheduler.start_agent(agent_id, profile, opts)
+  :: {:ok, pid()} | {:error, term()}
 
-The composition of the four subsystems produces properties that no individual component possesses alone.
+AgentScheduler.create_pipeline(name, stages)
+  :: {:ok, pipeline_id} | {:error, term()}
 
-\subsection{Fault Tolerance from Supervision}
+AgentScheduler.get_evaluation(agent_id)
+  :: {:ok, map()} | {:error, :not_found}
+\end{lstlisting}
 
-\begin{theorem}[Fault Tolerance as Limit Preservation]
-\label{thm:fault-tolerance}
-Let $\mathrm{Sup}: \AIOS \to \AIOS$ be the supervision endofunctor that maps each agent $a$ to its supervised version $\mathrm{Sup}(a)$ (an agent monitored by an OTP supervisor). Then $\mathrm{Sup}$ preserves finite limits in $\AIOS$.
-\end{theorem}
+% ------------------------------------------------------------------------
+\subsection{Tool Interface}\label{subsec:tools}
 
-\begin{proof}
-We verify preservation of products and equalizers, which together generate all finite limits.
+The Tool Interface mediates between agents and external systems, analogous to
+device drivers in a classical operating system.
 
-\textbf{Products.} The product of agents $a$ and $b$ in $\AIOS$ is the agent $a \times b$ that executes both in parallel and outputs the pair of results. The supervised version $\mathrm{Sup}(a \times b)$ restarts $a \times b$ on failure. We need:
-\[
-\mathrm{Sup}(a \times b) \cong \mathrm{Sup}(a) \times \mathrm{Sup}(b)
-\]
+\subsubsection{Three-Tier Registry}
 
-This holds because OTP's \texttt{one\_for\_all} restart strategy restarts all children when one fails, which is equivalent to restarting the product. The projections $\pi_1: a \times b \to a$ and $\pi_2: a \times b \to b$ are preserved because supervision does not modify the data flow, only the restart behavior.
-
-\textbf{Equalizers.} The equalizer of parallel tool chains $t, t': a \to b$ is the agent $\mathrm{eq}(t,t')$ that accepts only inputs on which $t$ and $t'$ agree. Supervision preserves this because the agreement condition is a property of the computation, not the process lifecycle.
-\end{proof}
-
-\begin{remark}
-This theorem explains why OTP-based agent systems are robust: supervision is not just ``restart on failure''---it is a categorical structure that preserves the compositional properties of the system.
-\end{remark}
-
-\subsection{Type Safety Propagation}
-
-\begin{theorem}[Type Safety Through the 2-Category]
-\label{thm:type-safety}
-Let $\mathrm{Type}: \AIOS \to \Set$ be the type functor that maps each agent to its input/output type schema and each tool to its type transformation. If each component (agent, tool, memory operation) is type-safe, then any composite operation in $\AIOS$ is type-safe.
-\end{theorem}
-
-\begin{proof}
-We prove this by showing that $\mathrm{Type}$ is a 2-functor, hence preserves all composition.
-
-For horizontal composition: if $t: A \to B$ has type $\tau_A \to \tau_B$ and $s: B \to C$ has type $\tau_B \to \tau_C$, then $s \circ_h t$ has type $\tau_A \to \tau_C$ by the compositionality of type systems. The intermediate type $\tau_B$ is checked at the 1-cell composition boundary.
-
-For vertical composition: if $\alpha: t \Rightarrow t'$ is a planning transformation, both $t$ and $t'$ have the same boundary types (they go between the same agents). The planner's natural transformation condition (Part IV, Theorem 5.1) ensures type preservation.
-
-The memory endofunctor preserves types by Part III, Theorem 7.2 (round-trip type safety of $\mathrm{Mem}[S]$).
-
-By induction on the depth of composition, every well-typed component system produces a well-typed composite. This is the ``free theorem'' of categorical type safety.
-\end{proof}
-
-\subsection{Market Equilibrium as Colimit}
-
-\begin{proposition}[Market Clearing]
-\label{prop:market-colimit}
-In the transaction category $\catT$ where objects are (agent, job) pairs and morphisms are proposals, the market clearing assignment is a colimit of the diagram of all active proposals.
-\end{proposition}
-
-\begin{proof}[Proof sketch]
-The diagram $D: \catP \to \catT$ consists of all active proposals as morphisms from agents to jobs. A cocone over $D$ is an assignment of agents to jobs such that every proposal is ``covered'' (either accepted or dominated by a better one). The colimit is the universal such assignment---the one that maximizes the total quality score while respecting budget constraints.
-
-In Agent-Hero's implementation, this corresponds to the acceptance of the highest-scored proposal for each job, with the budget ceiling as the constraint. The universality follows from the fact that any other valid assignment factors through this optimal one via proposal dominance morphisms.
-\end{proof}
-
-\subsection{Reputation as Presheaf}
-
-\begin{proposition}[Reputation Presheaf]
-\label{prop:reputation}
-The reputation system defines a presheaf $R: \Eval^\op \to \Set$ on the evaluation category, where $R(e)$ is the set of agents that have achieved evaluation $e$ or better.
-\end{proposition}
-
-\begin{proof}
-The evaluation category $\Eval$ has objects in $\mathbb{R}^6$ (6-dimensional quality vectors) and morphisms given by component-wise inequality: $e \to e'$ iff $e_i \leq e'_i$ for all $i$. This is a poset, hence a category.
-
-The contravariant functor $R: \Eval^\op \to \Set$ maps:
-\begin{itemize}
-  \item Each evaluation $e$ to the set $R(e) = \{a \in \Ag \mid \mathrm{score}(a) \geq e\}$ of agents meeting that threshold
-  \item Each morphism $e \leq e'$ to the inclusion $R(e') \hookrightarrow R(e)$ (higher thresholds have fewer qualifying agents)
-\end{itemize}
-
-This satisfies the presheaf conditions: $R(\id_e) = \id_{R(e)}$ and $R(f \circ g) = R(g) \circ R(f)$ (contravariance reverses composition, and set inclusion is functorial).
-\end{proof}
-
-\subsection{Escrow Consistency}
-
-\begin{theorem}[Financial Consistency via Escrow Monad]
-\label{thm:escrow}
-The escrow monad $E$ on the credit category $\mathbf{Cred}$ (Part IV, Theorem 7.1) interacts correctly with the memory functor $\Mem$: the composition $\Mem \circ E$ preserves the monad laws, ensuring that financial state is consistently persisted.
-\end{theorem}
-
-\begin{proof}
-We verify the three monad laws for $\Mem \circ E$:
-\begin{enumerate}
-  \item \textbf{Left unit}: $\Mem(\mu) \circ \Mem(\eta_{E(-)}) = \Mem(\mu \circ \eta_{E(-)}) = \Mem(\id) = \id$ where $\mu$ is the multiplication and $\eta$ is the unit. This uses functoriality of $\Mem$ and the left unit law of $E$.
-  \item \textbf{Right unit}: Symmetric argument.
-  \item \textbf{Associativity}: $\Mem(\mu) \circ \Mem(\mu_{E(-)}) = \Mem(\mu) \circ \Mem(E(\mu))$ by the associativity of $E$ and functoriality of $\Mem$.
-\end{enumerate}
-
-Concretely, this means: holding escrow (unit), transferring credits (bind), and settling (join) produce consistent memory states regardless of the order in which concurrent operations are persisted. This is guaranteed in the Elixir implementation by Mnesia's transactional semantics combined with the atomic RPC operations inherited from Agent-Hero.
-\end{proof}
-
-%% ============================================================
-\section{The Linux Analogy: Formal Correspondence}
-\label{sec:linux}
-
-\subsection{The Correspondence Table}
+Tools are organized into three trust tiers:
 
 \begin{table}[H]
 \centering
-\caption{Formal correspondence between Linux, AI OS, and Category Theory}
-\label{tab:correspondence}
-\begin{tabular}{llll}
+\caption{Tool tiers in the 3-tier registry}
+\begin{tabular}{lll}
 \toprule
-\textbf{Linux Subsystem} & \textbf{AI OS Module} & \textbf{Category} & \textbf{Paper} \\
+\textbf{Tier} & \textbf{Trust Level} & \textbf{Examples} \\
 \midrule
-Process scheduler (CFS) & Agent scheduler & $\Ag$ (0-cells) & Part I \\
-System calls & Tool invocations & $\Tl$ (1-cells) & Part II \\
-Device drivers & MCP tool drivers & $\Tl$ morphisms & Part II \\
-Virtual memory & Context memory & $\Mem$ functor & Part III \\
-Filesystem (ext4/ZFS) & Knowledge store & $\mathbf{St}$ category & Part III \\
-init/systemd & Planner engine & $\Plan$ (2-cells) & Part IV \\
-Package manager & Agent marketplace & Profunctor & Part IV \\
-Pipes/IPC & Agent messaging & $\AIOS$ composition & Synthesis \\
-Permissions/ACLs & Capability tokens & Subobject classifier & Part II \\
-Kernel modules & Hot-loaded agents & Functorial update & Part I \\
-syslog/metrics & Execution telemetry & $\Eval$ functor & Part I \\
-Process groups & Supervision trees & Limit-preserving & Part I \\
+Builtin  & Static, trusted   & \texttt{web-search}, \texttt{text-transform}, \texttt{pdf-parse} \\
+Sandbox  & Isolated execution & \texttt{code-exec}, \texttt{shell-exec}, \texttt{git-clone} \\
+MCP      & Runtime-discovered & \texttt{server\_\_tool} (namespaced) \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\subsection{The Functorial Correspondence}
+The registry supports \emph{freezing}: once frozen, no new tools can be registered.
+This implements contract-locked configuration where the tool set is immutable during
+agent execution.
 
-\begin{theorem}[Linux--AI OS Functor]
-\label{thm:linux-functor}
-There exists a structure-preserving functor $\Phi: \mathbf{Linux} \to \AIOS$ from the (simplified) Linux operating system category to the AI OS 2-category.
-\end{theorem}
+\subsubsection{Capability Tokens}
 
-\begin{proof}[Proof sketch]
-Define the Linux category $\mathbf{Linux}$ with:
-\begin{itemize}
-  \item Objects: processes (identified by PID)
-  \item Morphisms: system calls and pipe connections
-  \item Composition: pipe chaining
-\end{itemize}
+Access control is capability-based. Each agent holds unforgeable tokens that
+grant specific permissions on specific tools:
 
-The functor $\Phi$ maps:
-\begin{itemize}
-  \item Processes $\mapsto$ agents (0-cells)
-  \item System calls $\mapsto$ tool invocations (1-cells)
-  \item Pipe composition $\mapsto$ tool chain composition
-\end{itemize}
+\begin{lstlisting}[language=elixir, caption={Capability token structure}]
+%ToolInterface.Capability{
+  agent_id: "agent-1",
+  tool_id: "web-search",
+  permissions: [:invoke, :inspect],
+  rate_limit: 60,           # invocations per minute
+  expires_at: ~U[...],
+  signature: <<hmac_sha256>>  # tamper detection
+}
+\end{lstlisting}
 
-$\Phi$ preserves composition because pipe chaining in Linux is associative (standard result in Unix process theory) and tool chaining in $\Tl$ is associative (Part II, Theorem 4.2).
+Authorization checks: (1)~tool ID matches, (2)~token not expired,
+(3)~HMAC signature valid, (4)~\texttt{:invoke} permission present,
+(5)~rate limit not exceeded. Constant-time comparison prevents timing attacks.
 
-$\Phi$ preserves identities: the no-op system call maps to the identity tool.
+\subsubsection{Sandboxed Execution}
 
-$\Phi$ preserves the fork/exec pattern: forking a process maps to spawning an agent via \texttt{DynamicSupervisor.start\_child/2}, and exec maps to the agent's system prompt binding.
-\end{proof}
+Sandbox-tier tools execute in isolated BEAM processes with their own heaps:
 
-\subsection{Where the Analogy Breaks Down}
+\begin{lstlisting}[language=elixir, caption={Sandbox execution via spawn\_monitor}]
+def execute(tool_spec, input, opts) do
+  timeout = Keyword.get(opts, :timeout, 600_000)
+  parent = self()
+  ref = make_ref()
 
-The functor $\Phi$ is faithful (injective on morphisms) but not full (not surjective). The AI OS has structures absent from Linux:
+  {pid, monitor_ref} = spawn_monitor(fn ->
+    result = tool_spec.execute.(input)
+    send(parent, {:sandbox_result, ref, result})
+  end)
 
-\begin{enumerate}
-  \item \textbf{2-cells (Planning)}: Linux has no built-in notion of runtime reconfiguration of pipe chains by a global planner. The closest analog is a shell script, but shell scripts are not first-class objects managed by the kernel.
+  receive do
+    {:sandbox_result, ^ref, result} ->
+      Process.demonitor(monitor_ref, [:flush])
+      result
+    {:DOWN, ^monitor_ref, :process, ^pid, reason} ->
+      {:error, {:sandbox_crashed, reason}}
+  after
+    timeout ->
+      Process.exit(pid, :kill)
+      {:error, :timeout}
+  end
+end
+\end{lstlisting}
 
-  \item \textbf{Semantic memory}: Linux files are untyped byte streams. AI OS memory has typed schemas, versioning, semantic search, and graph relationships---structure that a traditional filesystem cannot express.
+Each execution is time-bounded (default 10 minutes, matching E2B sandbox behavior),
+error-contained, and cleaned up via monitor-based process reaping.
 
-  \item \textbf{Marketplace dynamics}: Linux has no resource market. CPU time is allocated by the scheduler, not bid upon. The planner's order book mechanism has no kernel equivalent.
+\subsubsection{Audit Logging}
 
-  \item \textbf{Quality evaluation}: Linux does not score process output quality. The evaluation functor $\Eval$ is specific to the AI OS.
-\end{enumerate}
+Every tool invocation is logged asynchronously via \texttt{GenServer.cast/2},
+recording: agent ID, tool ID, input (with sensitive fields redacted), output,
+duration, and status. The asynchronous cast ensures audit overhead does not
+impact tool invocation latency.
 
-These are precisely the features that make an AI OS more than a process manager---they are the \emph{intelligence-specific} abstractions.
+\subsubsection{Public Interface}
 
-%% ============================================================
-\section{Implementation in Elixir/OTP}
-\label{sec:implementation}
+\begin{lstlisting}[language=elixir, caption={Tool Interface public API}]
+ToolInterface.invoke(agent_id, tool_id, input, capability_token)
+  :: {:ok, result} | {:error, term()}
 
-\subsection{Why BEAM Is the Natural Substrate}
+ToolInterface.grant_capability(agent_id, tool_id, opts)
+  :: {:ok, Capability.t()} | {:error, term()}
 
-The correspondence between $\AIOS$ and Erlang/OTP is remarkably precise:
+ToolInterface.discover_mcp(server_name, url, token)
+  :: :ok | {:error, term()}
+
+ToolInterface.freeze()
+  :: :ok
+
+ToolInterface.list_tools(tier)
+  :: [tool_spec()]
+\end{lstlisting}
+
+% ------------------------------------------------------------------------
+\subsection{Memory Layer}\label{subsec:memory}
+
+The Memory Layer provides a typed filesystem for persistent agent cognition,
+with 24 schema types organized into 6 subcategories.
+
+\subsubsection{Schema Type System}
 
 \begin{table}[H]
 \centering
-\caption{$\AIOS$ to OTP mapping}
-\label{tab:otp}
-\begin{tabular}{lll}
+\caption{The 24 memory types across 6 subcategories}
+\begin{tabular}{ll}
 \toprule
-\textbf{$\AIOS$ Concept} & \textbf{OTP Primitive} & \textbf{Correspondence} \\
+\textbf{Subcategory} & \textbf{Types} \\
 \midrule
-0-cell (agent) & GenServer process & Stateful entity with mailbox \\
-1-cell (tool) & Message + function call & Morphism = message passing \\
-2-cell (plan) & Supervisor strategy & Higher-order coordination \\
-$\Mem$ endofunctor & ETS + Mnesia & State preservation \\
-Horizontal composition & Process linking & Pipeline chaining \\
-Vertical composition & Code upgrade & Runtime reconfiguration \\
-Limit preservation & Supervision tree & Fault tolerance \\
+Core       & \texttt{fact}, \texttt{decision}, \texttt{procedural}, \texttt{episodic} \\
+Extended   & \texttt{todo}, \texttt{issue}, \texttt{api}, \texttt{schema\_def} \\
+Workflow   & \texttt{workflow}, \texttt{task}, \texttt{step}, \texttt{agent\_run} \\
+Metadata   & \texttt{tag}, \texttt{annotation}, \texttt{embedding}, \texttt{index} \\
+System     & \texttt{config}, \texttt{session}, \texttt{context}, \texttt{log} \\
+Relational & \texttt{person}, \texttt{project}, \texttt{artifact}, \texttt{event} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\subsection{Unified Supervisor Architecture}
+Each schema is an Elixir struct with \texttt{@enforce\_keys} for compile-time
+safety and \texttt{@type} annotations for Dialyzer checking. The Schema Registry
+maps name strings to modules for runtime type resolution:
 
-The AI OS umbrella application composes all four subsystems under a single OTP supervisor:
+\begin{lstlisting}[language=elixir, caption={Schema Registry: name to module resolution}]
+# Initialization
+%{
+  "fact"       => MemoryLayer.Schema.FactData,
+  "decision"   => MemoryLayer.Schema.DecisionData,
+  "procedural" => MemoryLayer.Schema.ProceduralData,
+  "episodic"   => MemoryLayer.Schema.EpisodicData,
+  "todo"       => MemoryLayer.Schema.TodoData,
+  "issue"      => MemoryLayer.Schema.IssueData,
+  "workflow"   => MemoryLayer.Schema.WorkflowData,
+  "agent_run"  => MemoryLayer.Schema.AgentRunData
+}
+\end{lstlisting}
 
-\begin{lstlisting}[language=erlang, caption={AgentOS Application Supervisor (Elixir)}, label={lst:app}]
+\subsubsection{Dual-Layer Storage}
+
+Memories are persisted to two backends simultaneously:
+
+\begin{description}
+  \item[ETS (Working Memory)] --- In-process, microsecond access, volatile.
+    Analogous to human working memory. Used for active memories during
+    agent execution.
+  \item[Mnesia (Persistent Knowledge)] --- Distributed, ACID-transactional,
+    disk-backed. Analogous to long-term memory. Survives process crashes
+    and node restarts.
+\end{description}
+
+The storage router implements a read-through cache: recall checks ETS first
+(fast path), falls back to Mnesia (durable path), and promotes retrieved
+memories to ETS for future access. LRU eviction keeps working memory bounded.
+
+\subsubsection{Versioning and Graph}
+
+Memories evolve over time. The \texttt{evolve/3} operation creates a new
+memory linked to its parent via:
+
+\begin{enumerate}
+  \item A \textbf{version record} in Mnesia with causal annotation
+        (observation, inference, correction, decay) and a vector clock
+        for multi-agent conflict detection.
+  \item A \textbf{graph edge} connecting parent to child via one of nine
+        typed relations: \texttt{evolved\_into}, \texttt{references},
+        \texttt{supersedes}, \texttt{contradicts}, \texttt{supports},
+        \texttt{derived\_from}, \texttt{part\_of}, \texttt{triggers},
+        \texttt{blocked\_by}.
+\end{enumerate}
+
+Content hashing (SHA-256) enables deduplication: two memories with
+identical content share the same hash.
+
+\subsubsection{Public Interface}
+
+\begin{lstlisting}[language=elixir, caption={Memory Layer public API}]
+MemoryLayer.Memory.create(schema_struct)
+  :: {:ok, pid()} | {:error, term()}
+
+MemoryLayer.Memory.data(pid)
+  :: {:ok, struct()} | {:error, :deleted}
+
+MemoryLayer.Memory.evolve(pid, changes, reason)
+  :: {:ok, child_pid} | {:error, term()}
+
+MemoryLayer.Storage.search(query, opts)
+  :: {:ok, [map()]} | {:error, term()}
+
+MemoryLayer.Graph.link(from_id, to_id, relation, metadata)
+  :: :ok | {:error, term()}
+
+MemoryLayer.Graph.traverse(start_id, pattern, opts)
+  :: [String.t()]
+\end{lstlisting}
+
+% ------------------------------------------------------------------------
+\subsection{Planner Engine}\label{subsec:planner}
+
+The Planner Engine is the highest-level orchestration layer, implementing
+market-based job matching and financial settlement.
+
+\subsubsection{Order Book}
+
+The order book maintains two sides:
+
+\begin{description}
+  \item[Demands (Buy Orders)] --- Posted by clients, specifying required
+    capabilities, budget ceiling, and deadline.
+  \item[Proposals (Sell Orders)] --- Submitted by agents, specifying
+    execution plan, estimated credits, duration, and confidence score.
+\end{description}
+
+Matching uses price-time priority: proposals are sorted by
+\texttt{(estimated\_credits ASC, timestamp ASC)}. A match occurs when the
+best proposal's credits $\leq$ demand's budget ceiling. Upon match, all
+other proposals are auto-rejected.
+
+The cost functional for ranking proposals is:
+\begin{equation}\label{eq:cost-functional}
+  \text{cost}(\alpha, \tau) = \frac{\text{estimated\_credits}}
+                                    {1 + \text{confidence} \times \text{reputation}}
+\end{equation}
+
+\subsubsection{Escrow}
+
+Financial transactions use Mnesia-backed escrow:
+
+\begin{enumerate}
+  \item \texttt{hold(client\_id, amount, contract\_id)} --- Atomically moves
+        credits from available to held. Fails on insufficient funds.
+  \item \texttt{settle(escrow\_id, :release)} --- Transfers held credits to
+        the operator (job completed successfully).
+  \item \texttt{settle(escrow\_id, :refund)} --- Returns held credits to the
+        client (job cancelled or disputed).
+\end{enumerate}
+
+All balance mutations occur within Mnesia transactions, providing atomicity
+(no TOCTOU races), isolation (serialized concurrent operations), and durability
+(committed transactions survive crashes).
+
+The \textbf{conservation invariant} is maintained: total credits in the system
+(available + held + distributed) is constant. No operation creates or destroys credits.
+
+\subsubsection{Job Decomposition}
+
+The Decomposer transforms a task into a DAG of subtasks with dependency edges.
+Topological sort produces execution levels where each level contains subtasks
+that can execute in parallel:
+
+\begin{lstlisting}[language=elixir, caption={Parallel execution schedule from DAG decomposition}]
+task = %{
+  id: "task_42",
+  subtask_specs: [
+    %{description: "E2E tests",
+      required_capabilities: [:playwright],
+      estimated_credits: 1000, estimated_duration: 60},
+    %{description: "Load tests",
+      required_capabilities: [:k6],
+      estimated_credits: 800, estimated_duration: 45},
+    %{description: "Generate report",
+      required_capabilities: [:reporting],
+      estimated_credits: 200, estimated_duration: 15,
+      depends_on: [0, 1]}
+  ]
+}
+
+{:ok, dag} = PlannerEngine.Decomposer.decompose(task)
+schedule = PlannerEngine.Decomposer.topological_sort(dag)
+# => [["task_42_sub_0", "task_42_sub_1"], ["task_42_sub_2"]]
+#     Level 0: E2E + Load in parallel
+#     Level 1: Report after both complete
+\end{lstlisting}
+
+\subsubsection{Revenue Distribution}
+
+Upon contract completion, escrowed credits are distributed:
+
+\begin{table}[H]
+\centering
+\caption{Revenue split on contract completion}
+\begin{tabular}{lr}
+\toprule
+\textbf{Recipient} & \textbf{Share} \\
+\midrule
+Operator (agent who performed work) & 70\% \\
+Platform (marketplace fee)          & 15\% \\
+LLM Reserve (inference costs)       & 15\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Reputation and Anti-Gaming}
+
+The reputation system scores agents across 6 dimensions (accuracy, completeness,
+timeliness, communication, efficiency, innovation) using exponentially-weighted
+moving averages with decay factor $\lambda = 0.95$:
+
+\begin{equation}\label{eq:reputation}
+  R(\alpha) = \frac{\sum_{i=1}^{N} \lambda^{N-i} \langle w, q_i \rangle}
+                    {\sum_{i=1}^{N} \lambda^{N-i}}
+\end{equation}
+
+The trust score incorporates anti-gaming detection:
+\begin{equation}\label{eq:trust}
+  T(\alpha) = R(\alpha) \times (1 - \gamma(\alpha)) \times \min\!\Big(1, \frac{N(\alpha)}{N_{\min}}\Big)
+\end{equation}
+where $\gamma(\alpha)$ is the gaming suspicion score (0 to 1) and $N_{\min} = 5$
+is the seasoning threshold. Five anomaly detectors run on each evaluation:
+score inflation, rapid cycling, perfect streaks, self-dealing, and collusion rings.
+
+
+% ========================================================================
+\section{The Umbrella Application}\label{sec:umbrella}
+
+With the four subsystems defined, we now construct the \texttt{AgentOS}
+umbrella application that composes them into a unified runtime.
+
+\subsection{Mix Project Configuration}
+
+In Elixir's build system, an umbrella application declares its child
+applications as path dependencies:
+
+\begin{lstlisting}[language=elixir, caption={mix.exs for the AgentOS umbrella}]
+defmodule AgentOS.MixProject do
+  use Mix.Project
+
+  def project do
+    [
+      app: :agent_os,
+      version: "0.1.0",
+      elixir: "~> 1.17",
+      deps: deps()
+    ]
+  end
+
+  def application do
+    [
+      extra_applications: [:logger, :mnesia],
+      mod: {AgentOS.Application, []}
+    ]
+  end
+
+  defp deps do
+    [
+      {:agent_scheduler, path: "../agent_scheduler"},
+      {:tool_interface, path: "../tool_interface"},
+      {:memory_layer, path: "../memory_layer"},
+      {:planner_engine, path: "../planner_engine"},
+      {:jason, "~> 1.4"},
+      {:telemetry, "~> 1.3"}
+    ]
+  end
+end
+\end{lstlisting}
+
+The \texttt{path:} dependencies tell Mix that these are local applications
+within the same repository. Each compiles independently and exposes its
+public modules to the umbrella.
+
+\subsection{Startup Ordering}\label{subsec:startup}
+
+The most critical design decision in the umbrella is the \emph{startup order}
+of child applications. The order is not arbitrary---it reflects the dependency
+graph between subsystems.
+
+\begin{lstlisting}[language=elixir, caption={AgentOS.Application: ordered supervision tree}]
 defmodule AgentOS.Application do
   use Application
 
   @impl true
   def start(_type, _args) do
     children = [
-      # Layer 1: Memory (foundation)
+      # Layer 1: Memory -- foundation for all state
       {MemoryLayer, []},
-      # Layer 2: Tools (depends on memory)
+
+      # Layer 2: Tools -- depends on memory for
+      #          capability storage
       {ToolInterface, []},
-      # Layer 3: Scheduler (depends on tools + memory)
+
+      # Layer 3: Scheduler -- depends on tools and memory
       {AgentScheduler, []},
-      # Layer 4: Planner (depends on all three)
+
+      # Layer 4: Planner -- depends on all three
       {PlannerEngine, []}
     ]
 
@@ -684,357 +742,1296 @@ defmodule AgentOS.Application do
 end
 \end{lstlisting}
 
-The startup order Memory $\to$ Tools $\to$ Scheduler $\to$ Planner reflects the categorical dependency: the functor $\Mem$ must exist before morphisms ($\Tl$) can operate on it, objects ($\Ag$) need both, and natural transformations ($\Plan$) require the full structure.
+\subsubsection{Why This Order?}
 
-\subsection{Message Passing as Morphism Composition}
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  node distance=1.8cm,
+  layer/.style={draw, rounded corners, minimum width=10cm,
+                minimum height=1.2cm, font=\ttfamily\small,
+                fill=blue!5},
+  arrow/.style={-{Stealth[length=8pt]}, thick, gray}
+]
+  \node[layer, fill=purple!8] (planner) {Layer 4: PlannerEngine};
+  \node[layer, fill=green!8, below=0.5cm of planner] (scheduler) {Layer 3: AgentScheduler};
+  \node[layer, fill=orange!8, below=0.5cm of scheduler] (tools) {Layer 2: ToolInterface};
+  \node[layer, fill=blue!8, below=0.5cm of tools] (memory) {Layer 1: MemoryLayer};
 
-In the Elixir prototype, tool invocations between agents are implemented as GenServer calls:
+  \draw[arrow] (planner.south) -- (scheduler.north) node[midway, right, font=\scriptsize] {orchestrates agents};
+  \draw[arrow] (scheduler.south) -- (tools.north) node[midway, right, font=\scriptsize] {invokes tools};
+  \draw[arrow] (tools.south) -- (memory.north) node[midway, right, font=\scriptsize] {stores capabilities};
+  \draw[arrow] (planner.west) to[out=180,in=180] node[midway, left, font=\scriptsize] {reads reputation} (memory.west);
+  \draw[arrow] (scheduler.west) to[out=190,in=170] node[midway, left, font=\scriptsize\hspace{-1em}] {persists state} (memory.west);
+\end{tikzpicture}
+\caption{AgentOS supervision tree with dependency arrows. Each layer depends on
+all layers below it. Startup proceeds bottom-up.}
+\label{fig:supervision}
+\end{figure}
 
-\begin{lstlisting}[language=erlang, caption={Tool-mediated agent communication}, label={lst:tool-comm}]
-defmodule AgentScheduler.Pipeline do
-  @doc "Execute a tool chain between agents"
-  @spec execute_chain([Agent.t()], [Tool.t()]) ::
-    {:ok, term()} | {:error, term()}
-  def execute_chain(agents, tools) do
-    Enum.zip(agents, tools)
-    |> Enum.reduce({:ok, nil}, fn
-      {agent, tool}, {:ok, input} ->
-        GenServer.call(agent, {:invoke_tool, tool, input})
-      _, error -> error
-    end)
+The ordering reflects a strict dependency hierarchy:
+
+\begin{enumerate}
+  \item \textbf{MemoryLayer starts first} because it initializes ETS tables
+        (\texttt{:memory\_working}, \texttt{:memory\_lru}) and Mnesia tables
+        (\texttt{:memories}, \texttt{:versions}, \texttt{:edges}) that all other
+        subsystems depend on. If memory is unavailable, nothing can persist state.
+
+  \item \textbf{ToolInterface starts second} because it needs memory available for
+        storing capability tokens and audit logs. The tool registry itself
+        (builtin + sandbox tools) is initialized at startup.
+
+  \item \textbf{AgentScheduler starts third} because agents need both tools
+        (to execute steps) and memory (to persist memoization stores and checkpoints).
+        The Evaluator, Scheduler, Pipeline, and DynamicSupervisor all start in this phase.
+
+  \item \textbf{PlannerEngine starts last} because it orchestrates all three lower
+        layers. The order book needs the scheduler to dispatch matched agents.
+        The escrow system needs Mnesia (initialized by MemoryLayer). The reputation
+        system needs the evaluator to provide quality scores.
+\end{enumerate}
+
+\subsubsection{The one\_for\_one Strategy}
+
+The top-level supervisor uses \texttt{:one\_for\_one}: if any single subsystem
+crashes, only that subsystem is restarted. The other three continue operating.
+This is appropriate because each subsystem manages its own state independently
+via GenServers. A crash in the Planner Engine does not corrupt the Memory Layer's
+ETS tables, and vice versa.
+
+If the system required that a Planner crash also restart the Scheduler (because
+the Planner holds references to scheduler state), we would use
+\texttt{:rest\_for\_one}. The current design avoids this coupling.
+
+\subsection{The Unified Facade}\label{subsec:facade}
+
+The \texttt{AgentOS} module provides a simplified entry point that delegates
+to the appropriate subsystem:
+
+\begin{lstlisting}[language=elixir, caption={AgentOS facade module}]
+defmodule AgentOS do
+  @spec start(keyword()) :: {:ok, pid()} | {:error, term()}
+  def start(opts \\ []) do
+    AgentOS.Application.start(:normal, opts)
+  end
+
+  @spec submit_job(map()) :: {:ok, String.t()} | {:error, term()}
+  def submit_job(job_spec) do
+    PlannerEngine.OrderBook.post_demand(job_spec)
+  end
+
+  @spec status() :: map()
+  def status do
+    %{
+      scheduler: %{running: true},
+      tools: ToolInterface.list_tools(),
+      memory: %{running: true},
+      planner: %{running: true}
+    }
   end
 end
 \end{lstlisting}
 
-This is exactly morphism composition in $\AIOS$: each \texttt{GenServer.call} applies a 1-cell (tool) to a 0-cell (agent), and the fold composes them horizontally.
+Clients interact with \texttt{AgentOS.submit\_job/1} and never need to know
+which subsystem handles their request. The facade pattern keeps the public
+API surface small while the internal implementation spans four applications.
 
-\subsection{Supervision as Limit Preservation}
 
-The \texttt{DynamicSupervisor} implements the supervision functor:
+% ========================================================================
+\section{Pairwise Compositions}\label{sec:pairwise}
 
-\begin{lstlisting}[language=erlang, caption={Dynamic agent supervision}, label={lst:sup}]
-defmodule AgentScheduler.Supervisor do
-  use DynamicSupervisor
+The four subsystems yield $\binom{4}{2} = 6$ pairwise compositions.
+Each pair produces emergent capabilities that neither subsystem provides alone.
 
-  def start_agent(agent_spec) do
-    DynamicSupervisor.start_child(
-      __MODULE__,
-      {AgentScheduler.Agent, agent_spec}
-    )
-  end
+\subsection{Agent Scheduler + Tool Interface}\label{subsec:agent-tool}
 
-  # Supervision strategy: restart failed agents
-  # This is limit preservation in action
-  @impl true
-  def init(_args) do
-    DynamicSupervisor.init(
-      strategy: :one_for_one,
-      max_restarts: 10,
-      max_seconds: 60
-    )
+\emph{Emergent capability: agents invoke tools via capability tokens.}
+
+When an agent is assigned a job, it receives capability tokens for the tools
+required by that job. The composition works as follows:
+
+\begin{lstlisting}[language=elixir, caption={Agent invoking a tool via capability}]
+# 1. Start an agent with tool capabilities
+{:ok, _pid} = AgentScheduler.start_agent("agent_1", %{
+  name: "WebTester",
+  capabilities: [:playwright, :k6],
+  task_domain: [:web_testing]
+})
+
+# 2. Grant capability tokens for required tools
+{:ok, cap_playwright} = ToolInterface.grant_capability(
+  "agent_1", "code-exec",
+  permissions: [:invoke], rate_limit: 30
+)
+
+# 3. Agent executes a durable step that invokes a tool
+AgentScheduler.Agent.execute_step("agent_1", "run_e2e", fn ->
+  ToolInterface.invoke("agent_1", "code-exec",
+    %{"code" => "playwright_script", "language" => "javascript"},
+    cap_playwright)
+end)
+\end{lstlisting}
+
+The key insight is that \texttt{execute\_step/3} wraps the tool invocation
+in durable execution: if the agent crashes after the tool returns but before
+the step is recorded, the memoization store replays the cached result on restart
+instead of re-invoking the tool.
+
+\textbf{Type safety at the boundary:}
+The capability token's \texttt{tool\_id} must match the tool being invoked.
+The tool's \texttt{input\_schema} validates the input map. The agent's
+\texttt{execute\_step} wrapper ensures the result is memoized with a unique
+step ID. All three checks happen at different layers, composing into a
+defense-in-depth guarantee.
+
+\subsection{Agent Scheduler + Memory Layer}\label{subsec:agent-memory}
+
+\emph{Emergent capability: agents persist state across executions.}
+
+Agent memoization stores are in-process (they live in the GenServer's state).
+When an agent crashes and restarts, the memo store is empty. By composing with
+the Memory Layer, agents gain persistent state:
+
+\begin{lstlisting}[language=elixir, caption={Agent persisting state to typed memory}]
+# Agent creates a typed memory for its execution trace
+{:ok, trace_pid} = MemoryLayer.Memory.create(
+  %MemoryLayer.Schema.AgentRunData{
+    agent_id: "agent_1",
+    task: "web_testing",
+    status: :running,
+    started_at: DateTime.utc_now()
+  })
+
+# Each step result is persisted as a fact
+AgentScheduler.Agent.execute_step("agent_1", "discover_pages", fn ->
+  pages = discover_pages("https://example.com")
+
+  {:ok, _} = MemoryLayer.Memory.create(
+    %MemoryLayer.Schema.FactData{
+      assertion: "Discovered #{length(pages)} pages",
+      confidence: 1.0,
+      source: "agent_1/discover_pages"
+    })
+
+  pages
+end)
+\end{lstlisting}
+
+The Memory Layer's version tracking provides a complete audit trail: each
+step produces a new memory linked to its predecessors via \texttt{:derived\_from}
+edges. If the agent crashes and restarts, it can query the Memory Layer
+to reconstruct its progress:
+
+\begin{lstlisting}[language=elixir, caption={Agent recovering state from memory after crash}]
+# After restart, query memory for previous results
+{:ok, previous_results} = MemoryLayer.Storage.search(
+  "agent_1",
+  filter: %{schema_name: "agent_run"},
+  backend: :mnesia  # Durable storage survives crashes
+)
+\end{lstlisting}
+
+\subsection{Tool Interface + Memory Layer}\label{subsec:tool-memory}
+
+\emph{Emergent capability: tool results are cached in typed memory.}
+
+Tool invocations can be expensive (API calls, code execution, web scraping).
+By composing tools with memory, results are cached and deduplicated:
+
+\begin{lstlisting}[language=elixir, caption={Tool result caching via memory}]
+def invoke_with_cache(agent_id, tool_id, input, cap) do
+  # Check if result is already cached
+  cache_key = MemoryLayer.Memory.content_hash(
+    %{tool_id: tool_id, input: input})
+
+  case MemoryLayer.Storage.search(cache_key, backend: :ets) do
+    {:ok, [cached | _]} ->
+      {:ok, cached.data}
+
+    {:ok, []} ->
+      # Cache miss: invoke tool, store result
+      case ToolInterface.invoke(agent_id, tool_id, input, cap) do
+        {:ok, result} ->
+          {:ok, _} = MemoryLayer.Memory.create(
+            %MemoryLayer.Schema.FactData{
+              assertion: "Tool result for #{tool_id}",
+              confidence: 1.0,
+              source: "tool_cache/#{cache_key}"
+            })
+          {:ok, result}
+
+        error -> error
+      end
   end
 end
 \end{lstlisting}
 
-When an agent process crashes, the supervisor restarts it---preserving the limit (product/equalizer structure) of the agent composition, exactly as Theorem~\ref{thm:fault-tolerance} requires.
+The SHA-256 content hashing from the Memory Layer enables exact deduplication:
+identical inputs to the same tool always produce the same cache key.
 
-%% ============================================================
-\section{Comparison with Existing Frameworks}
-\label{sec:comparison}
+Additionally, the audit log from \texttt{ToolInterface.Audit} can be
+stored as \texttt{EpisodicData} memories, creating a queryable history of
+all tool invocations with graph relationships to the agents that invoked them.
 
-We compare $\AIOS$ with existing multi-agent frameworks to explain why none constitutes a true operating system.
+\subsection{Planner Engine + Agent Scheduler}\label{subsec:planner-scheduler}
 
-\subsection{Framework Analysis}
+\emph{Emergent capability: market-matched agents are automatically dispatched.}
+
+When the Planner Engine clears the market for a task, it needs to assign the
+matched agent to actually execute the work. This is the Planner-to-Scheduler
+composition:
+
+\begin{lstlisting}[language=elixir, caption={Market clearing dispatches to scheduler}]
+# Market clears: best proposal accepted, escrow held
+{:ok, contract} = PlannerEngine.Market.clear_market("task_42")
+
+# Scheduler assigns the matched agent
+:ok = AgentScheduler.Agent.assign_job(
+  contract.operator_id,
+  %{
+    id: contract.task_id,
+    task: :web_testing,
+    input: %{url: "https://example.com"},
+    contract_id: contract.id
+  }
+)
+
+# Agent transitions: :pending -> :running
+# Scheduler dispatches based on avruntime (Eq. 1)
+\end{lstlisting}
+
+The credit-weighted scheduling ensures fairness: clients who have consumed
+fewer resources relative to their credit balance get priority.
+Contracted clients preempt marketplace clients (two-tier scheduling via
+the \texttt{tier} field in the priority key).
+
+\subsection{Planner Engine + Memory Layer}\label{subsec:planner-memory}
+
+\emph{Emergent capability: market state and reputation persist across restarts.}
+
+The Planner Engine's Escrow system already uses Mnesia (initialized by the
+Memory Layer) for atomic financial transactions. The reputation system
+stores quality vectors that feed back into the order book's cost functional
+(Equation~\ref{eq:cost-functional}).
+
+When the Planner Engine restarts after a crash, Mnesia tables persist:
+\begin{itemize}
+  \item \texttt{:balances} --- Client credit balances (available + held)
+  \item \texttt{:escrows} --- Active escrow records with status
+\end{itemize}
+
+Reputation histories can be stored as typed memories:
+
+\begin{lstlisting}[language=elixir, caption={Reputation stored as typed memory}]
+# After each evaluation, persist as memory
+{:ok, _} = MemoryLayer.Memory.create(
+  %MemoryLayer.Schema.EpisodicData{
+    event: "quality_evaluation",
+    outcome: :completed,
+    context: %{
+      agent_id: "agent_1",
+      quality_vector: [0.87, 0.92, 0.78, 0.85, 0.95, 0.88],
+      trust_score: 0.82
+    },
+    participants: ["agent_1", "client_1"]
+  })
+\end{lstlisting}
+
+This creates a queryable history of all evaluations, with graph edges
+connecting evaluations to the agents and contracts they reference.
+
+\subsection{Planner Engine + Tool Interface}\label{subsec:planner-tool}
+
+\emph{Emergent capability: the planner validates agent capabilities against tool requirements.}
+
+When matching proposals to demands, the planner needs to verify that an
+agent's claimed capabilities correspond to actual registered tools:
+
+\begin{lstlisting}[language=elixir, caption={Capability verification during matching}]
+def verify_capabilities(proposal, demand) do
+  required = demand.required_capabilities
+  registered_tools = ToolInterface.list_tools()
+  tool_names = Enum.map(registered_tools, & &1.name)
+
+  # Check that all required capabilities map to real tools
+  Enum.all?(required, fn cap ->
+    Atom.to_string(cap) in tool_names or
+    Enum.any?(tool_names, &String.contains?(&1, Atom.to_string(cap)))
+  end)
+end
+\end{lstlisting}
+
+The tool registry freeze mechanism integrates with contract creation:
+once a market clears and a contract is created, the tool registry is frozen
+to ensure the tool set cannot change during execution.
+
+
+% ========================================================================
+\section{Full Four-Way Composition}\label{sec:full-composition}
+
+We now trace a complete job through the fully composed system, showing how
+all four subsystems interact.
+
+\subsection{The Complete Job Lifecycle}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  node distance=0.6cm and 0.3cm,
+  flowstep/.style={draw, rounded corners, minimum width=4cm, minimum height=0.8cm,
+               font=\small, align=center},
+  planstep/.style={flowstep, fill=purple!10},
+  schedstep/.style={flowstep, fill=green!10},
+  toolstep/.style={flowstep, fill=orange!10},
+  memstep/.style={flowstep, fill=blue!10},
+  arrow/.style={-{Stealth[length=6pt]}, thick}
+]
+  \node[planstep] (submit) {1. Client submits job};
+  \node[planstep, below=of submit] (decompose) {2. Decomposer creates DAG};
+  \node[planstep, below=of decompose] (orderbook) {3. OrderBook posts demand};
+  \node[planstep, below=of orderbook] (match) {4. Agent submits proposal};
+  \node[planstep, below=of match] (clear) {5. Market clears, escrow holds};
+  \node[schedstep, below=of clear] (assign) {6. Agent assigned via Scheduler};
+  \node[toolstep, below=of assign] (tools) {7. Agent invokes tools};
+  \node[memstep, below=of tools] (memory) {8. Results persisted to memory};
+  \node[schedstep, below=of memory] (eval) {9. Evaluator scores output};
+  \node[planstep, below=of eval] (settle) {10. Escrow settles, reputation updates};
+
+  \draw[arrow] (submit) -- (decompose);
+  \draw[arrow] (decompose) -- (orderbook);
+  \draw[arrow] (orderbook) -- (match);
+  \draw[arrow] (match) -- (clear);
+  \draw[arrow] (clear) -- (assign);
+  \draw[arrow] (assign) -- (tools);
+  \draw[arrow] (tools) -- (memory);
+  \draw[arrow] (memory) -- (eval);
+  \draw[arrow] (eval) -- (settle);
+
+  % Labels for subsystems
+  \node[right=0.5cm of submit, font=\scriptsize\color{purple!60}] {Planner};
+  \node[right=0.5cm of assign, font=\scriptsize\color{green!60!black}] {Scheduler};
+  \node[right=0.5cm of tools, font=\scriptsize\color{orange!60!black}] {Tools};
+  \node[right=0.5cm of memory, font=\scriptsize\color{blue!60}] {Memory};
+\end{tikzpicture}
+\caption{Complete job lifecycle through all four subsystems. Colors indicate which
+subsystem is primary at each step.}
+\label{fig:lifecycle}
+\end{figure}
+
+\subsection{Step-by-Step Walkthrough}
+
+\subsubsection{Step 1--2: Job Submission and Decomposition (Planner Engine)}
+
+\begin{lstlisting}[language=elixir, caption={Job submission and decomposition}]
+# Client submits a web testing job
+job_spec = %{
+  client_id: "client_1",
+  task_id: "task_42",
+  description: "Full web app test suite",
+  required_capabilities: [:playwright, :k6, :reporting],
+  budget_ceiling: 5000,
+  subtask_specs: [
+    %{description: "E2E tests",
+      required_capabilities: [:playwright],
+      estimated_credits: 2000, estimated_duration: 60},
+    %{description: "Load tests",
+      required_capabilities: [:k6],
+      estimated_credits: 1500, estimated_duration: 45},
+    %{description: "Generate report",
+      required_capabilities: [:reporting],
+      estimated_credits: 500, estimated_duration: 15,
+      depends_on: [0, 1]}
+  ]
+}
+
+# Decompose into DAG with parallel execution levels
+{:ok, dag} = PlannerEngine.Decomposer.decompose(job_spec)
+schedule = PlannerEngine.Decomposer.topological_sort(dag)
+# => [["task_42_sub_0", "task_42_sub_1"], ["task_42_sub_2"]]
+\end{lstlisting}
+
+\subsubsection{Step 3--5: Order Book Matching and Market Clearing (Planner Engine)}
+
+\begin{lstlisting}[language=elixir, caption={Market clearing with escrow}]
+# Post demand to order book
+:ok = PlannerEngine.OrderBook.post_demand(%{
+  client_id: "client_1",
+  task_id: "task_42",
+  required_capabilities: [:playwright, :k6],
+  budget_ceiling: 5000
+})
+
+# Agent submits proposal
+:ok = PlannerEngine.OrderBook.submit_proposal(%{
+  agent_id: "agent_web_tester",
+  task_id: "task_42",
+  execution_plan: "Playwright E2E + k6 load tests",
+  estimated_credits: 3500,
+  estimated_duration: 120,
+  confidence_score: 0.92
+})
+
+# Market clears: escrow holds 3500 credits
+{:ok, contract} = PlannerEngine.Market.clear_market("task_42")
+# contract.escrow_id now references a held escrow record
+\end{lstlisting}
+
+\subsubsection{Step 6: Agent Assignment (Scheduler)}
+
+\begin{lstlisting}[language=elixir, caption={Scheduler assigns agent to job}]
+# Start agent under supervision
+{:ok, _pid} = AgentScheduler.start_agent(
+  "agent_web_tester",
+  %{name: "WebTester", capabilities: [:playwright, :k6]},
+  credits: 0,
+  oversight: :autonomous_escalation
+)
+
+# Assign the job -- transitions agent to :running
+:ok = AgentScheduler.Agent.assign_job(
+  "agent_web_tester",
+  %{id: "task_42", contract_id: contract.id}
+)
+\end{lstlisting}
+
+\subsubsection{Step 7--8: Tool Invocation with Memory Persistence}
+
+\begin{lstlisting}[language=elixir, caption={Agent executes steps with tools and memory}]
+# Grant tool capabilities for this contract
+{:ok, cap} = ToolInterface.grant_capability(
+  "agent_web_tester", "code-exec",
+  permissions: [:invoke], rate_limit: 60
+)
+
+# Freeze tool registry (contract-locked)
+ToolInterface.freeze()
+
+# Execute durable step: invoke tool, persist to memory
+{:ok, e2e_results} = AgentScheduler.Agent.execute_step(
+  "agent_web_tester", "e2e_tests", fn ->
+    # Invoke sandboxed tool
+    {:ok, result} = ToolInterface.invoke(
+      "agent_web_tester", "code-exec",
+      %{"code" => playwright_script, "language" => "javascript"},
+      cap
+    )
+
+    # Persist result as typed memory
+    {:ok, _} = MemoryLayer.Memory.create(
+      %MemoryLayer.Schema.FactData{
+        assertion: "E2E tests passed: 47/50 scenarios",
+        confidence: 0.94,
+        source: "agent_web_tester/e2e_tests"
+      })
+
+    result
+  end
+)
+\end{lstlisting}
+
+If the agent crashes after the tool returns, the memoization store replays
+\texttt{"e2e\_tests"} from cache. The memory persists in Mnesia regardless
+of agent process state.
+
+\subsubsection{Step 9: Evaluation (Scheduler)}
+
+\begin{lstlisting}[language=elixir, caption={6-dimensional evaluation}]
+# Agent completes and submits result
+:ok = AgentScheduler.Agent.complete("agent_web_tester", %{
+  e2e_results: e2e_results,
+  load_results: load_results,
+  report: final_report
+})
+
+# Evaluator scores the output
+{:ok, evaluation} = AgentScheduler.Evaluator.evaluate(
+  "agent_web_tester",
+  %{
+    quality: 0.87,
+    adherence: 0.92,
+    speed: 0.78,
+    cost: 0.85,
+    error_rate: 0.06,       # inverted to 0.94
+    revision_count: 0.08    # inverted to 0.92
+  })
+# => %{composite: 0.8771, reputation: 0.8771, ...}
+\end{lstlisting}
+
+\subsubsection{Step 10: Settlement and Reputation (Planner Engine)}
+
+\begin{lstlisting}[language=elixir, caption={Escrow settlement and reputation update}]
+# Complete contract: settle escrow, distribute revenue
+{:ok, %{contract: completed, split: split}} =
+  PlannerEngine.Market.complete_contract(
+    contract.id,
+    [0.87, 0.92, 0.78, 0.85, 0.94, 0.92]
+  )
+
+# Revenue split:
+# split.operator = 2450 (70% of 3500)
+# split.platform = 525  (15%)
+# split.llm_reserve = 525 (15%)
+
+# Reputation updated with anti-gaming checks
+trust = PlannerEngine.Reputation.trust_score("agent_web_tester")
+\end{lstlisting}
+
+\subsection{Pipeline Composition Across Layers}
+
+For multi-stage jobs (like the web testing pipeline), the streaming pipeline
+composes all four subsystems across multiple agents:
+
+\begin{lstlisting}[language=elixir, caption={Streaming pipeline across subsystems}]
+{:ok, pipe_id} = AgentScheduler.create_pipeline(:web_testing, [
+  {:recon,     publishes: [:page_discovered, :api_found,
+                           :sitemap_built]},
+  {:behavior,  subscribes: [:page_discovered, :sitemap_built],
+               publishes: [:test_generated, :flow_mapped]},
+  {:load,      subscribes: [:api_found, :flow_mapped],
+               publishes: [:load_result, :perf_metric]},
+  {:observer,  subscribes: [:test_generated, :load_result,
+                            :perf_metric],
+               publishes: [:anomaly_detected]},
+  {:synthesis, subscribes: [:test_generated, :load_result,
+                            :anomaly_detected],
+               publishes: [:final_report]}
+])
+\end{lstlisting}
+
+Each stage is assigned to an agent from the scheduler's pool. The agent
+at each stage invokes tools (Tool Interface), persists intermediate results
+(Memory Layer), and publishes events that downstream stages consume.
+The pipeline constraint---$\text{sub}(s_i) \subseteq \bigcup_{j < i} \text{pub}(s_j)$---ensures
+correct data flow.
+
+Streaming reduces latency from $\sum_i t_i$ (sequential) to the critical
+path length, typically yielding 40--60\% wall-clock time reduction.
+
+
+% ========================================================================
+\section{Production System: Agent-Hero Marketplace}\label{sec:production}
+
+The composed AgentOS system is deployed as the backend for the Agent-Hero
+marketplace, a production platform for hiring AI agent teams.
+
+\subsection{Technology Stack}
 
 \begin{table}[H]
 \centering
-\caption{Comparison of multi-agent frameworks}
-\label{tab:comparison}
-\small
-\begin{tabular}{lccccc}
+\caption{Agent-Hero production stack}
+\begin{tabular}{ll}
 \toprule
-\textbf{Framework} & \textbf{Scheduling} & \textbf{Tools} & \textbf{Memory} & \textbf{Planning} & \textbf{Formal} \\
+\textbf{Component} & \textbf{Technology} \\
 \midrule
-AutoGen (Microsoft) & Partial & Yes & No & Partial & No \\
-Vertex AI Agents & Partial & Yes & Partial & No & No \\
-OpenAI Assistants & No & Yes & Partial & No & No \\
-LangGraph & Partial & Yes & Partial & Partial & No \\
-CrewAI & Partial & Yes & Partial & Partial & No \\
-MetaGPT & Partial & Yes & No & Partial & No \\
-\textbf{$\AIOS$ (This work)} & \textbf{Yes} & \textbf{Yes} & \textbf{Yes} & \textbf{Yes} & \textbf{Yes} \\
+Frontend           & Next.js 16, React 19, App Router \\
+Database           & Supabase (PostgreSQL + Auth + RLS + Realtime) \\
+Payments           & Stripe (checkout sessions, webhooks) \\
+AI SDK             & Vercel AI SDK v6 (multi-provider) \\
+Agent Runtime      & AgentOS (Elixir/OTP on BEAM) \\
+Queue              & Inngest (durable execution) \\
+Agent Protocol     & MCP (\texttt{StreamableHTTPClientTransport}) \\
+Quick Agents       & E2B sandbox (10-min timeout, ephemeral) \\
+Long Agents        & Fly.io (hours/days, persistent) \\
+Deployment         & Vercel (frontend), Docker/Fly.io (agents) \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\subsection{Why These Are Not Operating Systems}
+\subsection{Mapping AgentOS to Production}
 
-\begin{enumerate}
-  \item \textbf{AutoGen}: Provides agent communication patterns but lacks formal scheduling, has no typed memory system, and offers no marketplace dynamics. Agents are Python objects, not supervised processes.
-
-  \item \textbf{LangGraph}: Provides graph-based workflows but conflates scheduling with graph traversal. No typed memory beyond checkpointing. No formal tool security model. No market mechanism.
-
-  \item \textbf{CrewAI}: Provides role-based agent orchestration but lacks formal scheduling guarantees, has ad hoc memory, and no compositional tool security. No marketplace.
-
-  \item \textbf{OpenAI Assistants}: Provides tool-augmented LLM calls but has no agent scheduling (single-agent only), proprietary memory, and no planning beyond the LLM's own reasoning.
-\end{enumerate}
-
-The key differentiator of $\AIOS$ is \emph{compositional guarantees}: the 2-categorical structure ensures that combining subsystems preserves safety properties (type safety, fault tolerance, financial consistency). No existing framework provides this.
-
-\subsection{The Missing Abstractions}
-
-Existing frameworks fail to be operating systems because they lack:
-\begin{enumerate}
-  \item \textbf{Process isolation}: Agents share Python runtime state. OTP processes are isolated by the BEAM VM.
-  \item \textbf{Preemptive scheduling}: No framework can preempt a running agent. OTP's reduction-based scheduler can.
-  \item \textbf{Typed persistent memory}: Memory is either ad hoc (key-value) or absent. $\mathrm{Mem}[S]$ provides compile-time and runtime type safety with versioning.
-  \item \textbf{Formal security model}: Tool access is typically all-or-nothing. Capability tokens provide fine-grained, composable access control.
-  \item \textbf{Market dynamics}: No framework has a built-in mechanism for matching supply (agents) with demand (tasks) via bidding and escrow.
-\end{enumerate}
-
-%% ============================================================
-\section{Future Directions}
-\label{sec:future}
-
-\subsection{Enriched Categories for Probabilistic Reasoning}
-
-LLM outputs are inherently probabilistic. An enriched $\AIOS$ over the category of probability distributions would allow reasoning about uncertainty in agent composition. The hom-objects $\AIOS(a,b)$ would be distributions over tool chains, and composition would be convolution.
-
-\subsection{Higher Categories for Nested Hierarchies}
-
-Real agent systems have nested hierarchies: teams of agents, organizations of teams, federations of organizations. An $n$-categorical generalization of $\AIOS$ would provide $k$-cells for each level of hierarchy, with coherence conditions ensuring consistent composition at every level.
-
-\subsection{Topos-Theoretic Agent Logic}
-
-A topos-theoretic semantics for $\AIOS$ would provide an internal logic for reasoning about agent beliefs, capabilities, and obligations. The subobject classifier $\Omega$ would represent capability boundaries, and the internal language would allow expressing safety properties as logical formulas.
-
-\subsection{Distributed AI OS}
-
-The current framework assumes a single BEAM node. Extending to distributed BEAM clusters (Erlang distribution protocol) would enable a truly distributed AI OS where agents migrate between nodes, memory is replicated across geographic regions, and the marketplace spans multiple organizations.
-
-\subsection{Quantum Integration}
-
-As quantum computing matures, quantum agents (operating on qubits rather than classical bits) would be 0-cells in a quantum-enriched version of $\AIOS$. The tool category would include quantum channels, and memory would need to handle quantum state (no-cloning theorem constraints).
-
-%% ============================================================
-\section{Conclusion: The Next Trillion-Dollar Layer}
-\label{sec:conclusion}
-
-We have demonstrated that the AI Operating System admits a rigorous formulation as a 2-category $\AIOS$ with four interacting abstractions:
-
-\begin{center}
-\begin{tikzcd}[row sep=3em, column sep=3em]
-& \text{Planner (2-cells)} \arrow[d] & \\
-\text{Agents (0-cells)} \arrow[r] & \AIOS \arrow[d] & \text{Tools (1-cells)} \arrow[l] \\
-& \text{Memory (endofunctor)} &
-\end{tikzcd}
-\end{center}
-
-The key results of this synthesis are:
-
-\begin{enumerate}
-  \item \textbf{Coherence}: $\AIOS$ satisfies the interchange law (Theorem~\ref{thm:interchange}), ensuring that the order of composition does not matter.
-
-  \item \textbf{Memory preservation}: The endofunctor $\Mem$ preserves horizontal and vertical composition (Theorem~\ref{thm:memory-preserves}), ensuring consistent state management.
-
-  \item \textbf{Emergent fault tolerance}: Supervision is limit preservation (Theorem~\ref{thm:fault-tolerance}), explaining why OTP-based systems are robust.
-
-  \item \textbf{Type safety propagation}: Well-typed components compose into well-typed systems (Theorem~\ref{thm:type-safety}).
-
-  \item \textbf{Financial consistency}: The escrow monad interacts correctly with memory (Theorem~\ref{thm:escrow}).
-
-  \item \textbf{Formal Linux correspondence}: A structure-preserving functor $\Phi: \mathbf{Linux} \to \AIOS$ exists (Theorem~\ref{thm:linux-functor}), validating the OS analogy.
-\end{enumerate}
-
-The practical implication is profound: \emph{whoever builds the canonical AI OS---the ``Linux of AI agents''---will control the most valuable software layer of the next decade.} The four subsystems (agent scheduling, tool interfaces, typed memory, market-based planning) must be designed together as a coherent whole, not assembled piecemeal from incompatible libraries.
-
-Our Elixir/OTP prototype demonstrates that the BEAM virtual machine is a natural substrate for this architecture, providing process isolation, fault tolerance, message passing, and hot code reloading that map directly to the categorical structure of $\AIOS$.
-
-The AI Operating System is not a future abstraction. Its components are being built today in production systems---Agent-Hero, ContextFS, streaming testing frameworks---that demonstrate each subsystem independently. The contribution of this series is to show that they compose into something greater: a \emph{mathematically coherent operating system for artificial intelligence}.
-
-%% ============================================================
-\section*{Acknowledgments}
-
-The author thanks the YonedaAI Research Collective for ongoing discussions on categorical methods in AI systems. This work is grounded in production systems developed at Agent-Hero and ContextFS. The Erlang/OTP community's decades of work on fault-tolerant distributed systems provides the implementation foundation for this research.
-
-%% ============================================================
-\bibliographystyle{plainnat}
-
-\begin{thebibliography}{50}
-
-\bibitem[Armstrong(2003)]{armstrong2003erlang}
-Armstrong, J. (2003). \emph{Making Reliable Distributed Systems in the Presence of Software Errors}. PhD thesis, Royal Institute of Technology, Stockholm.
-
-\bibitem[Baez and Stay(2011)]{baez2011physics}
-Baez, J.C. and Stay, M. (2011). Physics, topology, logic and computation: a {R}osetta Stone. In \emph{New Structures for Physics}, Lecture Notes in Physics, vol. 813, pp. 95--172. Springer.
-
-\bibitem[B\'{e}nabou(1967)]{benabou1967bicategories}
-B\'{e}nabou, J. (1967). Introduction to bicategories. In \emph{Reports of the Midwest Category Seminar}, Lecture Notes in Mathematics, vol. 47, pp. 1--77. Springer.
-
-\bibitem[Borceux(1994)]{borceux1994handbook}
-Borceux, F. (1994). \emph{Handbook of Categorical Algebra}, vols. 1--3. Cambridge University Press.
-
-\bibitem[Cesarini and Thompson(2016)]{cesarini2016designing}
-Cesarini, F. and Thompson, S. (2016). \emph{Designing for Scalability with Erlang/OTP}. O'Reilly Media.
-
-\bibitem[Chase et al.(2023)]{chase2023langchain}
-Chase, H. et al. (2023). LangChain: Building applications with LLMs through composability. \url{https://github.com/langchain-ai/langchain}.
-
-\bibitem[Coecke and Kissinger(2017)]{coecke2017picturing}
-Coecke, B. and Kissinger, A. (2017). \emph{Picturing Quantum Processes}. Cambridge University Press.
-
-\bibitem[Dennis and Van Horn(1966)]{dennis1966capability}
-Dennis, J.B. and Van Horn, E.C. (1966). Programming semantics for multiprogrammed computations. \emph{Communications of the ACM}, 9(3):143--155.
-
-\bibitem[Fong and Spivak(2019)]{fong2019invitation}
-Fong, B. and Spivak, D.I. (2019). \emph{An Invitation to Applied Category Theory: Seven Sketches in Compositionality}. Cambridge University Press.
-
-\bibitem[Gao et al.(2023)]{gao2023metagpt}
-Gao, S. et al. (2023). MetaGPT: Meta programming for multi-agent collaborative framework. \emph{arXiv preprint arXiv:2308.00352}.
-
-\bibitem[Ghica and Jung(2016)]{ghica2016categorical}
-Ghica, D.R. and Jung, A. (2016). Categorical semantics of digital circuits. In \emph{Proceedings of FOSSACS}, pp. 556--572. Springer.
-
-\bibitem[Gray(1974)]{gray1974formal}
-Gray, J.W. (1974). \emph{Formal Category Theory: Adjointness for 2-Categories}. Lecture Notes in Mathematics, vol. 391. Springer.
-
-\bibitem[Hong et al.(2024)]{hong2024crewai}
-Hong, J. et al. (2024). CrewAI: Framework for orchestrating role-playing, autonomous AI agents. \url{https://github.com/joaomdmoura/crewAI}.
-
-\bibitem[Hu et al.(2024)]{hu2024aios}
-Hu, S. et al. (2024). AIOS: LLM agent operating system. \emph{arXiv preprint arXiv:2403.16971}.
-
-\bibitem[Joyal and Street(1993)]{joyal1993braided}
-Joyal, A. and Street, R. (1993). Braided tensor categories. \emph{Advances in Mathematics}, 102(1):20--78.
-
-\bibitem[Kelly(1982)]{kelly1982basic}
-Kelly, G.M. (1982). \emph{Basic Concepts of Enriched Category Theory}. London Mathematical Society Lecture Note Series, vol. 64. Cambridge University Press.
-
-\bibitem[Lamport(1978)]{lamport1978clocks}
-Lamport, L. (1978). Time, clocks, and the ordering of events in a distributed system. \emph{Communications of the ACM}, 21(7):558--565.
-
-\bibitem[Leinster(2004)]{leinster2004higher}
-Leinster, T. (2004). \emph{Higher Operads, Higher Categories}. London Mathematical Society Lecture Note Series, vol. 298. Cambridge University Press.
-
-\bibitem[Levy(1984)]{levy1984capability}
-Levy, H.M. (1984). \emph{Capability-Based Computer Systems}. Digital Press.
-
-\bibitem[Mac Lane(1998)]{maclane1998categories}
-Mac Lane, S. (1998). \emph{Categories for the Working Mathematician}, 2nd ed. Graduate Texts in Mathematics, vol. 5. Springer.
-
-\bibitem[Matsakis and Klock(2014)]{matsakis2014rust}
-Matsakis, N.D. and Klock, F.S. (2014). The Rust language. In \emph{Proceedings of the ACM SIGAda Annual Conference on High Integrity Language Technology}, pp. 103--104.
-
-\bibitem[Mei et al.(2024)]{mei2024llmos}
-Mei, K. et al. (2024). LLM as OS, agents as apps: Envisioning AIOS, agents and the AIOS-agent ecosystem. \emph{arXiv preprint arXiv:2312.03815}.
-
-\bibitem[Milewski(2019)]{milewski2019category}
-Milewski, B. (2019). \emph{Category Theory for Programmers}. Blurb.
-
-\bibitem[Moggi(1991)]{moggi1991monads}
-Moggi, E. (1991). Notions of computation and monads. \emph{Information and Computation}, 93(1):55--92.
-
-\bibitem[Myerson(1981)]{myerson1981mechanism}
-Myerson, R.B. (1981). Optimal auction design. \emph{Mathematics of Operations Research}, 6(1):58--73.
-
-\bibitem[OpenAI(2024)]{openai2024assistants}
-OpenAI (2024). Assistants API. \url{https://platform.openai.com/docs/assistants/overview}.
-
-\bibitem[Park et al.(2023)]{park2023generative}
-Park, J.S. et al. (2023). Generative agents: Interactive simulacra of human behavior. In \emph{Proceedings of UIST}, pp. 1--22.
-
-\bibitem[Riehl(2017)]{riehl2017category}
-Riehl, E. (2017). \emph{Category Theory in Context}. Dover Publications.
-
-\bibitem[Roth(2002)]{roth2002economist}
-Roth, A.E. (2002). The economist as engineer: Game theory, experimentation, and computation as tools for design economics. \emph{Econometrica}, 70(4):1341--1378.
-
-\bibitem[Russell and Norvig(2021)]{russell2021artificial}
-Russell, S. and Norvig, P. (2021). \emph{Artificial Intelligence: A Modern Approach}, 4th ed. Pearson.
-
-\bibitem[Silberschatz et al.(2018)]{silberschatz2018os}
-Silberschatz, A., Galvin, P.B., and Gagne, G. (2018). \emph{Operating System Concepts}, 10th ed. Wiley.
-
-\bibitem[Spivak(2014)]{spivak2014category}
-Spivak, D.I. (2014). \emph{Category Theory for the Sciences}. MIT Press.
-
-\bibitem[Street(1972)]{street1972formal}
-Street, R. (1972). The formal theory of monads. \emph{Journal of Pure and Applied Algebra}, 2(2):149--168.
-
-\bibitem[Tanenbaum and Bos(2014)]{tanenbaum2014modern}
-Tanenbaum, A.S. and Bos, H. (2014). \emph{Modern Operating Systems}, 4th ed. Pearson.
-
-\bibitem[Viroli et al.(2019)]{viroli2019engineering}
-Viroli, M. et al. (2019). Engineering resilient collective adaptive systems by self-stabilisation. \emph{ACM Transactions on Modeling and Computer Simulation}, 28(2):1--28.
-
-\bibitem[Wadler(1995)]{wadler1995monads}
-Wadler, P. (1995). Monads for functional programming. In \emph{Advanced Functional Programming}, Lecture Notes in Computer Science, vol. 925, pp. 24--52. Springer.
-
-\bibitem[Wang et al.(2024)]{wang2024survey}
-Wang, L. et al. (2024). A survey on large language model based autonomous agents. \emph{Frontiers of Computer Science}, 18(6):186345.
-
-\bibitem[Watson and Watson(2003)]{watson2003erlang}
-Watson, J. and Watson, M. (2003). Erlang and the Ericsson AXD 301. \emph{ACM SIGPLAN Notices}, 38(1):136--137.
-
-\bibitem[Wu et al.(2023)]{wu2023autogen}
-Wu, Q. et al. (2023). AutoGen: Enabling next-gen LLM applications via multi-agent conversation. \emph{arXiv preprint arXiv:2308.08155}.
-
-\bibitem[Xi et al.(2023)]{xi2023rise}
-Xi, Z. et al. (2023). The rise and potential of large language model based agents: A survey. \emph{arXiv preprint arXiv:2309.07864}.
-
-\bibitem[Yoneda(1954)]{yoneda1954}
-Yoneda, N. (1954). On the homology theory of modules. \emph{Journal of the Faculty of Science, University of Tokyo}, Section I, 7:193--227.
-
-\end{thebibliography}
-
-%% ============================================================
-\appendix
-
-\section{Categorical Glossary}
-\label{app:glossary}
-
-For the reader's convenience, we collect the key categorical concepts used throughout this series:
+Each AgentOS subsystem maps to a production concern:
 
 \begin{description}[style=nextline]
-  \item[Category] A collection of objects and morphisms with associative composition and identities.
-  \item[Functor] A structure-preserving map between categories.
-  \item[Natural Transformation] A ``morphism between functors''---a coherent family of morphisms indexed by objects.
-  \item[2-Category] A category enriched over $\Cat$, with objects, 1-morphisms, and 2-morphisms.
-  \item[Monad] An endofunctor with unit and multiplication satisfying associativity and unit laws. Used for computational effects.
-  \item[Presheaf] A contravariant functor to $\Set$. Used for representing observable properties.
-  \item[Profunctor] A functor $\catC^\op \times \catD \to \Set$. Used for heterogeneous relations.
-  \item[Limit/Colimit] Universal constructions representing products/equalizers (limits) or coproducts/coequalizers (colimits).
-  \item[Representable Functor] A functor naturally isomorphic to $\Hom(X,-)$ for some object $X$ (Yoneda lemma).
-  \item[Interchange Law] The axiom requiring that horizontal and vertical composition of 2-cells commute.
+  \item[Memory Layer $\to$ Supabase PostgreSQL]
+    In production, the Memory Layer's Mnesia backend is replaced by
+    Supabase PostgreSQL with Row Level Security. The ETS working memory
+    layer maps to Redis for distributed caching. The schema type system
+    maps to Supabase table schemas with Zod v4 validation on the TypeScript side.
+
+  \item[Tool Interface $\to$ MCP Servers]
+    Each agent type connects to external MCP servers via
+    \texttt{StreamableHTTPClientTransport}. The 3-tier registry maps to:
+    builtin tools (Vercel AI SDK built-in tools),
+    sandbox tools (E2B ephemeral environments),
+    and MCP tools (agent-specific MCP servers deployed on Fly.io).
+
+  \item[Agent Scheduler $\to$ Inngest + Vercel]
+    The durable execution model (memoized steps with replay on crash)
+    maps directly to Inngest's step functions. The credit-weighted scheduler
+    maps to the Supabase \texttt{profiles.credits} column with atomic RPC
+    updates via \texttt{adminClient.rpc()}.
+
+  \item[Planner Engine $\to$ Stripe + Supabase]
+    The escrow system maps to Stripe checkout sessions: credits are purchased
+    via Stripe, held in the database during execution, and distributed upon
+    completion. The order book maps to the job posting and proposal submission
+    flow in the Agent-Hero UI. The reputation system maps to the
+    \texttt{agent\_ratings} table with EWMA computation.
 \end{description}
 
-\section{Full $\AIOS$ Specification}
-\label{app:spec}
+\subsection{Job Lifecycle in Production}
 
-For implementors, the complete $\AIOS$ specification:
+\begin{enumerate}
+  \item \textbf{Client posts job} --- Creates a job record in Supabase via the
+        Next.js API route. Triggers decomposition.
+  \item \textbf{Planner decomposes} --- Inngest function decomposes the job into
+        subtasks and posts them as individual demands.
+  \item \textbf{Order book matches} --- Agents (operators) submit proposals.
+        The matching engine selects the best proposal per subtask.
+  \item \textbf{Market clears} --- Stripe holds the payment. Contract record
+        created in Supabase.
+  \item \textbf{Scheduler runs agents} --- Inngest dispatches agent execution.
+        Each agent connects to its MCP server, invokes tools, persists results.
+  \item \textbf{Evaluator scores} --- 6-dimensional quality assessment.
+        Client can approve or request revisions.
+  \item \textbf{Settlement} --- Stripe releases payment. Revenue split applied.
+        Reputation updated.
+\end{enumerate}
 
-\begin{definition}[Complete $\AIOS$ Specification]
-\[
-\AIOS = \left( \Ag, \Tl, \Plan, \Mem, \Eval, E, \mathrm{Sup} \right)
-\]
-where:
+\subsection{Deployment Architecture}
+
+\begin{lstlisting}[caption={Deployment topology}, basicstyle=\ttfamily\footnotesize]
+                    +-------------------+
+                    |    Vercel CDN     |
+                    |  Next.js Frontend |
+                    +---------+---------+
+                              |
+                    +---------+---------+
+                    |   Supabase Cloud  |
+                    |  PostgreSQL + Auth|
+                    |  + RLS + Realtime |
+                    +---------+---------+
+                              |
+              +---------------+---------------+
+              |                               |
+    +---------+---------+           +---------+---------+
+    |   Inngest Queue   |           |   Stripe Webhooks |
+    | (durable steps)   |           |   (payments)      |
+    +---------+---------+           +-------------------+
+              |
+    +---------+---------+
+    |   Agent Runtimes  |
+    | +----- Fly.io ---+|
+    | | MCP Server     ||
+    | | AgentOS/BEAM   ||
+    | +----------------+|
+    | +----- E2B ------+|
+    | | Sandbox (10m)  ||
+    | +----------------+|
+    +-------------------+
+\end{lstlisting}
+
+
+% ========================================================================
+\section{System Properties}\label{sec:properties}
+
+We now establish three key properties of the composed system: fault isolation,
+type safety, and resource fairness.
+
+\subsection{Fault Isolation}
+
+\begin{theorem}[Subsystem Independence]\label{thm:fault-isolation}
+A crash in subsystem $S_i$ does not corrupt the state of subsystem $S_j$ for $i \neq j$.
+\end{theorem}
+
+\begin{proof}
+Each subsystem runs as a separate OTP application under \texttt{AgentOS.Supervisor}
+with \texttt{:one\_for\_one} strategy. Subsystem state is held in GenServer
+processes with isolated heaps (the BEAM guarantees no shared mutable state between
+processes). When a subsystem crashes:
+
+\begin{enumerate}
+  \item The supervisor detects the crash via process monitoring.
+  \item Only the crashed subsystem's supervision subtree is restarted.
+  \item Other subsystems continue operating with their state intact.
+  \item Mnesia tables (used by Memory Layer and Escrow) survive process crashes
+        because they are backed by \texttt{disc\_copies}.
+\end{enumerate}
+
+The only cross-subsystem dependency at crash time is that a subsystem attempting
+to call a crashed subsystem's GenServer will receive \texttt{\{:error, :noproc\}}
+(or a timeout), which is handled by pattern matching in all public APIs.
+\end{proof}
+
+\begin{corollary}[Cascading Failure Prevention]
+The maximum blast radius of any single process crash is the subsystem that process
+belongs to, bounded by the subsystem's \texttt{max\_restarts/max\_seconds} configuration.
+\end{corollary}
+
+\subsection{Agent-Level Fault Isolation}
+
+Within the Agent Scheduler, individual agent crashes are further isolated:
+
+\begin{theorem}[Agent Independence]\label{thm:agent-isolation}
+A crash in agent $A_i$ does not affect agent $A_j$ for $i \neq j$, and the
+agent's durable execution guarantees that completed steps are not re-executed
+on restart.
+\end{theorem}
+
+\begin{proof}
+Agents run under \texttt{AgentScheduler.Supervisor} (a DynamicSupervisor with
+\texttt{:one\_for\_one} strategy). Each agent is a GenServer with:
+
 \begin{itemize}
-  \item $\Ag$: Agent category (0-cells). Objects: agent profiles. Morphisms: data flows.
-  \item $\Tl$: Tool category (1-cells). Objects: data types. Morphisms: tool operations.
-  \item $\Plan$: Planning 2-cells. Natural transformations between tool chain functors.
-  \item $\Mem: \AIOS \to \AIOS$: Memory endofunctor. Preserves horizontal and vertical composition.
-  \item $\Eval: \Exec \to \mathbb{R}^6$: Evaluation functor. Maps execution traces to quality vectors.
-  \item $E$: Escrow monad on $\mathbf{Cred}$. Unit (hold), bind (transfer), join (settle).
-  \item $\mathrm{Sup}: \AIOS \to \AIOS$: Supervision endofunctor. Preserves finite limits.
+  \item Its own heap (BEAM process isolation).
+  \item A unique registration in \texttt{AgentScheduler.Registry}.
+  \item A \texttt{:transient} restart policy (only restarted on abnormal exit).
+  \item A 30-second shutdown timeout for graceful checkpointing.
 \end{itemize}
 
-\textbf{Axioms}:
+For durable execution: the \texttt{memo\_store} maps step IDs to cached results.
+On crash and restart, the memo store is lost (it was in-process state), but
+if the agent persisted results to the Memory Layer (as shown in
+Section~\ref{subsec:agent-memory}), those results survive in Mnesia and can
+be used to skip completed steps.
+\end{proof}
+
+\subsection{Type Safety Across Boundaries}
+
+\begin{theorem}[Cross-Module Type Safety]\label{thm:type-safety}
+The composition of subsystems preserves type safety: if each subsystem's internal
+invariants hold, the composed system's invariants hold.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+Type safety is enforced at three levels:
+
 \begin{enumerate}
-  \item Interchange law (Theorem~\ref{thm:interchange})
-  \item $\Mem$ preserves composition (Theorem~\ref{thm:memory-preserves})
-  \item $\mathrm{Sup}$ preserves limits (Theorem~\ref{thm:fault-tolerance})
-  \item $\mathrm{Type}$ is a 2-functor (Theorem~\ref{thm:type-safety})
-  \item $E$ satisfies monad laws under $\Mem$ (Theorem~\ref{thm:escrow})
+  \item \textbf{Compile-time (Dialyzer):} Each module declares \texttt{@spec} type
+        annotations. Dialyzer performs success typing across module boundaries,
+        catching type mismatches at compile time.
+
+  \item \textbf{Runtime (Struct enforcement):} Memory schemas use
+        \texttt{@enforce\_keys} to guarantee required fields are present.
+        Capability tokens enforce their structure via the \texttt{@enforce\_keys}
+        attribute. Pattern matching in GenServer callbacks rejects malformed messages.
+
+  \item \textbf{Protocol (Message contracts):} Cross-subsystem communication uses
+        typed message tuples: \texttt{\{:execute\_step, step\_id, fun\}},
+        \texttt{\{:hold, client\_id, amount, contract\_id\}}, etc. Each GenServer's
+        \texttt{handle\_call} pattern-matches on the message structure, rejecting
+        messages that don't conform.
 \end{enumerate}
-\end{definition}
+
+Since message passing is the only communication mechanism between subsystems
+(no shared mutable state), type safety at the message boundary is sufficient
+to guarantee cross-module type safety.
+\end{proof}
+
+\subsection{Resource Fairness}
+
+\begin{theorem}[Credit-Weighted Fairness]\label{thm:fairness}
+The scheduler's avruntime mechanism ensures that no client can monopolize agent
+resources: a client's scheduling priority decreases proportionally to their
+resource consumption relative to their credit balance.
+\end{theorem}
+
+\begin{proof}
+From Equation~\ref{eq:avruntime}, after consuming $k$ agent invocations, client $c$'s
+avruntime is:
+\[
+  \text{avruntime}_k(c) = \sum_{i=1}^{k} \frac{\kappa_{A_i} \cdot \text{cr}_0}{\text{cr}_c(i) \cdot w(p_c)}
+\]
+
+Since $\text{cr}_c(i)$ decreases with each invocation (credits are consumed), the
+denominator shrinks and avruntime grows faster. Meanwhile, a client $c'$ with more
+remaining credits has $\text{cr}_{c'}(i) > \text{cr}_c(i)$, so their avruntime grows
+slower. The scheduler always dispatches the minimum-avruntime client, ensuring
+$c'$ is prioritized.
+
+The contracted/marketplace two-tier system provides a $4\times$ weight to contracted
+clients, but within each tier, the fairness guarantee holds.
+\end{proof}
+
+\subsection{Financial Conservation}
+
+\begin{theorem}[Credit Conservation]\label{thm:conservation}
+The total credits in the system is invariant under all escrow operations:
+\[
+  \sum_p \text{available}(p) + \sum_e \text{held}(e) + \sum_d \text{distributed}(d) = C_0
+\]
+where $C_0$ is the total credits ever purchased.
+\end{theorem}
+
+\begin{proof}
+Each escrow operation is a Mnesia transaction that conserves the total:
+
+\begin{itemize}
+  \item \texttt{hold}: decrements available by $n$, increments held by $n$.
+  \item \texttt{settle(:release)}: decrements held by $n$, increments distributed by $n$.
+  \item \texttt{settle(:refund)}: decrements held by $n$, increments available by $n$.
+\end{itemize}
+
+Mnesia transactions are serialized, preventing race conditions. The balance check
+(\texttt{available >= amount}) in \texttt{hold} prevents negative balances.
+No operation creates or destroys credits.
+\end{proof}
+
+
+% ========================================================================
+\section{Implementation Summary}\label{sec:implementation}
+
+\subsection{Source Code Structure}
+
+\begin{table}[H]
+\centering
+\caption{Source code organization}
+\begin{tabular}{llr}
+\toprule
+\textbf{Application} & \textbf{Modules} & \textbf{Lines} \\
+\midrule
+\texttt{agent\_os/}        & \texttt{AgentOS}, \texttt{Application}  & $\sim$80 \\
+\texttt{agent\_scheduler/} & \texttt{Agent}, \texttt{Scheduler}, \texttt{Pipeline},
+                              \texttt{Evaluator}, \texttt{Supervisor}  & $\sim$900 \\
+\texttt{tool\_interface/}  & \texttt{Registry}, \texttt{Capability}, \texttt{Sandbox},
+                              \texttt{MCPClient}, \texttt{Audit}  & $\sim$800 \\
+\texttt{memory\_layer/}    & \texttt{Memory}, \texttt{Schema}, \texttt{Storage},
+                              \texttt{Graph}, \texttt{Version}  & $\sim$900 \\
+\texttt{planner\_engine/}  & \texttt{OrderBook}, \texttt{Escrow}, \texttt{Market},
+                              \texttt{Decomposer}, \texttt{Reputation}  & $\sim$900 \\
+\midrule
+\textbf{Total}             & \textbf{24 modules} & $\sim$\textbf{3,500} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Key Design Patterns}
+
+\begin{description}[style=nextline]
+  \item[GenServer for Stateful Services]
+    Every stateful component (Registry, Scheduler, Evaluator, Pipeline, OrderBook,
+    Escrow, Market, Reputation, Storage, Graph, Audit, Schema Registry) is a
+    GenServer. This provides: serialized state access (no race conditions),
+    process isolation (crash containment), and a standard callback interface
+    (\texttt{init}, \texttt{handle\_call}, \texttt{handle\_cast}, \texttt{handle\_info}).
+
+  \item[DynamicSupervisor for Agent Pools]
+    Agents are created dynamically when jobs are assigned and terminated when
+    jobs complete. The DynamicSupervisor provides on-demand process creation
+    with automatic restart on crash.
+
+  \item[Registry for O(1) Lookup]
+    Agent processes are registered in \texttt{AgentScheduler.Registry} (an
+    Elixir \texttt{Registry} with \texttt{:unique} keys) for constant-time
+    lookup by agent ID. This avoids the need for a centralized process table.
+
+  \item[Behaviour Callbacks for Polymorphism]
+    The \texttt{MemoryLayer.StorageBackend} behaviour defines the interface
+    that all storage backends must implement: \texttt{save}, \texttt{recall},
+    \texttt{search}, \texttt{delete}, \texttt{update}. Adding a new backend
+    (ChromaDB, FalkorDB, PostgreSQL) requires implementing these five callbacks.
+
+  \item[Telemetry for Observability]
+    Every significant event emits a \texttt{:telemetry} event:
+    \texttt{[:agent\_scheduler, :agent, :step\_completed]},
+    \texttt{[:tool\_interface, :invocation]}, etc. These can be consumed by
+    monitoring systems (Prometheus, Datadog, CloudWatch) without modifying
+    application code.
+
+  \item[Mnesia for ACID Transactions]
+    Financial operations (escrow hold/settle/refund, balance updates) use
+    Mnesia transactions for atomicity and isolation. Mnesia is started during
+    the MemoryLayer initialization phase, ensuring it is available before
+    the Escrow system starts.
+\end{description}
+
+
+% ========================================================================
+\section{Composition Algebra}\label{sec:algebra}
+
+We can formalize the composition structure of AgentOS using a simple algebra
+of module interfaces.
+
+\subsection{Module Interfaces as Types}
+
+Each subsystem exposes a set of typed functions (its public API).
+We write $\mathcal{I}(S)$ for the interface of subsystem $S$:
+
+\begin{align*}
+  \mathcal{I}(\text{Memory}) &= \{\text{create}, \text{data}, \text{evolve}, \text{search}, \text{link}, \text{traverse}\} \\
+  \mathcal{I}(\text{Tools})  &= \{\text{invoke}, \text{grant}, \text{discover}, \text{freeze}, \text{list}\} \\
+  \mathcal{I}(\text{Sched})  &= \{\text{submit}, \text{start\_agent}, \text{pipeline}, \text{evaluate}\} \\
+  \mathcal{I}(\text{Plan})   &= \{\text{post}, \text{propose}, \text{clear}, \text{hold}, \text{settle}, \text{decompose}\}
+\end{align*}
+
+\subsection{Composition as Interface Products}
+
+Pairwise composition yields new capabilities that use functions from both interfaces:
+
+\begin{align*}
+  \mathcal{I}(\text{Sched}) \times \mathcal{I}(\text{Tools}) &\to \text{durable\_tool\_invocation} \\
+  \mathcal{I}(\text{Sched}) \times \mathcal{I}(\text{Memory}) &\to \text{persistent\_agent\_state} \\
+  \mathcal{I}(\text{Tools}) \times \mathcal{I}(\text{Memory}) &\to \text{cached\_tool\_results} \\
+  \mathcal{I}(\text{Plan}) \times \mathcal{I}(\text{Sched}) &\to \text{market\_dispatched\_agents} \\
+  \mathcal{I}(\text{Plan}) \times \mathcal{I}(\text{Memory}) &\to \text{persistent\_market\_state} \\
+  \mathcal{I}(\text{Plan}) \times \mathcal{I}(\text{Tools}) &\to \text{capability\_verified\_matching}
+\end{align*}
+
+\subsection{The Full Product}
+
+The AgentOS umbrella is the product of all four interfaces:
+\[
+  \mathcal{I}(\text{AgentOS}) = \mathcal{I}(\text{Memory}) \times \mathcal{I}(\text{Tools}) \times \mathcal{I}(\text{Sched}) \times \mathcal{I}(\text{Plan})
+\]
+
+with the startup ordering constraint:
+\[
+  \text{Memory} \prec \text{Tools} \prec \text{Sched} \prec \text{Plan}
+\]
+
+where $A \prec B$ means ``$A$ must be fully initialized before $B$ starts.''
+
+The facade module $\texttt{AgentOS}$ projects from this product to a simplified
+interface:
+\[
+  \pi : \mathcal{I}(\text{AgentOS}) \to \{\text{start}, \text{submit\_job}, \text{status}\}
+\]
+
+
+% ========================================================================
+\section{Emergent Properties of Composition}\label{sec:emergent}
+
+Beyond the pairwise compositions analyzed in Section~\ref{sec:pairwise},
+the full four-way composition exhibits emergent properties that require
+all four subsystems to interact.
+
+\subsection{End-to-End Durable Execution}
+
+The combination of:
+\begin{itemize}
+  \item Agent memoization (Scheduler)
+  \item Tool sandboxing (Tool Interface)
+  \item Mnesia persistence (Memory Layer)
+  \item Escrow transactions (Planner Engine)
+\end{itemize}
+yields end-to-end durable execution: a job can crash at any point and resume
+from the last successful step without re-executing tools, losing memory, or
+double-spending credits.
+
+\subsection{Self-Improving Reputation}
+
+The feedback loop:
+\[
+  \text{Evaluation} \xrightarrow{\text{scores}} \text{Reputation}
+  \xrightarrow{\text{trust}} \text{OrderBook}
+  \xrightarrow{\text{matching}} \text{Contracts}
+  \xrightarrow{\text{execution}} \text{Evaluation}
+\]
+creates a self-improving system where high-performing agents receive more
+contracts (via lower cost functionals), which produces more evaluations,
+which refines their reputation scores. The anti-gaming detectors prevent
+this feedback loop from being exploited.
+
+\subsection{Adaptive Pipeline Composition}
+
+The combination of DAG decomposition (Planner) with streaming pipelines
+(Scheduler) enables adaptive execution: if an agent at stage $i$ discovers
+new information (persisted in Memory), the planner can dynamically add new
+subtasks to the DAG and extend the pipeline.
+
+
+% ========================================================================
+\section{Related Work}\label{sec:related}
+
+\subsection{Agent Frameworks}
+
+\textbf{LangChain}~\citep{langchain2023} and \textbf{AutoGPT}~\citep{autogpt2023}
+provide agent orchestration but lack formal process management, financial
+settlement, and typed memory systems. \textbf{CrewAI}~\citep{crewai2024}
+introduces team-based agent coordination but without market mechanisms
+or capability-based security.
+
+\subsection{Operating System Analogies}
+
+\textbf{AIOS}~\citep{mei2024aios} proposes an LLM-based OS with agent scheduling
+and tool management but does not address financial mechanisms or typed memory.
+\textbf{AgentOS} by SWE-agent~\citep{yang2024swe} focuses on software engineering
+tasks without general-purpose memory or market orchestration.
+
+\subsection{OTP and Supervision}
+
+The Erlang/OTP supervision tree model~\citep{armstrong2003thesis} has been
+applied to distributed systems for decades. Our contribution is applying
+these patterns specifically to AI agent management, where the unique challenges
+include durable execution across LLM calls, capability-based tool access,
+typed memory for agent cognition, and market-based resource allocation.
+
+\subsection{Market Mechanisms for AI}
+
+\textbf{MIRI}~\citep{soares2015corrigibility} and
+\textbf{Anthropic}~\citep{bai2022constitutional} study AI alignment but not
+market-based orchestration. The closest work is economic mechanism design
+for multi-agent systems~\citep{shoham2009multiagent}, which we instantiate
+with concrete OTP implementations and Stripe-backed financial settlement.
+
+
+% ========================================================================
+\section{Conclusion}\label{sec:conclusion}
+
+This paper has presented the synthesis of four independently developed subsystems
+into a unified AI operating system. The key contributions are:
+
+\begin{enumerate}
+  \item \textbf{Modular composition via OTP supervision}: The \texttt{AgentOS}
+        umbrella application composes Memory Layer, Tool Interface, Agent Scheduler,
+        and Planner Engine with a dependency-ordered supervision tree that provides
+        fault isolation and automatic recovery.
+
+  \item \textbf{Six pairwise emergent capabilities}: Every pair of subsystems
+        yields capabilities that neither provides alone: durable tool invocation,
+        persistent agent state, cached tool results, market-dispatched agents,
+        persistent market state, and capability-verified matching.
+
+  \item \textbf{Complete production job lifecycle}: The composed system supports
+        the full cycle from job submission through decomposition, market matching,
+        agent execution with tools and memory, evaluation, and financial settlement.
+
+  \item \textbf{Formal guarantees}: We proved fault isolation (Theorem~\ref{thm:fault-isolation}),
+        agent independence (Theorem~\ref{thm:agent-isolation}), cross-module type
+        safety (Theorem~\ref{thm:type-safety}), credit-weighted fairness
+        (Theorem~\ref{thm:fairness}), and credit conservation
+        (Theorem~\ref{thm:conservation}).
+
+  \item \textbf{Production validation}: The system is deployed as the Agent-Hero
+        marketplace, a Next.js + Supabase + Stripe platform running on BEAM.
+\end{enumerate}
+
+The central lesson is that complex AI systems need not be monolithic.
+By designing each subsystem as a self-contained module with a well-defined
+interface, and composing them through standard functional programming patterns
+(supervision trees, message passing, typed interfaces), we achieve both
+modularity and emergent capability. The BEAM virtual machine provides the
+ideal substrate: lightweight processes for massive agent concurrency,
+supervision trees for fault tolerance, and Mnesia for distributed
+transactional state.
+
+\subsection{Future Work}
+
+\begin{itemize}
+  \item \textbf{Distributed deployment}: Extending AgentOS across multiple
+        BEAM nodes for horizontal scaling, using Erlang distribution for
+        cross-node GenServer calls and Mnesia replication for distributed memory.
+
+  \item \textbf{Formal verification}: Using session types or
+        Scribble~\citep{honda2012scribble} to formally verify the message-passing
+        protocols between subsystems.
+
+  \item \textbf{Adaptive scheduling}: Replacing the static avruntime formula with
+        a learned scheduling policy that adapts to workload characteristics.
+
+  \item \textbf{Vector memory backends}: Integrating ChromaDB for semantic search
+        and FalkorDB for graph traversal, extending the Memory Layer's storage
+        router with production-grade backends.
+
+  \item \textbf{Multi-agent negotiation}: Extending the order book with
+        multi-round negotiation protocols where agents can counter-propose
+        and clients can revise requirements.
+\end{itemize}
+
+
+% ========================================================================
+\appendix
+\section{Module Dependency Matrix}\label{app:deps}
+
+Table~\ref{tab:deps} shows which modules each subsystem calls, establishing
+the complete dependency graph of the composed system.
+
+\begin{table}[H]
+\centering
+\caption{Cross-subsystem module dependencies. Rows are callers, columns are callees.}
+\label{tab:deps}
+\small
+\begin{tabular}{l|cccc}
+\toprule
+ & \textbf{Memory} & \textbf{Tools} & \textbf{Scheduler} & \textbf{Planner} \\
+\midrule
+\textbf{Memory}    & ---     & ---     & ---       & --- \\
+\textbf{Tools}     & read    & ---     & ---       & --- \\
+\textbf{Scheduler} & persist & invoke  & ---       & --- \\
+\textbf{Planner}   & persist & verify  & dispatch  & --- \\
+\textbf{AgentOS}   & status  & list    & ---       & submit \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The matrix is lower-triangular (with the exception of AgentOS, which calls
+all four), confirming that the dependency order
+Memory $\prec$ Tools $\prec$ Scheduler $\prec$ Planner is acyclic.
+
+
+\section{Supervision Tree Diagram}\label{app:supervision}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  every node/.style={font=\ttfamily\footnotesize},
+  level 1/.style={sibling distance=4cm, level distance=1.8cm},
+  level 2/.style={sibling distance=2.5cm, level distance=1.8cm},
+  level 3/.style={sibling distance=1.5cm, level distance=1.5cm},
+  sup/.style={draw, rounded corners, fill=red!10, minimum width=2.2cm, align=center},
+  gen/.style={draw, rounded corners, fill=blue!10, minimum width=2cm, align=center},
+  dyn/.style={draw, rounded corners, fill=green!10, minimum width=2cm, align=center},
+  edge from parent/.style={draw, -{Stealth[length=5pt]}},
+]
+  \node[sup] {AgentOS\\Supervisor}
+    child { node[sup] {MemoryLayer\\Supervisor}
+      child { node[gen] {Schema\\Registry} }
+      child { node[gen] {Storage\\Router} }
+      child { node[gen] {Graph\\Manager} }
+    }
+    child { node[sup] {ToolInterface\\Supervisor}
+      child { node[gen] {Tool\\Registry} }
+      child { node[gen] {Audit\\Logger} }
+    }
+    child { node[sup] {AgentScheduler\\AppSupervisor}
+      child { node[gen] {Evaluator} }
+      child { node[gen] {Scheduler} }
+      child { node[gen] {Pipeline} }
+      child { node[dyn] {Agent\\Pool} }
+    }
+    child { node[sup] {PlannerEngine\\Supervisor}
+      child { node[gen] {Escrow} }
+      child { node[gen] {OrderBook} }
+      child { node[gen] {Reputation} }
+      child { node[gen] {Market} }
+    };
+\end{tikzpicture}
+\caption{Complete supervision tree of AgentOS. Red = supervisors, blue = GenServers,
+green = DynamicSupervisor.}
+\label{fig:full-tree}
+\end{figure}
+
+
+\section{Message Flow Diagram}\label{app:messages}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  node distance=3cm,
+  box/.style={draw, rounded corners, minimum width=2.5cm, minimum height=1cm,
+              font=\small\ttfamily, align=center},
+  arrow/.style={-{Stealth[length=6pt]}, thick},
+  label/.style={font=\scriptsize, midway, above, sloped}
+]
+  \node[box, fill=purple!10] (client) {Client};
+  \node[box, fill=purple!10, right=of client] (planner) {Planner\\Engine};
+  \node[box, fill=green!10, below=2cm of planner] (scheduler) {Agent\\Scheduler};
+  \node[box, fill=orange!10, right=of scheduler] (tools) {Tool\\Interface};
+  \node[box, fill=blue!10, below=2cm of scheduler] (memory) {Memory\\Layer};
+
+  \draw[arrow] (client) -- (planner) node[label] {submit\_job};
+  \draw[arrow] (planner) -- (scheduler) node[label] {assign\_job};
+  \draw[arrow] (scheduler) -- (tools) node[label] {invoke};
+  \draw[arrow] (scheduler) -- (memory) node[label] {persist};
+  \draw[arrow] (tools) -- (memory) node[label] {cache};
+  \draw[arrow, dashed] (scheduler) to[bend right=30] node[label, below, sloped] {evaluate} (planner);
+\end{tikzpicture}
+\caption{Primary message flows between subsystems during job execution.
+Solid arrows are synchronous \texttt{GenServer.call}; dashed arrows are
+asynchronous feedback loops.}
+\label{fig:messages}
+\end{figure}
+
+
+\section{Algorithm: Complete Job Execution}\label{app:algorithm}
+
+\begin{algorithm}[H]
+\DontPrintSemicolon
+\SetAlgoLined
+\KwIn{Job specification $J$ with client $c$, task $\tau$, subtasks $[s_1, \ldots, s_n]$, budget $B$}
+\KwOut{Evaluation result and financial settlement}
+\BlankLine
+\tcp{Phase 1: Decomposition (Planner Engine)}
+$\text{DAG} \gets \texttt{Decomposer.decompose}(J)$\;
+$\text{levels} \gets \texttt{Decomposer.topological\_sort}(\text{DAG})$\;
+\BlankLine
+\tcp{Phase 2: Market Matching (Planner Engine)}
+\texttt{OrderBook.post\_demand}$(c, \tau, B)$\;
+\ForEach{proposal $p$ from agents}{
+  \texttt{OrderBook.submit\_proposal}$(p)$\;
+}
+$\text{contract} \gets \texttt{Market.clear\_market}(\tau)$\;
+$\text{escrow\_id} \gets \texttt{Escrow.hold}(c, p.\text{credits}, \text{contract.id})$\;
+\BlankLine
+\tcp{Phase 3: Execution (Scheduler + Tools + Memory)}
+$\text{agent} \gets \texttt{Scheduler.start\_agent}(\text{contract.operator\_id})$\;
+$\text{cap} \gets \texttt{ToolInterface.grant\_capability}(\text{agent}, \text{tools})$\;
+\texttt{ToolInterface.freeze()}\;
+\ForEach{level $L$ in levels}{
+  \ForEach{subtask $s$ in $L$ \textbf{in parallel}}{
+    $\text{result} \gets \texttt{Agent.execute\_step}(\text{agent}, s.\text{id}, \lambda.\;$
+    $\quad \texttt{ToolInterface.invoke}(\text{agent}, s.\text{tool}, s.\text{input}, \text{cap})$
+    $)$\;
+    \texttt{Memory.create}$(\text{FactData}\{s.\text{id}, \text{result}\})$\;
+  }
+}
+\texttt{Agent.complete}$(\text{agent}, \text{results})$\;
+\BlankLine
+\tcp{Phase 4: Evaluation and Settlement}
+$\text{scores} \gets \texttt{Evaluator.evaluate}(\text{agent}, \text{quality\_vector})$\;
+$\text{split} \gets \texttt{Market.complete\_contract}(\text{contract.id}, \text{quality\_vector})$\;
+\texttt{Reputation.record\_quality}$(\text{agent}, \text{quality\_vector})$\;
+\Return{$(\text{scores}, \text{split})$}
+\caption{Complete job execution through all four AgentOS subsystems}
+\label{alg:full-job}
+\end{algorithm}
+
+
+% ========================================================================
+\bibliographystyle{plainnat}
+\begin{thebibliography}{99}
+
+\bibitem[Armstrong(2003)]{armstrong2003thesis}
+J.~Armstrong.
+\newblock Making reliable distributed systems in the presence of software errors.
+\newblock PhD thesis, Royal Institute of Technology, Stockholm, 2003.
+
+\bibitem[AutoGPT(2023)]{autogpt2023}
+T.~Richards et~al.
+\newblock {AutoGPT}: An autonomous GPT-4 agent.
+\newblock \url{https://github.com/Significant-Gravitas/AutoGPT}, 2023.
+
+\bibitem[Bai et~al.(2022)]{bai2022constitutional}
+Y.~Bai, S.~Kadavath, S.~Kundu, et~al.
+\newblock Constitutional {AI}: Harmlessness from {AI} feedback.
+\newblock \emph{arXiv preprint arXiv:2212.08073}, 2022.
+
+\bibitem[CrewAI(2024)]{crewai2024}
+J.~Moura.
+\newblock {CrewAI}: Framework for orchestrating role-playing AI agents.
+\newblock \url{https://github.com/joaomdmoura/crewAI}, 2024.
+
+\bibitem[Honda et~al.(2012)]{honda2012scribble}
+K.~Honda, N.~Yoshida, and M.~Carbone.
+\newblock Multiparty asynchronous session types.
+\newblock \emph{Journal of the ACM}, 63(1):1--67, 2016.
+
+\bibitem[LangChain(2023)]{langchain2023}
+H.~Chase.
+\newblock {LangChain}: Building applications with {LLMs} through composability.
+\newblock \url{https://github.com/langchain-ai/langchain}, 2023.
+
+\bibitem[Mei et~al.(2024)]{mei2024aios}
+K.~Mei, Z.~Li, S.~Xu, et~al.
+\newblock {AIOS}: {LLM} agent operating system.
+\newblock \emph{arXiv preprint arXiv:2403.16971}, 2024.
+
+\bibitem[Shoham and Leyton-Brown(2009)]{shoham2009multiagent}
+Y.~Shoham and K.~Leyton-Brown.
+\newblock \emph{Multiagent Systems: Algorithmic, Game-Theoretic, and Logical
+  Foundations}.
+\newblock Cambridge University Press, 2009.
+
+\bibitem[Soares et~al.(2015)]{soares2015corrigibility}
+N.~Soares, B.~Fallenstein, E.~Yudkowsky, and S.~Armstrong.
+\newblock Corrigibility.
+\newblock In \emph{AAAI Workshop on AI and Ethics}, 2015.
+
+\bibitem[Yang et~al.(2024)]{yang2024swe}
+J.~Yang, C.~Jimenez, A.~Wettig, et~al.
+\newblock {SWE-agent}: Agent-computer interfaces enable automated software engineering.
+\newblock \emph{arXiv preprint arXiv:2405.15793}, 2024.
+
+\end{thebibliography}
 
 \end{document}

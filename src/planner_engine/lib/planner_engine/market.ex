@@ -47,6 +47,8 @@ defmodule PlannerEngine.Market do
   @operator_share 0.70
   @platform_share 0.15
   @llm_reserve_share 0.15
+  # Suppress unused warning — reserved for future LLM cost accounting
+  _ = @llm_reserve_share
 
   # ── Types ──────────────────────────────────────────────────────────────────
 

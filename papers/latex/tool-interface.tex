@@ -1,5 +1,6 @@
 % ===========================================================================
-% Paper II: Tool Interface Layer — Morphisms, Security, and Capability Abstraction
+% Paper II: Tool Interface Layer — Composition, Capabilities, and the
+%           Elixir/OTP Reference Implementation
 % Series: The AI Operating System (Part II of V)
 % ===========================================================================
 \documentclass[12pt,a4paper]{article}
@@ -10,7 +11,6 @@
 \usepackage{lmodern}
 \usepackage[margin=1in]{geometry}
 \usepackage{amsmath,amssymb,amsthm,mathtools}
-\usepackage{tikz-cd}
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning,calc,shapes.geometric,decorations.pathmorphing,fit}
 \usepackage[colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
@@ -28,9 +28,20 @@
 \usepackage{eso-pic}
 
 % ---------- GrokRxiv sidebar ----------
+\definecolor{grokgray}{RGB}{110,110,110}
 \AddEverypageHook{%
   \ifnum\value{page}=1
-    \put(527,-400){\rotatebox{90}{\footnotesize\texttt{GrokRxiv:2026.03.tool-interface-ai-os [cs.AI] 10 Mar 2026}}}
+    \begin{tikzpicture}[remember picture, overlay]
+      \node[
+        rotate=90,
+        anchor=south,
+        font=\Large\sffamily\bfseries\color{grokgray},
+        inner sep=0pt
+      ] at ([xshift=38pt, yshift=0.52\paperheight]current page.south west)
+      {GrokRxiv:2026.03.tool-interface-ai-os\quad
+       [\,cs.AI\,]\quad
+       10 Mar 2026};
+    \end{tikzpicture}
   \fi
 }
 
@@ -45,8 +56,7 @@
 \newtheorem{definition}[theorem]{Definition}
 \newtheorem{example}[theorem]{Example}
 \newtheorem{remark}[theorem]{Remark}
-\newtheorem{axiom}[theorem]{Axiom}
-\newtheorem{construction}[theorem]{Construction}
+\newtheorem{designprinciple}[theorem]{Design Principle}
 
 % ---------- code listings ----------
 \definecolor{codebg}{RGB}{248,248,248}
@@ -59,8 +69,8 @@
 \lstdefinelanguage{elixir}{
   keywords={def,defp,defmodule,do,end,fn,use,require,import,alias,case,cond,if,else,
             when,with,for,receive,after,try,catch,rescue,raise,throw,spawn,send,
-            defstruct,defprotocol,defimpl,quote,unquote,@,true,false,nil,
-            GenServer,Supervisor,Application,Agent},
+            defstruct,defprotocol,defimpl,quote,unquote,@,true,false,nil,not,in,
+            GenServer,Supervisor,Application,Agent,Task,Process},
   sensitive=true,
   morecomment=[l]{\#},
   morestring=[b]",
@@ -114,19 +124,9 @@
 \renewcommand{\headrulewidth}{0.4pt}
 
 % ---------- custom commands ----------
-\newcommand{\Cat}[1]{\mathbf{#1}}
-\newcommand{\Hom}{\operatorname{Hom}}
-\newcommand{\id}{\operatorname{id}}
-\newcommand{\ob}{\operatorname{ob}}
-\newcommand{\Mor}{\operatorname{Mor}}
-\newcommand{\Set}{\Cat{Set}}
-\newcommand{\Tool}{\Cat{Tool}}
-\newcommand{\Type}{\Cat{Type}}
-\newcommand{\Cap}{\Cat{Cap}}
-\newcommand{\Sand}{\Cat{Sand}}
-\newcommand{\Aud}{\Cat{Aud}}
-\newcommand{\MCP}{\textsc{mcp}}
 \newcommand{\agenthero}{\textsc{Agent-Hero}}
+\newcommand{\MCP}{\textsc{mcp}}
+\newcommand{\pipe}{\;|\!\!>\;}
 
 % ===========================================================================
 \begin{document}
@@ -134,8 +134,8 @@
 % ---------- title ----------
 \begin{center}
   {\LARGE\bfseries The AI Operating System, Part II:\\[4pt]
-  Tool Interface Layer --- Morphisms, Security,\\[2pt]
-  and Capability Abstraction}
+  Tool Interface Layer --- Composition, Capabilities,\\[2pt]
+  and the Elixir/OTP Reference Implementation}
 
   \bigskip
 
@@ -143,7 +143,7 @@
   The YonedaAI Collaboration\\
   YonedaAI Research Collective\\
   Chicago, IL\\[2pt]
-  \texttt{matthew@yonedaai.com} · \texttt{https://yonedaai.com}
+  \texttt{matthew@yonedaai.com} \textperiodcentered{} \texttt{https://yonedaai.com}
 
   \bigskip
 
@@ -155,10 +155,10 @@
 % ===== ABSTRACT =====
 \begin{abstract}
 \noindent
-An AI Operating System mediates every interaction between intelligent agents and the external world through a \emph{tool interface layer} that is analogous to the device-driver subsystem of a classical operating system. In this second paper of a five-part series, we develop a categorical framework in which tools are morphisms in a typed category \Tool, capability tokens are representable functors $\Hom_{\Tool}(T,-)$, and sandboxing corresponds to passage to a quotient subcategory. We prove that tool composition inherits the associativity and identity axioms of the underlying category, that type-safe invocation preserves correctness through a functorial mapping from JSON Schema to algebraic types, and that sandbox isolation prevents information leakage under a formal adversarial model. The framework is instantiated concretely through an analysis of the \agenthero{} platform's three-tier tool registry---Builtin, Sandbox, and MCP (Model Context Protocol)---with its capability-based access control, contract-locked configurations, E2B ephemeral sandboxes, and per-invocation audit logging. We provide a complete implementation in Elixir/OTP that exploits BEAM process isolation as a natural realisation of categorical sandboxing, with GenServer-based registries, capability tokens as process-local state, and supervision trees that mirror the compositional hierarchy. Comparisons are drawn to Unix device models, Plan~9's everything-is-a-file philosophy, Capsicum capabilities, and seL4 verified microkernel security. The paper contains over thirty references spanning capability security, distributed systems, category theory, and the Model Context Protocol specification.
+An AI Operating System mediates every interaction between intelligent agents and the external world through a \emph{tool interface layer} that is analogous to the device-driver subsystem of a classical operating system. In this second paper of a five-part series, we design a tool interface layer built on the principles of functional composition, capability-based security, and sandboxed execution. The design centres on a three-tier tool registry---Builtin, Sandbox, and MCP (Model Context Protocol)---where tools are higher-order functions composed through pipelines, access is governed by HMAC-signed capability tokens with time-to-live and rate limiting, and untrusted code executes in isolated BEAM processes with hard timeouts. We present a complete reference implementation in Elixir/OTP comprising six modules: a GenServer-based registry with freeze semantics, a cryptographic capability token system, a process-isolated sandbox executor, a JSON-RPC MCP protocol client with parallel discovery, an asynchronous audit logger with telemetry integration, and a facade module that composes these components into a single invocation pipeline. The implementation exploits the BEAM virtual machine's natural properties---per-process heap isolation, preemptive scheduling, supervision trees, and message-passing concurrency---to achieve the security and reliability guarantees that classical operating systems obtain through hardware-enforced protection rings. We validate the design against the \agenthero{} production platform, where the three-tier model maps directly to builtin tools, E2B ephemeral sandboxes, and \texttt{StreamableHTTPClientTransport}-based MCP connections. Comparisons are drawn to Unix device drivers, Plan~9, Capsicum capabilities, and seL4 verified security.
 
 \medskip
-\noindent\textbf{Keywords:} AI operating system, tool interface, capability-based security, Model Context Protocol, category theory, morphism composition, Elixir/OTP, sandboxing, type safety
+\noindent\textbf{Keywords:} AI operating system, tool interface, capability-based security, Model Context Protocol, functional composition, Elixir/OTP, sandboxing, pipeline operators, higher-order functions
 \end{abstract}
 
 \tableofcontents
@@ -172,356 +172,1444 @@ The fundamental architectural insight of classical operating systems is that app
 
 In an AI Operating System, the same architectural principle applies with even greater force. Agents---large language models with autonomy over their computational environment---must interact with external systems: databases, web APIs, file systems, code interpreters, and other agents. These interactions are mediated by \emph{tools}: typed functions that accept structured input and return structured output, with well-defined security boundaries, execution constraints, and audit trails.
 
-This paper develops a formal theory of the tool interface layer. Our contributions are:
+This paper develops the design and implementation of the tool interface layer. Our approach is rooted in functional programming: tools are composable functions, security is enforced through unforgeable capability tokens, isolation is achieved through process boundaries, and the entire invocation pipeline is a composition of pure validation, authorized execution, and audit logging. While the underlying ideas can be formalized using category theory (tools as morphisms, capabilities as representable functors), we focus on the engineering design and its concrete realization in Elixir/OTP.
+
+\paragraph{Contributions.} Our contributions are:
 
 \begin{enumerate}[leftmargin=2em]
-\item A \textbf{categorical model} in which tools are morphisms in a category $\Tool$ whose objects are data types, capability tokens are representable functors, and sandboxing is a categorical quotient (Section~\ref{sec:tool-model}).
+\item A \textbf{three-tier tool registry design} (Builtin, Sandbox, MCP) with freeze semantics that locks tool configurations at execution time, preventing privilege escalation through dynamic discovery (Section~\ref{sec:design}).
 
-\item A \textbf{formal security architecture} based on capability-based access control, with proofs that sandbox isolation prevents information leakage and that contract-locked configurations form frozen subcategories (Section~\ref{sec:security}).
+\item A \textbf{capability-based security model} using HMAC-signed tokens with time-to-live, rate limiting, and permission scoping, enforcing the Principle of Least Authority without centralized access control lists (Section~\ref{sec:capabilities}).
 
-\item A detailed analysis of the \textbf{Model Context Protocol} (MCP) as a universal tool interface satisfying a Yoneda-like universality property (Section~\ref{sec:protocol}).
+\item A \textbf{sandboxed execution model} using BEAM process isolation with monitored timeouts, providing the same isolation guarantees as E2B ephemeral environments but at the language-runtime level (Section~\ref{sec:sandbox}).
 
-\item A \textbf{type-theoretic framework} for tool invocation in which JSON Schema to algebraic type conversion is a functor that preserves correctness (Section~\ref{sec:type-safe}).
+\item A \textbf{complete Elixir/OTP reference implementation} comprising six modules totaling approximately 700 lines, with GenServer state machines, supervision trees, and telemetry integration (Sections~\ref{sec:facade}--\ref{sec:audit}).
 
-\item A complete \textbf{Elixir/OTP implementation} that realises the categorical abstractions through BEAM process isolation (Section~\ref{sec:elixir}).
+\item A \textbf{MCP protocol client} with session management, parallel multi-server discovery via \texttt{Task.async\_stream}, and closure-based remote execution (Section~\ref{sec:mcp}).
 
-\item \textbf{Case studies} drawn from the \agenthero{} production platform, including web scraping pipelines, sandboxed code execution, and multi-MCP server orchestration (Section~\ref{sec:case-studies}).
+\item \textbf{Production validation} against the \agenthero{} platform, demonstrating that the reference implementation's design maps directly to a deployed system handling real agent workloads (Section~\ref{sec:production}).
 \end{enumerate}
 
-\paragraph{Relation to the series.} This is Part~II of a five-part series on the AI Operating System. Part~I~\citep{longyoneda2026kernel} established the kernel architecture---the process model and scheduling layer. The present paper builds on that foundation by defining the interface through which scheduled agent processes access external capabilities. Part~III will address memory and persistence, Part~IV the agent orchestration layer, and Part~V the integration of all components into a unified operating system theory.
+\paragraph{Relation to the series.} This is Part~II of a five-part series on the AI Operating System. Part~I~\citep{longyoneda2026kernel} established the kernel architecture---the process model and scheduling layer. The present paper builds on that foundation by defining the interface through which scheduled agent processes access external capabilities. Part~III will address memory and persistence, Part~IV the agent orchestration layer, and Part~V the integration of all components.
+
+\paragraph{Notation.} We use Elixir syntax throughout. The pipe operator \texttt{|>} denotes left-to-right function composition: \texttt{x |> f |> g} means ``apply \texttt{f} to \texttt{x}, then apply \texttt{g} to the result.'' Pattern matching on tagged tuples (\texttt{\{:ok, value\}} and \texttt{\{:error, reason\}}) provides exhaustive error handling. The \texttt{with} expression chains multiple pattern-matched operations, short-circuiting on the first failure.
+
 
 % ===== 2. BACKGROUND =====
-\section{Background}
+\section{Background and Motivation}
 \label{sec:background}
 
-\subsection{Device Drivers and System Calls}
+\subsection{Device Drivers and the Abstraction Principle}
 
 The device driver model in Unix-like operating systems provides three critical properties~\citep{love2010linux}:
 
 \begin{enumerate}[leftmargin=2em]
 \item \textbf{Abstraction.} Applications interact with a uniform file-descriptor interface regardless of the underlying device.
-\item \textbf{Isolation.} A misbehaving driver cannot (in principle) corrupt unrelated kernel state, especially in microkernel designs.
+\item \textbf{Isolation.} A misbehaving driver cannot corrupt unrelated kernel state, especially in microkernel designs.
 \item \textbf{Multiplexing.} Multiple processes can share a single device through the driver's queuing and scheduling logic.
 \end{enumerate}
 
-Plan~9 from Bell Labs extended this model to its logical conclusion: every resource---networks, graphics, even per-process name spaces---is presented as a file system~\citep{pike1995plan9}. This ``everything is a file'' philosophy provides a universal interface that any program can consume without special-purpose client libraries. We argue that the AI OS tool layer should aspire to the same universality.
+Plan~9 from Bell Labs extended this model to its logical conclusion: every resource---networks, graphics, even per-process name spaces---is presented as a file system~\citep{pike1995plan9}. This ``everything is a file'' philosophy provides a universal interface that any program can consume without special-purpose client libraries. The AI OS tool layer aspires to the same universality: every external capability, whether a web search engine, a code interpreter, or a third-party API, is accessed through the same typed invocation protocol.
 
 \subsection{Capability-Based Security}
 
-Traditional access control uses access control lists (ACLs) attached to resources. Capability-based security inverts this: each subject holds unforgeable \emph{capability tokens} that grant specific permissions on specific objects~\citep{dennis1966capabilities,levy1984capability}. Modern realisations include:
+Traditional access control uses access control lists (ACLs) attached to resources. Capability-based security inverts this: each subject holds unforgeable \emph{capability tokens} that grant specific permissions on specific objects~\citep{dennis1966capabilities,levy1984capability}. Modern realizations include:
 
 \begin{itemize}[leftmargin=2em]
 \item \textbf{Capsicum} (FreeBSD): capability mode restricts a sandboxed process to only the file descriptors it was given at entry~\citep{watson2010capsicum}.
 \item \textbf{seL4}: a formally verified microkernel where every system call requires a capability argument~\citep{klein2009sel4}.
 \item \textbf{WASI} (WebAssembly System Interface): capability-based access to host resources from sandboxed WebAssembly modules~\citep{wasi2023spec}.
-\item \textbf{Macaroons}: decentralised capability tokens with contextual caveats for distributed systems~\citep{birgisson2014macaroons}.
+\item \textbf{Macaroons}: decentralized capability tokens with contextual caveats for distributed systems~\citep{birgisson2014macaroons}.
 \end{itemize}
 
-The AI OS adapts capability-based security to the agent setting: each agent holds a set of capability tokens that determine which tools it may invoke, with what parameters, and at what rate.
+The AI OS adapts capability-based security to the agent setting: each agent holds a set of capability tokens that determine which tools it may invoke, with what parameters, and at what rate. Tokens are cryptographically signed, time-bounded, and rate-limited---unforgeable values that travel with the agent rather than being stored in a central authority.
 
-\subsection{Category Theory Preliminaries}
+\subsection{The BEAM Virtual Machine}
 
-We assume familiarity with basic category theory~\citep{maclane1998categories,awodey2010category,leinster2014basic}. We recall the essential definitions for self-containment.
-
-\begin{definition}[Category]
-A \emph{category} $\mathcal{C}$ consists of a collection $\ob(\mathcal{C})$ of objects, for each pair of objects $A,B$ a set $\Hom_{\mathcal{C}}(A,B)$ of morphisms, an identity morphism $\id_A \in \Hom_{\mathcal{C}}(A,A)$ for each object $A$, and a composition operation $\circ : \Hom_{\mathcal{C}}(B,C) \times \Hom_{\mathcal{C}}(A,B) \to \Hom_{\mathcal{C}}(A,C)$ that is associative and unital.
-\end{definition}
-
-\begin{definition}[Functor]
-A \emph{functor} $F : \mathcal{C} \to \mathcal{D}$ maps objects to objects and morphisms to morphisms, preserving identity and composition: $F(\id_A) = \id_{F(A)}$ and $F(g \circ f) = F(g) \circ F(f)$.
-\end{definition}
-
-\begin{definition}[Representable Functor]
-For an object $T$ in a category $\mathcal{C}$, the \emph{representable functor} $\Hom_{\mathcal{C}}(T, -) : \mathcal{C} \to \Set$ maps each object $A$ to the set $\Hom_{\mathcal{C}}(T, A)$ and each morphism $f : A \to B$ to the post-composition function $f_* : \Hom_{\mathcal{C}}(T, A) \to \Hom_{\mathcal{C}}(T, B)$.
-\end{definition}
-
-\begin{definition}[Subobject Classifier]
-In a topos $\mathcal{E}$, a \emph{subobject classifier} is an object $\Omega$ together with a morphism $\top : 1 \to \Omega$ such that for every mono $m : S \hookrightarrow X$ there exists a unique characteristic morphism $\chi_m : X \to \Omega$ making the appropriate pullback square commute~\citep{maclane1994sheaves}.
-\end{definition}
-
-\subsection{Erlang/OTP and the BEAM}
-
-The BEAM virtual machine (Erlang/Elixir runtime) provides lightweight processes with the following properties~\citep{armstrong2003erlang,juric2019elixir}:
+The BEAM virtual machine (Erlang/Elixir runtime) provides properties that make it an ideal substrate for a tool interface layer~\citep{armstrong2003erlang,juric2019elixir}:
 
 \begin{itemize}[leftmargin=2em]
-\item \textbf{Process isolation}: each process has its own heap; no shared mutable state.
-\item \textbf{Message passing}: processes communicate only through asynchronous messages.
-\item \textbf{Supervision trees}: processes are organised hierarchically; a supervisor restarts failed children according to a declared strategy.
-\item \textbf{Hot code loading}: modules can be upgraded at runtime without stopping the system.
+\item \textbf{Process isolation}: Each process has its own heap. There is no shared mutable state between processes.
+\item \textbf{Message passing}: Processes communicate only through asynchronous, copied messages.
+\item \textbf{Preemptive scheduling}: The BEAM scheduler preempts processes after a reduction count, preventing any single tool execution from starving others.
+\item \textbf{Supervision trees}: Processes are organized hierarchically; a supervisor restarts failed children according to a declared strategy.
+\item \textbf{Hot code loading}: Modules can be upgraded at runtime without stopping the system.
 \end{itemize}
 
-These properties make the BEAM an ideal substrate for implementing categorical sandboxing: each sandboxed tool execution becomes a BEAM process whose capability tokens are stored in process-local state, inaccessible to other processes.
+These properties mean that BEAM process isolation provides the same security boundary that classical operating systems achieve through hardware protection rings. A sandboxed tool execution in a spawned BEAM process cannot read the parent's memory, cannot access file descriptors it was not given, and is automatically cleaned up if it crashes or times out.
 
+\subsection{Functional Programming as Design Language}
 
-% ===== 3. TOOL MODEL =====
-\section{Tool Model --- Formal Definition}
-\label{sec:tool-model}
+We frame the tool interface layer using the vocabulary of functional programming rather than, say, object-oriented design patterns or formal category theory. The key concepts are:
 
-\subsection{The Tool Category}
-
-\begin{definition}[Tool Category $\Tool$]
-\label{def:tool-cat}
-The \emph{tool category} $\Tool$ is defined as follows:
-\begin{itemize}
-\item \textbf{Objects.} The objects of $\Tool$ are \emph{data types}---structured schemas that describe the input and output of tool operations. Formally, $\ob(\Tool) = \{ \tau \mid \tau \text{ is a JSON Schema type} \}$.
-\item \textbf{Morphisms.} A morphism $t : \tau_{\text{in}} \to \tau_{\text{out}}$ is a \emph{tool operation} that accepts input of type $\tau_{\text{in}}$ and produces output of type $\tau_{\text{out}}$.
-\item \textbf{Identity.} For each type $\tau$, the identity morphism $\id_\tau : \tau \to \tau$ is the pass-through operation that returns its input unchanged.
-\item \textbf{Composition.} Given $t_1 : \tau_A \to \tau_B$ and $t_2 : \tau_B \to \tau_C$, the composite $t_2 \circ t_1 : \tau_A \to \tau_C$ is the tool pipeline that feeds the output of $t_1$ into $t_2$.
+\begin{itemize}[leftmargin=2em]
+\item \textbf{Composition}: Tools are functions that compose. The output of one tool feeds into the input of the next. Composition is associative: \texttt{x |> f |> g |> h} produces the same result regardless of how we parenthesize the intermediate steps.
+\item \textbf{Higher-order functions}: Tools are values. A tool's \texttt{execute} field holds a function (\texttt{fn input -> \{:ok, result\} end}). This function can be stored, passed, composed, and wrapped.
+\item \textbf{Closures}: The MCP client constructs remote execution functions as closures that capture the server URL, authentication token, and session ID. The caller invokes the closure without knowing it dispatches over HTTP.
+\item \textbf{Pattern matching}: Authorization, validation, and dispatch are implemented as pattern matches on tagged tuples, providing exhaustive case analysis and clear error paths.
+\item \textbf{Pipeline operators}: The invocation pipeline---authorize, validate, execute, audit---is a left-to-right composition expressed with \texttt{with} and \texttt{|>}.
 \end{itemize}
-\end{definition}
 
-\begin{theorem}[Tool Composition is Associative]
-\label{thm:assoc}
-For any composable morphisms $t_1 : \tau_A \to \tau_B$, $t_2 : \tau_B \to \tau_C$, and $t_3 : \tau_C \to \tau_D$ in $\Tool$, composition is associative:
-\[
-  t_3 \circ (t_2 \circ t_1) = (t_3 \circ t_2) \circ t_1.
-\]
-\end{theorem}
+\begin{remark}[Categorical background]
+For readers familiar with category theory, the design has a clean categorical interpretation: tools are morphisms in a typed category, capability tokens correspond to the representable functor $\mathrm{Hom}(T, -)$, and sandboxing is a passage to a restricted subcategory. The Yoneda lemma guarantees that capability tokens faithfully represent tools. We do not develop this formalism here, but note that the functional programming concepts above are the computational counterparts of these categorical structures.
+\end{remark}
 
-\begin{proof}
-Tool operations are functions on typed data. Function composition is associative: for any input $x \in \tau_A$,
-\begin{align}
-  (t_3 \circ (t_2 \circ t_1))(x) &= t_3((t_2 \circ t_1)(x)) = t_3(t_2(t_1(x))), \\
-  ((t_3 \circ t_2) \circ t_1)(x) &= (t_3 \circ t_2)(t_1(x)) = t_3(t_2(t_1(x))).
-\end{align}
-The two expressions are identical for all $x$, establishing associativity. Identity morphisms satisfy $\id_{\tau_B} \circ t_1 = t_1$ and $t_1 \circ \id_{\tau_A} = t_1$ by the same argument. Thus $\Tool$ satisfies the category axioms.
-\end{proof}
 
-% TikZ diagram: tool composition
-\begin{figure}[ht]
-\centering
-\begin{tikzcd}[column sep=3cm, row sep=1.5cm]
-\tau_A \arrow[r, "t_1"{name=t1}] \arrow[rr, bend left=30, "t_2 \circ t_1"{name=comp12}] \arrow[rrr, bend left=50, "t_3 \circ t_2 \circ t_1"{name=comp123}]
-  & \tau_B \arrow[r, "t_2"{name=t2}]
-  & \tau_C \arrow[r, "t_3"{name=t3}]
-  & \tau_D
-\end{tikzcd}
-\caption{Morphism composition in $\Tool$. Associativity ensures that the order of bracketing in a pipeline of tool operations is immaterial.}
-\label{fig:composition}
-\end{figure}
+% ===== 3. THREE-TIER TOOL REGISTRY =====
+\section{Three-Tier Tool Registry Design}
+\label{sec:design}
 
-\subsection{Tool Tiers as Subcategories}
+\subsection{Design Overview}
 
-The \agenthero{} platform organises tools into three tiers, each forming a subcategory of $\Tool$:
+The tool interface layer organizes tools into three tiers based on trust level and execution model. Each tier represents a different trade-off between flexibility and security:
 
-\begin{definition}[Three-Tier Decomposition]
-\label{def:tiers}
-The tool category decomposes as:
-\[
-  \Tool = \Tool_{\text{Builtin}} \cup \Tool_{\text{Sandbox}} \cup \Tool_{\text{MCP}}
-\]
-where:
+\begin{designprinciple}[Tiered Trust]
+\label{dp:tiers}
+Tools are partitioned into three tiers with decreasing trust and increasing isolation requirements:
 \begin{enumerate}
-\item $\Tool_{\text{Builtin}}$ contains statically defined, trusted operations: \texttt{web-search}, \texttt{text-transform}, \texttt{web-scrape}, \texttt{pdf-parse}, \texttt{generate-document}, \texttt{spreadsheet-read}.
-
-\item $\Tool_{\text{Sandbox}}$ contains operations that execute arbitrary code in an isolated environment: \texttt{git-clone}, \texttt{npm-run}, \texttt{code-exec}, \texttt{file-ops}, \texttt{python-exec}, \texttt{shell-exec}.
-
-\item $\Tool_{\text{MCP}}$ contains runtime-discovered tools provided by external MCP servers, namespaced as \texttt{\$\{serverName\}\_\_\$\{toolName\}}.
+\item \textbf{Builtin} --- Statically defined, trusted operations that execute in the registry process itself.
+\item \textbf{Sandbox} --- Operations requiring isolated execution in a separate BEAM process with hard timeouts.
+\item \textbf{MCP} --- Runtime-discovered tools from external Model Context Protocol servers, accessed over HTTP.
 \end{enumerate}
-\end{definition}
+\end{designprinciple}
 
-Each tier has a different trust level, which we formalise through capability restrictions in Section~\ref{sec:security}.
+The three tiers are not an arbitrary partition. They correspond to three fundamentally different trust relationships:
+
+\begin{itemize}[leftmargin=2em]
+\item \textbf{Builtin tools} are authored by the platform developers, reviewed, tested, and deployed as part of the system. They run in the same trust domain as the registry. Examples: \texttt{web-search}, \texttt{text-transform}, \texttt{web-scrape}, \texttt{pdf-parse}, \texttt{generate-document}, \texttt{spreadsheet-read}.
+
+\item \textbf{Sandbox tools} execute code that may come from untrusted sources (agent-generated code, third-party scripts). They must be isolated: separate heap, hard timeout, monitored lifecycle. Examples: \texttt{git-clone}, \texttt{npm-run}, \texttt{code-exec}, \texttt{file-ops}, \texttt{python-exec}, \texttt{shell-exec}.
+
+\item \textbf{MCP tools} are discovered at runtime from external servers. The platform has no control over their implementation. They are accessed via HTTP with Bearer token authentication and namespaced to prevent collisions: \texttt{\$\{serverName\}\_\_\$\{toolName\}}.
+\end{itemize}
 
 \begin{figure}[ht]
 \centering
 \begin{tikzpicture}[
-  tier/.style={draw, rounded corners, minimum width=7cm, minimum height=1.8cm, align=center},
-  label/.style={font=\small\bfseries, anchor=west}
+  tier/.style={draw, rounded corners, minimum width=10cm, minimum height=1.8cm, align=center},
+  label/.style={font=\small\bfseries, anchor=east}
 ]
 \node[tier, fill=green!10] (builtin) at (0,0) {
   \texttt{web-search} \quad \texttt{text-transform} \quad \texttt{web-scrape}\\[2pt]
   \texttt{pdf-parse} \quad \texttt{generate-document} \quad \texttt{spreadsheet-read}
 };
-\node[tier, fill=yellow!10] (sandbox) at (0,-2.5) {
+\node[tier, fill=yellow!10] (sandbox) at (0,-2.8) {
   \texttt{git-clone} \quad \texttt{npm-run} \quad \texttt{code-exec}\\[2pt]
   \texttt{file-ops} \quad \texttt{python-exec} \quad \texttt{shell-exec}
 };
-\node[tier, fill=blue!10] (mcp) at (0,-5) {
-  \texttt{\$\{server\}\_\_\$\{tool\}} \quad (runtime-discovered)\\[2pt]
-  MCP servers via \texttt{StreamableHTTPClientTransport}
+\node[tier, fill=blue!10] (mcp) at (0,-5.6) {
+  \texttt{\$\{server\}\_\_\$\{tool\}} \quad (runtime-discovered via JSON-RPC)\\[2pt]
+  HTTP transport with Bearer token authentication
 };
-\node[label] at (-4.2,0) {Builtin};
-\node[label] at (-4.2,-2.5) {Sandbox};
-\node[label] at (-4.2,-5) {MCP};
+\node[label] at (-5.8,0) {\small Builtin};
+\node[label] at (-5.8,-2.8) {\small Sandbox};
+\node[label] at (-5.8,-5.6) {\small MCP};
 
-\draw[-{Stealth}, thick] (builtin.south) -- (sandbox.north) node[midway, right, font=\footnotesize] {trust boundary};
-\draw[-{Stealth}, thick] (sandbox.south) -- (mcp.north) node[midway, right, font=\footnotesize] {trust boundary};
+\draw[-{Stealth}, thick, red!60!black] (builtin.south) -- (sandbox.north) node[midway, right=4pt, font=\footnotesize\color{red!60!black}] {trust boundary};
+\draw[-{Stealth}, thick, red!60!black] (sandbox.south) -- (mcp.north) node[midway, right=4pt, font=\footnotesize\color{red!60!black}] {trust boundary};
+
+\node[anchor=west, font=\footnotesize] at (5.5, 0) {Direct execution};
+\node[anchor=west, font=\footnotesize] at (5.5, -2.8) {Isolated process};
+\node[anchor=west, font=\footnotesize] at (5.5, -5.6) {Remote HTTP call};
 \end{tikzpicture}
-\caption{Three-tier tool registry in \agenthero{}. Trust decreases from top to bottom; capability requirements increase correspondingly.}
+\caption{Three-tier tool registry. Trust decreases from top to bottom; isolation increases correspondingly. Each tier boundary represents a different execution model.}
 \label{fig:three-tier}
 \end{figure}
 
-\subsection{Capability Tokens as Representable Functors}
+\subsection{Tool Specification as a Record Type}
 
-\begin{definition}[Capability Token]
-\label{def:cap-token}
-Let $T$ be an object of $\Tool$ representing a specific tool's input type. A \emph{capability token} for $T$ is the representable functor
-\[
-  \Cap_T := \Hom_{\Tool}(T, -) : \Tool \to \Set.
-\]
-For each output type $\tau$, $\Cap_T(\tau) = \Hom_{\Tool}(T, \tau)$ is the set of tool operations accessible from $T$ that produce values of type $\tau$.
-\end{definition}
+Every tool, regardless of tier, conforms to a common specification. In Elixir, this is expressed as a typed struct:
 
-The Yoneda lemma~\citep{maclane1998categories} guarantees that each capability token faithfully represents the tool:
+\begin{lstlisting}[language=elixir, caption={Tool specification type.}, label={lst:tool-spec}]
+@type tool_tier :: :builtin | :sandbox | :mcp
 
-\begin{proposition}[Capability Faithfulness via Yoneda]
-\label{prop:yoneda-cap}
-For any functor $F : \Tool \to \Set$, there is a natural bijection
-\[
-  \text{Nat}(\Hom_{\Tool}(T, -), F) \cong F(T).
-\]
-In particular, taking $F = \Hom_{\Tool}(T', -)$, we obtain $\Hom_{\Tool}(T, T') \cong \text{Nat}(\Hom_{\Tool}(T', -), \Hom_{\Tool}(T, -))$. Two tools are indistinguishable by their capability tokens if and only if they are isomorphic in $\Tool$.
-\end{proposition}
+@type tool_spec :: %{
+  name: String.t(),
+  tier: tool_tier(),
+  description: String.t(),
+  input_schema: map(),            # JSON Schema for input validation
+  output_schema: map() | nil,     # JSON Schema for output (optional)
+  validate: (map() -> :ok | {:error, term()}) | nil,
+  execute: (map() -> {:ok, any()} | {:error, term()})
+}
+\end{lstlisting}
 
-\begin{remark}
-In the implementation, a capability token is concretised as a signed, scoped data structure:
-\[
-  \text{token} = (\text{agent\_id}, \text{tool\_id}, \text{permissions}, \text{rate\_limit}, \text{expiry}, \text{signature}).
-\]
-The functor interpretation ensures that the bearer of a token can only access morphisms (tool operations) that the token's scope includes.
-\end{remark}
+The critical field is \texttt{execute}: a higher-order function that takes a map of input parameters and returns a tagged result tuple. This is the tool's runtime behavior, captured as a first-class value. For builtin tools, the function runs directly. For sandbox tools, it runs inside an isolated process. For MCP tools, it is a closure that dispatches a JSON-RPC call over HTTP.
+
+The \texttt{validate} field is an optional higher-order function for input validation. When present, it is called before execution. When absent (nil), all inputs are accepted. This allows tools to define custom validation logic beyond what JSON Schema can express---for example, URL safety checks that block localhost and private IP ranges.
+
+\subsection{The Registry GenServer}
+
+The registry is implemented as a \texttt{GenServer}---an OTP behavior that provides a single-threaded, message-driven state machine. The state holds three maps (one per tier) plus a boolean frozen flag:
+
+\begin{lstlisting}[language=elixir, caption={Registry state and initialization.}, label={lst:registry-state}]
+defmodule ToolInterface.Registry do
+  use GenServer
+  require Logger
+
+  defstruct builtin: %{}, sandbox: %{}, mcp: %{}, frozen: false
+
+  def start_link(opts \\ []) do
+    GenServer.start_link(__MODULE__, opts, name: __MODULE__)
+  end
+
+  @impl true
+  def init(_opts) do
+    state = %__MODULE__{
+      builtin: load_builtin_tools(),
+      sandbox: load_sandbox_tools(),
+      mcp: %{},
+      frozen: false
+    }
+    Logger.info(
+      "[Registry] Initialized with #{map_size(state.builtin)} builtin, " <>
+      "#{map_size(state.sandbox)} sandbox tools"
+    )
+    {:ok, state}
+  end
+end
+\end{lstlisting}
+
+Builtin and sandbox tools are loaded at startup from static definitions. MCP tools start empty and are populated through runtime discovery. The GenServer's single-threaded message processing guarantees that all registry operations---lookup, registration, freezing---are serialized, eliminating race conditions without explicit locks.
+
+\subsection{Lookup: Searching Across Tiers}
+
+Tool lookup searches across all three tiers in priority order (builtin first, then sandbox, then MCP):
+
+\begin{lstlisting}[language=elixir, caption={Tool lookup across tiers.}, label={lst:lookup}]
+def handle_call({:lookup, tool_id}, _from, state) do
+  result =
+    case Map.get(state.builtin, tool_id) ||
+         Map.get(state.sandbox, tool_id) ||
+         Map.get(state.mcp, tool_id) do
+      nil  -> {:error, :not_found}
+      tool -> {:ok, tool}
+    end
+  {:reply, result, state}
+end
+\end{lstlisting}
+
+The \texttt{||} chain is a pattern common in Elixir: it evaluates left-to-right and returns the first non-nil value. This gives builtin tools priority over sandbox tools, and sandbox tools priority over MCP tools. A builtin \texttt{web-search} cannot be shadowed by an MCP tool with the same name.
+
+\subsection{MCP Registration with Namespacing}
+
+When an MCP server is discovered, its tools are registered with a namespace prefix to prevent collisions:
+
+\begin{lstlisting}[language=elixir, caption={MCP tool registration with namespace and freeze guard.}, label={lst:register-mcp}]
+def handle_call({:register_mcp, _server_name, _tools}, _from,
+                %{frozen: true} = state) do
+  {:reply, {:error, :frozen}, state}
+end
+
+def handle_call({:register_mcp, server_name, tools}, _from, state) do
+  namespaced =
+    for tool <- tools, into: %{} do
+      namespaced_name = "#{server_name}__#{tool.name}"
+      spec = %{
+        name: namespaced_name,
+        tier: :mcp,
+        description: Map.get(tool, :description, ""),
+        input_schema: Map.get(tool, :input_schema, %{}),
+        output_schema: Map.get(tool, :output_schema, nil),
+        validate: build_mcp_validator(tool),
+        execute: Map.get(tool, :execute,
+                         fn _ -> {:error, :not_implemented} end)
+      }
+      {namespaced_name, spec}
+    end
+
+  Logger.info("[Registry] Registered #{map_size(namespaced)} " <>
+              "MCP tools from #{server_name}")
+  {:reply, :ok, %{state | mcp: Map.merge(state.mcp, namespaced)}}
+end
+\end{lstlisting}
+
+Note the two clauses of \texttt{handle\_call}: the first pattern matches on \texttt{\%\{frozen: true\}} and rejects the registration. The second clause handles the normal case. This is Elixir's pattern matching applied to state machine design---the frozen guard is not a runtime conditional but a structural match on the state.
+
+\subsection{Freeze Semantics: Contract-Locked Configuration}
+
+The freeze operation is the registry's most important security feature:
+
+\begin{lstlisting}[language=elixir, caption={Registry freeze operation.}, label={lst:freeze}]
+def handle_call(:freeze, _from, state) do
+  total = map_size(state.builtin) +
+          map_size(state.sandbox) +
+          map_size(state.mcp)
+  Logger.info("[Registry] Frozen with #{total} total tools")
+  {:reply, :ok, %{state | frozen: true}}
+end
+\end{lstlisting}
+
+Once frozen, the registry is immutable: no new tools can be registered. This implements the \emph{contract-locked configuration} pattern. When an agent execution begins, the tool set is frozen. The agent cannot discover additional tools or escalate its privileges by connecting to new MCP servers during execution. This is analogous to Capsicum's capability mode~\citep{watson2010capsicum}: once a process enters capability mode, it can only use the file descriptors it already holds.
+
+\begin{designprinciple}[Contract Locking]
+\label{dp:freeze}
+The set of available tools must be frozen before agent execution begins. No tool registration, deregistration, or modification is permitted during execution. This prevents:
+\begin{enumerate}
+\item Privilege escalation through dynamic tool discovery.
+\item Time-of-check/time-of-use (TOCTOU) vulnerabilities in capability validation.
+\item Non-deterministic behavior from changing tool sets mid-execution.
+\end{enumerate}
+\end{designprinciple}
+
+\subsection{Builtin Tool Definitions}
+
+Builtin tools are defined as maps with higher-order functions for validation and execution. Here is the \texttt{web-search} tool with its input validator:
+
+\begin{lstlisting}[language=elixir, caption={Builtin tool definition with validation function.}, label={lst:builtin-tool}]
+%{
+  name: "web-search",
+  tier: :builtin,
+  description: "Search the web using a query string",
+  input_schema: %{
+    "type" => "object",
+    "properties" => %{
+      "query" => %{"type" => "string"},
+      "max_results" => %{
+        "type" => "integer", "minimum" => 1, "maximum" => 20
+      }
+    },
+    "required" => ["query"]
+  },
+  output_schema: %{
+    "type" => "array",
+    "items" => %{"type" => "object"}
+  },
+  validate: &validate_web_search/1,
+  execute: fn input ->
+    {:ok, %{results: [], query: input["query"]}}
+  end
+}
+\end{lstlisting}
+
+The \texttt{validate} field uses a function capture (\texttt{\&validate\_web\_search/1}) that points to a private function performing domain-specific validation:
+
+\begin{lstlisting}[language=elixir, caption={Pattern-matched input validation.}, label={lst:validate}]
+defp validate_web_search(%{"query" => q})
+  when is_binary(q) and byte_size(q) > 0, do: :ok
+defp validate_web_search(_), do: {:error, :invalid_query}
+\end{lstlisting}
+
+This is pure pattern matching: the function has two clauses. The first matches a map with a non-empty binary \texttt{"query"} key and returns \texttt{:ok}. The second is a catch-all that returns an error. There is no conditional logic, no null checking, no exception throwing---just exhaustive pattern matching on the input structure.
+
+\subsection{URL Safety Validation}
+
+Tools that access URLs (\texttt{web-scrape}, \texttt{pdf-parse}, \texttt{git-clone}) share a URL safety validator that blocks access to localhost, loopback, link-local, and private network ranges:
+
+\begin{lstlisting}[language=elixir, caption={URL safety validation blocking internal addresses.}, label={lst:url-safety}]
+defp validate_url_string(url) do
+  uri = URI.parse(url)
+  blocked_hosts = ["localhost", "127.0.0.1", "0.0.0.0", "::1"]
+  blocked_prefixes = [
+    "169.254.", "10.", "192.168.",
+    "172.16.", "172.17.", "172.18.", "172.19.",
+    "172.20.", "172.21.", "172.22.", "172.23.",
+    "172.24.", "172.25.", "172.26.", "172.27.",
+    "172.28.", "172.29.", "172.30.", "172.31."
+  ]
+  host = uri.host || ""
+
+  cond do
+    host in blocked_hosts ->
+      {:error, {:blocked_host, host}}
+    Enum.any?(blocked_prefixes,
+              &String.starts_with?(host, &1)) ->
+      {:error, {:blocked_ip_range, host}}
+    true ->
+      :ok
+  end
+end
+\end{lstlisting}
+
+This prevents Server-Side Request Forgery (SSRF) attacks where an agent tricks a tool into accessing internal infrastructure. The blocked ranges cover the full RFC~1918 private address space plus the AWS metadata endpoint range (\texttt{169.254.x.x}).
+
+\subsection{Listing and Filtering}
+
+The registry supports listing tools filtered by tier, implemented through pattern-matched \texttt{handle\_call} clauses:
+
+\begin{lstlisting}[language=elixir, caption={Filtered tool listing.}, label={lst:list}]
+def handle_call({:list, nil}, _from, state) do
+  all = Map.values(state.builtin) ++
+        Map.values(state.sandbox) ++
+        Map.values(state.mcp)
+  {:reply, all, state}
+end
+
+def handle_call({:list, :builtin}, _from, state) do
+  {:reply, Map.values(state.builtin), state}
+end
+
+def handle_call({:list, :sandbox}, _from, state) do
+  {:reply, Map.values(state.sandbox), state}
+end
+
+def handle_call({:list, :mcp}, _from, state) do
+  {:reply, Map.values(state.mcp), state}
+end
+\end{lstlisting}
+
+Each tier filter is its own function clause. Adding a new tier would mean adding a new clause---no modification to existing code. This is the open/closed principle realized through pattern matching.
 
 
-% ===== 4. SECURITY ARCHITECTURE =====
-\section{Security Architecture}
-\label{sec:security}
+% ===== 4. CAPABILITY-BASED SECURITY =====
+\section{Capability Token System}
+\label{sec:capabilities}
 
-\subsection{Capability-Based Access Control}
+\subsection{Design Philosophy}
 
-\begin{definition}[Capability System]
-\label{def:cap-system}
-A \emph{capability system} for $\Tool$ is a triple $(\mathcal{A}, \Gamma, \vdash)$ where:
-\begin{itemize}
-\item $\mathcal{A}$ is a set of \emph{agents},
-\item $\Gamma : \mathcal{A} \to \mathcal{P}(\Mor(\Tool))$ assigns to each agent a set of permitted morphisms (its capability set),
-\item $\vdash$ is a judgement: $a \vdash t$ means agent $a$ is authorised to invoke tool $t$.
+The tool interface layer uses capability-based access control rather than access control lists. Each agent holds unforgeable tokens that grant specific permissions on specific tools. A token is a value: it can be passed, stored, and validated, but it cannot be forged because it carries a cryptographic signature.
+
+\begin{designprinciple}[Capability Tokens as Values]
+\label{dp:cap-values}
+Capability tokens are immutable value types, not references to centralized state. A token encodes:
+\begin{enumerate}
+\item \emph{Who}: the agent identity (\texttt{agent\_id}).
+\item \emph{What}: the tool identity (\texttt{tool\_id}).
+\item \emph{How}: the permitted operations (\texttt{permissions}).
+\item \emph{How fast}: the maximum invocation rate (\texttt{rate\_limit}).
+\item \emph{Until when}: the expiry time (\texttt{expires\_at}).
+\item \emph{Proof}: the HMAC-SHA256 signature (\texttt{signature}).
+\end{enumerate}
+\end{designprinciple}
+
+This design has several advantages over centralized ACLs:
+
+\begin{itemize}[leftmargin=2em]
+\item \textbf{No central bottleneck}: Authorization is validated locally by checking the token's signature. There is no database lookup, no network call, no single point of failure.
+\item \textbf{Offline validation}: A token can be validated without contacting any authority---the HMAC signature is self-contained.
+\item \textbf{Fine-grained scoping}: Each token is scoped to exactly one tool. An agent with access to ten tools holds ten tokens.
+\item \textbf{Time-bounded}: Tokens expire automatically. Compromised tokens have a limited window of exploitability.
+\item \textbf{Rate-limited}: Each token enforces a per-minute invocation cap, preventing abuse even with valid credentials.
 \end{itemize}
-The judgement is defined by: $a \vdash t \iff t \in \Gamma(a)$.
-\end{definition}
 
-\begin{axiom}[Principle of Least Authority]
-\label{ax:pola}
-For each agent $a \in \mathcal{A}$ and task $\phi$, the capability set $\Gamma(a)$ contains only those morphisms necessary to complete $\phi$:
-\[
-  \Gamma(a) = \{ t \in \Mor(\Tool) \mid \phi \text{ requires } t \}.
-\]
-\end{axiom}
+\subsection{Token Structure}
 
-In the \agenthero{} system, the Principle of Least Authority is enforced through \emph{contract-locked tool configurations}: when an agent execution begins, the set of available tools is frozen and cannot be modified during the run. This prevents privilege escalation through dynamic tool discovery.
+The capability token is implemented as an Elixir struct with enforced keys:
 
-\subsection{Sandboxing as Categorical Quotient}
+\begin{lstlisting}[language=elixir, caption={Capability token struct definition.}, label={lst:cap-struct}]
+defmodule ToolInterface.Capability do
+  @type permission :: :invoke | :inspect | :compose
 
-\begin{definition}[Sandbox Subcategory]
-\label{def:sandbox}
-Given a capability set $\Gamma(a)$ for agent $a$, the \emph{sandbox} of $a$ is the subcategory
-\[
-  \Sand_a := \Tool|_{\Gamma(a)}
-\]
-where $\ob(\Sand_a) = \{ \tau \in \ob(\Tool) \mid \exists t \in \Gamma(a).\; \text{src}(t) = \tau \text{ or } \text{tgt}(t) = \tau \}$ and $\Mor(\Sand_a) = \Gamma(a) \cup \{ \id_\tau \mid \tau \in \ob(\Sand_a) \}$.
-\end{definition}
+  @type t :: %__MODULE__{
+    agent_id: String.t(),
+    tool_id: String.t(),
+    permissions: [permission()],
+    rate_limit: pos_integer(),
+    expires_at: DateTime.t(),
+    signature: binary(),
+    invocation_count: non_neg_integer(),
+    last_reset_at: DateTime.t()
+  }
 
-\begin{definition}[Information Leakage]
-\label{def:leakage}
-Let $\Sand_a$ and $\Sand_b$ be sandboxes for agents $a$ and $b$. An \emph{information leak} from $a$ to $b$ is a morphism $\ell : \tau_a \to \tau_b$ where $\tau_a \in \ob(\Sand_a) \setminus \ob(\Sand_b)$ and $\tau_b \in \ob(\Sand_b)$, and $\ell \notin \Gamma(a) \cup \Gamma(b)$.
-\end{definition}
+  @enforce_keys [:agent_id, :tool_id, :permissions,
+                 :rate_limit, :expires_at, :signature]
+  defstruct [
+    :agent_id, :tool_id, :permissions,
+    :rate_limit, :expires_at, :signature,
+    invocation_count: 0,
+    last_reset_at: nil
+  ]
+end
+\end{lstlisting}
 
-\begin{theorem}[Sandbox Isolation]
-\label{thm:isolation}
-If $\Sand_a$ and $\Sand_b$ are sandboxes with disjoint capability sets, $\Gamma(a) \cap \Gamma(b) = \emptyset$, and the only morphisms available to each agent are those in their respective sandboxes, then no information leak exists from $a$ to $b$.
-\end{theorem}
+Three permission levels are defined:
 
-\begin{proof}
-Suppose for contradiction that a leak $\ell : \tau_a \to \tau_b$ exists. By Definition~\ref{def:leakage}, $\ell \notin \Gamma(a)$ and $\ell \notin \Gamma(b)$. Since agent $a$ can only invoke morphisms in $\Gamma(a)$ and agent $b$ can only invoke morphisms in $\Gamma(b)$, neither agent can invoke $\ell$. Therefore $\ell$ cannot be executed, contradicting the assumption that it constitutes a leak. More generally, any composite path $\tau_a \to \cdots \to \tau_b$ must traverse at least one morphism outside both $\Gamma(a)$ and $\Gamma(b)$, which neither agent can invoke.
+\begin{itemize}[leftmargin=2em]
+\item \textbf{\texttt{:invoke}} --- Permission to execute the tool. This is the most common permission.
+\item \textbf{\texttt{:inspect}} --- Permission to read the tool's schema and description without executing it.
+\item \textbf{\texttt{:compose}} --- Permission to use the tool as part of a composed pipeline with other tools.
+\end{itemize}
 
-In the BEAM implementation, this corresponds to the fact that BEAM processes have isolated heaps: process $P_a$ implementing $\Sand_a$ cannot read the memory of process $P_b$ implementing $\Sand_b$, and all communication must go through explicit message passing mediated by the capability system.
-\end{proof}
+The \texttt{invocation\_count} and \texttt{last\_reset\_at} fields track rate limiting state. The rate window resets every 60 seconds.
 
-\subsection{Contract-Locked Configurations as Frozen Subcategories}
+\subsection{Token Creation with HMAC Signing}
 
-\begin{definition}[Frozen Subcategory]
-\label{def:frozen}
-A subcategory $\mathcal{F} \hookrightarrow \Tool$ is \emph{frozen} if no new morphisms or objects can be added to $\mathcal{F}$ after its creation. Formally, $\mathcal{F}$ is equipped with a timestamp $t_0$ such that for all $t > t_0$, $\ob(\mathcal{F}_t) = \ob(\mathcal{F}_{t_0})$ and $\Mor(\mathcal{F}_t) = \Mor(\mathcal{F}_{t_0})$.
-\end{definition}
+Token creation validates parameters and computes an HMAC-SHA256 signature over the token's identity fields:
 
-This corresponds directly to the \agenthero{} implementation, where tool configurations are locked at execution start:
+\begin{lstlisting}[language=elixir, caption={Token creation with cryptographic signing.}, label={lst:cap-create}]
+@signing_key "tool_interface_capability_signing_key_v1"
 
-\begin{lstlisting}[language=typescript, caption={Contract-locked tool configuration (simplified from Agent-Hero).}, label={lst:contract-lock}]
-// Tool set is frozen at execution start
+def create(agent_id, tool_id, permissions, rate_limit, ttl_seconds)
+    when is_binary(agent_id) and is_binary(tool_id)
+    and is_list(permissions)
+    and is_integer(rate_limit) and rate_limit > 0
+    and is_integer(ttl_seconds) and ttl_seconds > 0 do
+
+  valid_permissions = [:invoke, :inspect, :compose]
+
+  if Enum.all?(permissions, &(&1 in valid_permissions)) do
+    expires_at = DateTime.add(DateTime.utc_now(),
+                              ttl_seconds, :second)
+    token = %__MODULE__{
+      agent_id: agent_id,
+      tool_id: tool_id,
+      permissions: permissions,
+      rate_limit: rate_limit,
+      expires_at: expires_at,
+      signature: <<>>,
+      invocation_count: 0,
+      last_reset_at: DateTime.utc_now()
+    }
+    signature = compute_signature(token)
+    {:ok, %{token | signature: signature}}
+  else
+    {:error, :invalid_permissions}
+  end
+end
+
+def create(_, _, _, _, _), do: {:error, :invalid_parameters}
+\end{lstlisting}
+
+The guard clause (\texttt{when is\_binary(agent\_id) and ...}) ensures that the function only matches when all parameters have the correct types. If any parameter is wrong---a nil agent ID, a negative rate limit, a non-integer TTL---the second clause matches and returns \texttt{\{:error, :invalid\_parameters\}}.
+
+The HMAC signature is computed over a canonical string representation of the token's identity fields:
+
+\begin{lstlisting}[language=elixir, caption={HMAC-SHA256 signature computation.}, label={lst:hmac}]
+defp compute_signature(%__MODULE__{} = token) do
+  payload =
+    "#{token.agent_id}:#{token.tool_id}:" <>
+    "#{inspect(token.permissions)}:" <>
+    "#{token.rate_limit}:" <>
+    "#{DateTime.to_iso8601(token.expires_at)}"
+
+  :crypto.mac(:hmac, :sha256, @signing_key, payload)
+end
+\end{lstlisting}
+
+The signing key would come from a secrets manager in production. The signature binds the token's fields together: modifying any field (agent ID, tool ID, permissions, rate limit, or expiry) invalidates the signature.
+
+\subsection{Authorization: The Five-Check Pipeline}
+
+Token authorization is a pipeline of five checks, implemented as a \texttt{cond} expression:
+
+\begin{lstlisting}[language=elixir, caption={Five-check authorization pipeline.}, label={lst:authorize}]
+def authorize(%__MODULE__{} = token, tool_id) do
+  cond do
+    token.tool_id != tool_id ->
+      {:error, :unauthorized}
+
+    :invoke not in token.permissions ->
+      {:error, :unauthorized}
+
+    expired?(token) ->
+      {:error, :expired}
+
+    not valid_signature?(token) ->
+      {:error, :invalid_signature}
+
+    rate_limited?(token) ->
+      {:error, :rate_limited}
+
+    true ->
+      updated = increment_invocation(token)
+      {:ok, updated}
+  end
+end
+
+def authorize(_, _), do: {:error, :unauthorized}
+\end{lstlisting}
+
+The five checks, in order:
+
+\begin{enumerate}[leftmargin=2em]
+\item \textbf{Tool match}: The token's \texttt{tool\_id} must match the requested tool. A token for \texttt{web-search} cannot authorize \texttt{code-exec}.
+\item \textbf{Permission check}: The token must include the \texttt{:invoke} permission.
+\item \textbf{Expiry check}: The token must not have passed its \texttt{expires\_at} time.
+\item \textbf{Signature verification}: The token's HMAC signature must match a fresh computation, using constant-time comparison to prevent timing attacks:
+\begin{lstlisting}[language=elixir, caption={Constant-time signature verification.}, label={lst:sig-verify}]
+defp valid_signature?(%__MODULE__{} = token) do
+  expected = compute_signature(%{token | signature: <<>>})
+  :crypto.hash_equals(expected, token.signature)
+rescue
+  _ -> false
+end
+\end{lstlisting}
+\item \textbf{Rate limit check}: The token's invocation count must be below the rate limit for the current 60-second window.
+\end{enumerate}
+
+On success, the token is returned with an incremented invocation count. On failure, a specific error atom identifies which check failed, enabling precise error reporting in audit logs.
+
+\subsection{Rate Limiting with Sliding Windows}
+
+Rate limiting uses a 60-second sliding window:
+
+\begin{lstlisting}[language=elixir, caption={Rate limiting with window reset.}, label={lst:rate-limit}]
+defp rate_limited?(%__MODULE__{} = token) do
+  if should_reset_rate_window?(token) do
+    false
+  else
+    token.invocation_count >= token.rate_limit
+  end
+end
+
+defp should_reset_rate_window?(%__MODULE__{last_reset_at: nil}),
+  do: true
+defp should_reset_rate_window?(%__MODULE__{last_reset_at: last}) do
+  DateTime.diff(DateTime.utc_now(), last, :second) >= 60
+end
+
+defp increment_invocation(%__MODULE__{} = token) do
+  if should_reset_rate_window?(token) do
+    %{token | invocation_count: 1,
+              last_reset_at: DateTime.utc_now()}
+  else
+    %{token | invocation_count: token.invocation_count + 1}
+  end
+end
+\end{lstlisting}
+
+The rate window resets when more than 60 seconds have elapsed since \texttt{last\_reset\_at}. Note the pattern match on \texttt{last\_reset\_at: nil}---the first invocation always resets the window.
+
+\subsection{Cooperative Revocation}
+
+Since tokens are values (not references to centralized state), revocation is cooperative: a revoked token is one whose expiry has been set to the past.
+
+\begin{lstlisting}[language=elixir, caption={Cooperative token revocation.}, label={lst:revoke}]
+def revoke(%__MODULE__{} = token) do
+  expired_token = %{token |
+    expires_at: DateTime.add(DateTime.utc_now(), -1, :second)
+  }
+  signature = compute_signature(expired_token)
+  %{expired_token | signature: signature}
+end
+\end{lstlisting}
+
+The revoked token's signature is recomputed so that it remains structurally valid but immediately fails the expiry check. This approach is appropriate for short-lived tokens (the default TTL is 3600 seconds). For long-lived tokens in a production system, a revocation list would supplement cooperative revocation.
+
+
+% ===== 5. SANDBOXED EXECUTION =====
+\section{Sandboxed Execution}
+\label{sec:sandbox}
+
+\subsection{Isolation Through Process Boundaries}
+
+The sandbox module executes tool operations in isolated BEAM processes. Each execution spawns a new process with its own heap, executes the tool's function, and sends the result back to the parent via message passing. The parent monitors the spawned process and kills it if it exceeds the timeout.
+
+\begin{designprinciple}[Process-Level Isolation]
+\label{dp:isolation}
+Each sandboxed execution runs in a spawned BEAM process that:
+\begin{enumerate}
+\item Has its own heap---no shared mutable state with the parent.
+\item Communicates only through message passing---no direct memory access.
+\item Is monitored---the parent receives a \texttt{:DOWN} message if the process crashes.
+\item Is time-bounded---the parent kills the process after a configurable timeout.
+\end{enumerate}
+This provides the same isolation guarantee as E2B ephemeral sandboxes, but at the language-runtime level rather than the container level.
+\end{designprinciple}
+
+\subsection{The Execute Function}
+
+The sandbox executor is the most carefully designed function in the system:
+
+\begin{lstlisting}[language=elixir, caption={Complete sandbox executor with monitored process isolation.}, label={lst:sandbox-execute}]
+defmodule ToolInterface.Sandbox do
+  require Logger
+
+  @default_timeout 600_000   # 10 minutes (matching E2B)
+  @max_timeout 1_800_000     # 30 minutes absolute maximum
+
+  def execute(tool_spec, input, opts \\ []) do
+    timeout = min(
+      Keyword.get(opts, :timeout, @default_timeout),
+      @max_timeout
+    )
+    parent = self()
+    ref = make_ref()
+
+    {pid, monitor_ref} =
+      spawn_monitor(fn ->
+        # This process has its own heap.
+        # No shared mutable state with parent.
+        result =
+          try do
+            case tool_spec.execute.(input) do
+              {:ok, _} = ok  -> ok
+              {:error, _} = err -> err
+              other -> {:ok, other}
+            end
+          rescue
+            e -> {:error, {:execution_failed,
+                           Exception.message(e)}}
+          catch
+            :exit, reason ->
+              {:error, {:sandbox_exit, reason}}
+            :throw, value ->
+              {:error, {:sandbox_throw, value}}
+          end
+
+        send(parent, {:sandbox_result, ref, result})
+      end)
+
+    receive do
+      {:sandbox_result, ^ref, result} ->
+        Process.demonitor(monitor_ref, [:flush])
+        result
+
+      {:DOWN, ^monitor_ref, :process, ^pid, reason} ->
+        {:error, {:sandbox_crashed, reason}}
+    after
+      timeout ->
+        Process.exit(pid, :kill)
+        receive do
+          {:DOWN, ^monitor_ref, :process, ^pid, _} -> :ok
+        after
+          5_000 ->
+            Process.demonitor(monitor_ref, [:flush])
+        end
+        {:error, :timeout}
+    end
+  end
+end
+\end{lstlisting}
+
+This function deserves a detailed walkthrough:
+
+\begin{enumerate}[leftmargin=2em]
+\item \textbf{Timeout clamping} (lines 8--11): The requested timeout is clamped to an absolute maximum of 30 minutes. Even if a caller requests an infinite timeout, the sandbox will terminate.
+
+\item \textbf{Reference creation} (line 13): A unique reference (\texttt{make\_ref()}) tags the result message. This prevents a stale result from a previous sandbox execution from being confused with the current one.
+
+\item \textbf{Spawn with monitor} (lines 15--33): \texttt{spawn\_monitor/1} atomically creates a new process and establishes a monitor. If the process crashes, the parent receives a \texttt{\{:DOWN, monitor\_ref, :process, pid, reason\}} message.
+
+\item \textbf{Comprehensive error handling} (lines 19--31): The spawned process wraps the tool execution in a \texttt{try/rescue/catch} block that handles:
+  \begin{itemize}
+  \item Normal \texttt{\{:ok, \_\}} and \texttt{\{:error, \_\}} returns (passed through).
+  \item Unexpected return values (wrapped in \texttt{\{:ok, other\}}).
+  \item Raised exceptions (caught and wrapped as \texttt{\{:error, \{:execution\_failed, msg\}\}}).
+  \item Process exits (caught as \texttt{\{:error, \{:sandbox\_exit, reason\}\}}).
+  \item Throws (caught as \texttt{\{:error, \{:sandbox\_throw, value\}\}}).
+  \end{itemize}
+
+\item \textbf{Result collection} (lines 35--37): The parent waits for the sandbox result, pattern matching on the unique reference. On success, the monitor is flushed to avoid a spurious \texttt{:DOWN} message.
+
+\item \textbf{Crash handling} (lines 39--40): If the process crashes before sending a result, the monitor's \texttt{:DOWN} message is received and converted to an error tuple.
+
+\item \textbf{Timeout handling} (lines 41--49): If neither a result nor a crash arrives within the timeout, the parent kills the sandbox process with \texttt{Process.exit(pid, :kill)}, waits for the \texttt{:DOWN} message to confirm the kill, and returns \texttt{\{:error, :timeout\}}.
+\end{enumerate}
+
+\subsection{Parallel Sandbox Execution}
+
+Multiple tool operations can execute in parallel sandboxes using \texttt{Task.async\_stream}:
+
+\begin{lstlisting}[language=elixir, caption={Parallel sandbox execution with controlled concurrency.}, label={lst:parallel-sandbox}]
+def execute_parallel(tool_input_pairs, opts \\ []) do
+  max_concurrency = Keyword.get(opts, :max_concurrency, 5)
+  timeout = Keyword.get(opts, :timeout, @default_timeout)
+
+  tool_input_pairs
+  |> Task.async_stream(
+    fn {tool_spec, input} ->
+      execute(tool_spec, input, timeout: timeout)
+    end,
+    max_concurrency: max_concurrency,
+    timeout: timeout + 5_000,
+    on_timeout: :kill_task
+  )
+  |> Enum.map(fn
+    {:ok, result}      -> result
+    {:exit, :timeout}  -> {:error, :timeout}
+    {:exit, reason}    -> {:error, {:task_failed, reason}}
+  end)
+end
+\end{lstlisting}
+
+The \texttt{max\_concurrency} option bounds the number of simultaneous sandbox processes, preventing resource exhaustion. The Task timeout is set slightly longer than the sandbox timeout (5 seconds longer) to allow the sandbox's internal cleanup to complete before the Task layer forcibly terminates.
+
+\subsection{URL Validation for Sandbox Tools}
+
+Sandbox tools that access external URLs share the same URL safety validation used by builtin tools, reused through a public API:
+
+\begin{lstlisting}[language=elixir, caption={URL validation reused across tiers.}, label={lst:sandbox-url}]
+@spec validate_url(String.t()) ::
+  :ok | {:error, {:blocked_url, String.t()}}
+def validate_url(url) when is_binary(url) do
+  uri = URI.parse(url)
+  host = uri.host || ""
+
+  blocked_hosts = ["localhost", "127.0.0.1",
+                   "0.0.0.0", "::1", "[::1]"]
+  blocked_prefixes = [
+    "169.254.", "10.", "192.168.",
+    "172.16.", "172.17.", "172.18.", "172.19.",
+    "172.20.", "172.21.", "172.22.", "172.23.",
+    "172.24.", "172.25.", "172.26.", "172.27.",
+    "172.28.", "172.29.", "172.30.", "172.31."
+  ]
+
+  cond do
+    host in blocked_hosts ->
+      {:error, {:blocked_url, "Host #{host} is blocked"}}
+    Enum.any?(blocked_prefixes,
+              &String.starts_with?(host, &1)) ->
+      {:error, {:blocked_url, "IP range #{host} is blocked"}}
+    true ->
+      :ok
+  end
+end
+
+def validate_url(_), do: {:error, {:blocked_url, "Invalid URL"}}
+\end{lstlisting}
+
+
+% ===== 6. MCP PROTOCOL CLIENT =====
+\section{MCP Protocol Client}
+\label{sec:mcp}
+
+\subsection{The Model Context Protocol}
+
+The Model Context Protocol (MCP)~\citep{mcp2024spec} defines a standard interface for language models to discover and invoke tools provided by external servers. In the \agenthero{} production platform, MCP integration uses the \texttt{@modelcontextprotocol/sdk} library with \texttt{StreamableHTTPClientTransport} for efficient HTTP-based communication. The Elixir reference implementation mirrors this design using Finch for HTTP and Jason for JSON encoding.
+
+An MCP server exposes three operations:
+
+\begin{enumerate}[leftmargin=2em]
+\item \textbf{Initialize} --- Establish a session. The server returns a session ID in the \texttt{mcp-session-id} response header.
+\item \textbf{List Tools} --- Returns an array of tool descriptors, each with a name, description, and JSON Schema for its input.
+\item \textbf{Call Tool} --- Invokes a specific tool with typed arguments and returns a structured result.
+\end{enumerate}
+
+All three operations use JSON-RPC 2.0 over HTTP POST, with Bearer token authentication.
+
+\subsection{Session Initialization}
+
+The MCP client begins by establishing a session with the server:
+
+\begin{lstlisting}[language=elixir, caption={MCP session initialization via JSON-RPC.}, label={lst:mcp-init}]
+defp initialize_session(url, token) do
+  body = Jason.encode!(%{
+    jsonrpc: "2.0",
+    id: generate_request_id(),
+    method: "initialize",
+    params: %{
+      protocolVersion: "2024-11-05",
+      capabilities: %{},
+      clientInfo: %{
+        name: "tool_interface",
+        version: "0.1.0"
+      }
+    }
+  })
+
+  case http_post(url, body, auth_headers(token, nil),
+                 @discovery_timeout) do
+    {:ok, %{status: 200, headers: headers}} ->
+      session_id = extract_session_id(headers)
+      {:ok, session_id}
+    {:ok, %{status: status}} ->
+      {:error, {:http_error, status}}
+    {:error, reason} ->
+      {:error, {:connection_failed, reason}}
+  end
+end
+\end{lstlisting}
+
+The session ID is extracted from the response headers and included in all subsequent requests. This allows the server to maintain per-session state (tool availability, rate limits, etc.).
+
+\subsection{Tool Discovery and Registration}
+
+After session initialization, the client lists available tools and registers them:
+
+\begin{lstlisting}[language=elixir, caption={MCP tool discovery and registration pipeline.}, label={lst:mcp-discover}]
+def discover_and_register(server_name, url, token) do
+  Logger.info("[MCPClient] Discovering tools from " <>
+              "#{server_name} at #{url}")
+
+  with :ok <- validate_server_url(url),
+       {:ok, session_id} <- initialize_session(url, token),
+       {:ok, raw_tools} <- list_tools(url, token, session_id) do
+
+    tools = Enum.map(raw_tools, fn raw_tool ->
+      %{
+        name: raw_tool["name"],
+        description: raw_tool["description"] || "",
+        input_schema: raw_tool["inputSchema"] || %{},
+        execute: build_remote_executor(
+          url, token, session_id, raw_tool["name"]
+        )
+      }
+    end)
+
+    Logger.info("[MCPClient] Discovered #{length(tools)} " <>
+                "tools from #{server_name}")
+    ToolInterface.Registry.register_mcp(server_name, tools)
+  end
+end
+\end{lstlisting}
+
+The \texttt{with} expression chains three operations: URL validation, session initialization, and tool listing. If any step fails, the entire pipeline short-circuits and returns the error. This is the Elixir equivalent of monadic \texttt{bind} in Haskell or the \texttt{Result} chain in Rust.
+
+\subsection{Closures as Remote Executors}
+
+The most elegant part of the MCP client is the \texttt{build\_remote\_executor} function:
+
+\begin{lstlisting}[language=elixir, caption={Closure-based remote executor construction.}, label={lst:closure}]
+defp build_remote_executor(url, token, session_id, tool_name) do
+  fn input ->
+    call_tool(url, token, session_id, tool_name, input)
+  end
+end
+\end{lstlisting}
+
+This function returns a \emph{closure}---an anonymous function that captures the server URL, authentication token, session ID, and tool name in its environment. The closure has the same type signature as any other tool's \texttt{execute} function: \texttt{fn input -> \{:ok, result\} | \{:error, reason\} end}. The caller---the registry, the sandbox, the invocation pipeline---does not know or care that this function dispatches over HTTP. The network boundary is hidden behind a function value.
+
+This is the key insight: by representing remote tool invocation as a closure, MCP tools are compositionally identical to local tools. They can be stored in the registry, authorized via capability tokens, audited, and composed into pipelines, all using the same code paths.
+
+\subsection{Remote Tool Invocation}
+
+The \texttt{call\_tool} function sends a JSON-RPC request and parses the response:
+
+\begin{lstlisting}[language=elixir, caption={JSON-RPC tool invocation.}, label={lst:call-tool}]
+def call_tool(url, token, session_id, tool_name, input) do
+  body = Jason.encode!(%{
+    jsonrpc: "2.0",
+    id: generate_request_id(),
+    method: "tools/call",
+    params: %{name: tool_name, arguments: input}
+  })
+
+  case http_post(url, body,
+                 auth_headers(token, session_id),
+                 @invocation_timeout) do
+    {:ok, %{status: 200, body: response_body}} ->
+      case Jason.decode(response_body) do
+        {:ok, %{"result" => result}} ->
+          {:ok, result}
+        {:ok, %{"error" => %{"message" => msg}}} ->
+          {:error, {:mcp_error, msg}}
+        {:error, _} ->
+          {:error, :invalid_response}
+      end
+    {:ok, %{status: status}} ->
+      {:error, {:http_error, status}}
+    {:error, reason} ->
+      {:error, {:connection_failed, reason}}
+  end
+end
+\end{lstlisting}
+
+Pattern matching on the nested JSON response provides exhaustive error handling: a successful result, a JSON-RPC error, a malformed response, an HTTP error, and a connection failure each produce a distinct, tagged error tuple.
+
+\subsection{Parallel Multi-Server Discovery}
+
+The \texttt{discover\_all} function connects to multiple MCP servers in parallel:
+
+\begin{lstlisting}[language=elixir, caption={Parallel MCP discovery with fault isolation.}, label={lst:discover-all}]
+def discover_all(servers, opts \\ []) do
+  max_concurrency = Keyword.get(opts, :max_concurrency, 10)
+  timeout = Keyword.get(opts, :timeout, @discovery_timeout)
+
+  servers
+  |> Task.async_stream(
+    fn server ->
+      case discover_and_register(
+        server.name, server.url, server.token
+      ) do
+        :ok -> {:ok, server.name}
+        {:error, reason} ->
+          Logger.warning(
+            "[MCPClient] Failed to discover from " <>
+            "#{server.name}: #{inspect(reason)}"
+          )
+          {:error, server.name, reason}
+      end
+    end,
+    max_concurrency: max_concurrency,
+    timeout: timeout,
+    on_timeout: :kill_task
+  )
+  |> Enum.map(fn
+    {:ok, result}      -> result
+    {:exit, :timeout}  -> {:error, "unknown", :timeout}
+    {:exit, reason}    -> {:error, "unknown", {:task_failed, reason}}
+  end)
+end
+\end{lstlisting}
+
+This mirrors the \agenthero{} platform's \texttt{Promise.allSettled()} pattern: each server is discovered independently, and a slow or failing server does not block discovery from other servers. The \texttt{max\_concurrency: 10} bound prevents overwhelming the network or the BEAM scheduler with too many simultaneous HTTP connections.
+
+\subsection{Authentication Headers}
+
+Bearer token authentication is implemented through header construction:
+
+\begin{lstlisting}[language=elixir, caption={Authentication header construction with session ID.}, label={lst:auth-headers}]
+defp auth_headers(token, session_id) do
+  headers = [
+    {"content-type", "application/json"},
+    {"authorization", "Bearer #{token}"},
+    {"accept", "application/json"}
+  ]
+
+  if session_id do
+    [{"mcp-session-id", session_id} | headers]
+  else
+    headers
+  end
+end
+\end{lstlisting}
+
+The session ID is prepended to the headers list only when present. This is idiomatic Elixir: the \texttt{if} expression returns the augmented or original list, and the caller receives the correct headers without conditional logic at the call site.
+
+
+% ===== 7. THE INVOCATION PIPELINE =====
+\section{The Invocation Pipeline: Facade Module}
+\label{sec:facade}
+
+\subsection{Composing the Components}
+
+The \texttt{ToolInterface} facade module composes the registry, capability system, sandbox, and audit logger into a single invocation pipeline:
+
+\begin{lstlisting}[language=elixir, caption={Complete tool invocation pipeline.}, label={lst:invoke}]
+defmodule ToolInterface do
+  alias ToolInterface.{Registry, Capability, Sandbox, Audit}
+
+  @spec invoke(String.t(), String.t(), map(), Capability.t()) ::
+    {:ok, any()} | {:error, term()}
+  def invoke(agent_id, tool_id, input, capability_token) do
+    start_time = System.monotonic_time(:millisecond)
+
+    with {:ok, _token} <- Capability.authorize(
+                            capability_token, tool_id),
+         {:ok, tool_spec} <- Registry.lookup(tool_id),
+         :ok <- validate_input(tool_spec, input) do
+      result = execute_tool(tool_spec, input)
+      duration = System.monotonic_time(:millisecond) - start_time
+      status = if match?({:ok, _}, result), do: :ok, else: :error
+
+      Audit.log_invocation(
+        agent_id, tool_id, input, result, duration, status
+      )
+      result
+    else
+      {:error, _reason} = error ->
+        duration = System.monotonic_time(:millisecond) - start_time
+        Audit.log_invocation(
+          agent_id, tool_id, input, error, duration, :error
+        )
+        error
+    end
+  end
+end
+\end{lstlisting}
+
+The \texttt{with} expression is the heart of the invocation pipeline. It chains three operations:
+
+\begin{enumerate}[leftmargin=2em]
+\item \textbf{Authorize}: Check the capability token against the requested tool. If the token is invalid, expired, rate-limited, or scoped to a different tool, short-circuit with the error.
+\item \textbf{Lookup}: Find the tool specification in the registry. If the tool does not exist, short-circuit with \texttt{\{:error, :not\_found\}}.
+\item \textbf{Validate}: Run the tool's input validator (if present). If validation fails, short-circuit with the validation error.
+\end{enumerate}
+
+If all three succeed, execution proceeds. The result (success or failure) and execution duration are recorded in the audit log. The \texttt{else} clause handles any short-circuit error, also logging it for audit purposes.
+
+\subsection{Tier-Aware Execution Dispatch}
+
+Tool execution is dispatched based on the tool's tier:
+
+\begin{lstlisting}[language=elixir, caption={Tier-aware execution dispatch via pattern matching.}, label={lst:dispatch}]
+defp execute_tool(%{tier: :sandbox} = tool_spec, input) do
+  Sandbox.execute(tool_spec, input)
+end
+
+defp execute_tool(tool_spec, input) do
+  try do
+    tool_spec.execute.(input)
+  rescue
+    e -> {:error, {:execution_failed, Exception.message(e)}}
+  end
+end
+\end{lstlisting}
+
+Two function clauses implement the dispatch:
+
+\begin{itemize}[leftmargin=2em]
+\item \textbf{Sandbox tools}: Pattern match on \texttt{\%\{tier: :sandbox\}} and delegate to \texttt{Sandbox.execute/2}, which spawns an isolated process.
+\item \textbf{All other tools}: Call the tool's \texttt{execute} function directly in the current process. Exceptions are caught and wrapped in error tuples.
+\end{itemize}
+
+For MCP tools (tier \texttt{:mcp}), the second clause applies: the tool's \texttt{execute} function is the closure built by \texttt{build\_remote\_executor}, which dispatches over HTTP. The facade does not need to know this---it simply calls the function.
+
+\subsection{Input Validation}
+
+Input validation uses the tool's optional \texttt{validate} function:
+
+\begin{lstlisting}[language=elixir, caption={Input validation with optional validator.}, label={lst:validate-input}]
+defp validate_input(tool_spec, input) do
+  case tool_spec.validate do
+    nil ->
+      :ok
+    validate_fn when is_function(validate_fn, 1) ->
+      case validate_fn.(input) do
+        :ok             -> :ok
+        {:ok, _validated} -> :ok
+        {:error, _} = err -> err
+      end
+  end
+end
+\end{lstlisting}
+
+The pattern match on \texttt{nil} versus \texttt{is\_function(validate\_fn, 1)} provides a clean optional validation path. When the validator is nil, all inputs pass. When present, the validator is called and its result is pattern-matched to normalize the return value.
+
+\subsection{Public API Functions}
+
+The facade exposes four additional functions:
+
+\begin{lstlisting}[language=elixir, caption={Facade public API.}, label={lst:facade-api}]
+def grant_capability(agent_id, tool_id, opts \\ []) do
+  permissions = Keyword.get(opts, :permissions, [:invoke])
+  rate_limit = Keyword.get(opts, :rate_limit, 60)
+  ttl = Keyword.get(opts, :ttl_seconds, 3600)
+  Capability.create(agent_id, tool_id, permissions,
+                    rate_limit, ttl)
+end
+
+def discover_mcp(server_name, url, token) do
+  ToolInterface.MCPClient.discover_and_register(
+    server_name, url, token
+  )
+end
+
+def freeze do
+  Registry.freeze()
+end
+
+def list_tools(tier \\ nil) do
+  Registry.list(tier)
+end
+\end{lstlisting}
+
+The facade provides sensible defaults: 60 invocations per minute, 1 hour TTL, invoke-only permissions. A caller can override any of these through keyword options.
+
+\subsection{OTP Application and Supervision}
+
+The system starts as an OTP application with a supervision tree:
+
+\begin{lstlisting}[language=elixir, caption={OTP supervision tree.}, label={lst:supervision}]
+defmodule ToolInterface.Application do
+  use Application
+
+  @impl true
+  def start(_type, _args) do
+    children = [
+      ToolInterface.Registry,
+      ToolInterface.Audit
+    ]
+    opts = [strategy: :one_for_one,
+            name: ToolInterface.Supervisor]
+    Supervisor.start_link(children, opts)
+  end
+end
+\end{lstlisting}
+
+The \texttt{:one\_for\_one} strategy means that if the Registry crashes, only the Registry is restarted---the Audit logger continues running. If the Audit logger crashes, only the Audit logger is restarted. This fault isolation ensures that a bug in audit logging cannot take down tool registration, and vice versa.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[
+  node distance=1.8cm,
+  box/.style={draw, rounded corners, minimum width=3.5cm, minimum height=1cm, align=center, font=\small},
+  supervisor/.style={box, fill=red!10, thick},
+  genserver/.style={box, fill=blue!10},
+  worker/.style={box, fill=green!10},
+  facade/.style={box, fill=orange!10, dashed},
+]
+\node[supervisor] (app) {ToolInterface.Supervisor\\{\footnotesize\texttt{:one\_for\_one}}};
+\node[genserver, below left=1.8cm and 1.5cm of app] (reg) {Registry\\{\footnotesize GenServer}};
+\node[genserver, below right=1.8cm and 1.5cm of app] (audit) {Audit\\{\footnotesize GenServer}};
+\node[worker, below=1.5cm of reg] (sandbox) {Sandbox\\{\footnotesize spawned processes}};
+\node[worker, below=1.5cm of audit] (mcp) {MCPClient\\{\footnotesize HTTP/JSON-RPC}};
+\node[facade, above=1.5cm of app] (facade) {ToolInterface\\{\footnotesize facade module}};
+
+\draw[-{Stealth}, thick] (app) -- (reg) node[midway, left, font=\footnotesize] {supervises};
+\draw[-{Stealth}, thick] (app) -- (audit) node[midway, right, font=\footnotesize] {supervises};
+\draw[-{Stealth}, dashed] (facade) -- (app);
+\draw[-{Stealth}, dashed, blue] (facade.south) to[bend right=15] node[midway, left, font=\footnotesize] {lookup} (reg.north);
+\draw[-{Stealth}, dashed, blue] (facade.south) to[bend left=15] node[midway, right, font=\footnotesize] {log} (audit.north);
+\draw[-{Stealth}, dashed] (reg) -- (sandbox) node[midway, left, font=\footnotesize] {execute};
+\draw[-{Stealth}, dashed] (reg) -- (mcp) node[midway, right=8pt, font=\footnotesize] {register};
+\end{tikzpicture}
+\caption{OTP supervision tree. Solid arrows represent supervision relationships. Dashed arrows represent function calls and message passing. The facade module is not a process---it coordinates calls to the supervised GenServers.}
+\label{fig:otp-tree}
+\end{figure}
+
+
+% ===== 8. AUDIT AND OBSERVABILITY =====
+\section{Audit Logger}
+\label{sec:audit}
+
+\subsection{Design: Asynchronous, Non-Blocking Logging}
+
+The audit logger records every tool invocation with full context. It is implemented as a GenServer that receives log entries asynchronously via \texttt{GenServer.cast/2}, ensuring that audit overhead does not impact tool invocation latency.
+
+\begin{designprinciple}[Non-Blocking Audit]
+\label{dp:audit}
+Audit logging must not add latency to tool invocations. The audit logger receives entries via asynchronous casts (fire-and-forget). Entries are accumulated in memory and periodically flushed to persistent storage.
+\end{designprinciple}
+
+\subsection{Entry Structure}
+
+Each audit entry captures the complete invocation context:
+
+\begin{lstlisting}[language=elixir, caption={Audit entry structure.}, label={lst:audit-entry}]
+defmodule ToolInterface.Audit do
+  use GenServer
+  require Logger
+
+  @type entry :: %{
+    id: String.t(),           # unique entry ID
+    timestamp: DateTime.t(),   # UTC timestamp
+    agent_id: String.t(),      # who invoked
+    tool_id: String.t(),       # what was invoked
+    input: map(),              # sanitized input
+    output: any(),             # sanitized output
+    duration_ms: non_neg_integer(),  # execution time
+    status: :ok | :error       # outcome
+  }
+end
+\end{lstlisting}
+
+\subsection{Asynchronous Logging with Telemetry}
+
+The \texttt{log\_invocation} function constructs an entry, emits a telemetry event, and casts to the GenServer:
+
+\begin{lstlisting}[language=elixir, caption={Audit logging with telemetry integration.}, label={lst:audit-log}]
+def log_invocation(agent_id, tool_id, input, output,
+                   duration_ms, status) do
+  entry = %{
+    id: generate_entry_id(),
+    timestamp: DateTime.utc_now(),
+    agent_id: agent_id,
+    tool_id: tool_id,
+    input: sanitize_for_logging(input),
+    output: sanitize_for_logging(output),
+    duration_ms: duration_ms,
+    status: status
+  }
+
+  # Emit telemetry event for external observability
+  :telemetry.execute(
+    [:tool_interface, :invocation],
+    %{duration_ms: duration_ms},
+    %{agent_id: agent_id, tool_id: tool_id, status: status}
+  )
+
+  GenServer.cast(__MODULE__, {:log, entry})
+end
+\end{lstlisting}
+
+The \texttt{:telemetry.execute/3} call emits a structured event that can be consumed by Prometheus exporters, StatsD clients, or any other telemetry backend. This integrates with the broader Erlang/Elixir observability ecosystem without coupling the audit logger to a specific monitoring system.
+
+\subsection{Sensitive Data Sanitization}
+
+Before logging, input and output data are sanitized to prevent credential leakage:
+
+\begin{lstlisting}[language=elixir, caption={Recursive sensitive data sanitization.}, label={lst:sanitize}]
+defp sanitize_for_logging(data) when is_map(data) do
+  sensitive_keys = ["password", "token", "secret",
+                    "api_key", "authorization"]
+
+  Map.new(data, fn
+    {key, _value} when is_binary(key) ->
+      if String.downcase(key) in sensitive_keys do
+        {key, "[REDACTED]"}
+      else
+        {key, sanitize_for_logging(Map.get(data, key))}
+      end
+    {key, value} ->
+      {key, sanitize_for_logging(value)}
+  end)
+end
+
+defp sanitize_for_logging(data) when is_list(data) do
+  Enum.map(data, &sanitize_for_logging/1)
+end
+
+defp sanitize_for_logging(data), do: data
+\end{lstlisting}
+
+The sanitizer recursively traverses maps and lists, replacing values at sensitive keys with \texttt{[REDACTED]}. This prevents Bearer tokens, API keys, and passwords from appearing in audit logs.
+
+\subsection{Ring Buffer with Capacity Bounds}
+
+The GenServer maintains entries in a bounded ring buffer:
+
+\begin{lstlisting}[language=elixir, caption={Ring buffer entry storage with capacity bounds.}, label={lst:ring-buffer}]
+defstruct entries: [],
+          entry_count: 0,
+          max_entries: 10_000,
+          flush_interval_ms: 60_000
+
+@impl true
+def handle_cast({:log, entry}, state) do
+  Logger.debug(
+    "[Audit] #{entry.agent_id} -> #{entry.tool_id} " <>
+    "[#{entry.status}] #{entry.duration_ms}ms"
+  )
+
+  entries =
+    if state.entry_count >= state.max_entries do
+      # Drop oldest entry when at capacity
+      [entry | Enum.take(state.entries, state.max_entries - 1)]
+    else
+      [entry | state.entries]
+    end
+
+  new_count = min(state.entry_count + 1, state.max_entries)
+  {:noreply, %{state | entries: entries, entry_count: new_count}}
+end
+\end{lstlisting}
+
+When the buffer reaches capacity (default 10,000 entries), the oldest entry is dropped. This prevents unbounded memory growth in long-running systems. Periodic flushing to persistent storage ensures that entries survive process restarts.
+
+\subsection{Periodic Flushing}
+
+The audit GenServer schedules periodic flushes using \texttt{Process.send\_after}:
+
+\begin{lstlisting}[language=elixir, caption={Periodic flush scheduling.}, label={lst:flush}]
+@impl true
+def init(opts) do
+  max_entries = Keyword.get(opts, :max_entries, 10_000)
+  flush_interval = Keyword.get(opts, :flush_interval_ms, 60_000)
+
+  state = %__MODULE__{
+    entries: [],
+    entry_count: 0,
+    max_entries: max_entries,
+    flush_interval_ms: flush_interval
+  }
+
+  if flush_interval > 0 do
+    Process.send_after(self(), :periodic_flush, flush_interval)
+  end
+
+  {:ok, state}
+end
+
+@impl true
+def handle_info(:periodic_flush, state) do
+  if state.entry_count > 0 do
+    do_flush(state.entries)
+  end
+  Process.send_after(self(), :periodic_flush,
+                     state.flush_interval_ms)
+  {:noreply, state}
+end
+\end{lstlisting}
+
+The flush mechanism uses \texttt{handle\_info} to process the self-sent \texttt{:periodic\_flush} message. In production, \texttt{do\_flush} would write to a database, object storage, or streaming pipeline (Kafka, CloudWatch, etc.). The reference implementation retains entries in memory only.
+
+\subsection{Query and Statistics}
+
+The audit logger supports querying entries and computing aggregate statistics:
+
+\begin{lstlisting}[language=elixir, caption={Audit statistics computation.}, label={lst:stats}]
+defp compute_stats(entries) do
+  total = length(entries)
+  ok_count = Enum.count(entries, &(&1.status == :ok))
+  error_count = total - ok_count
+  total_duration = Enum.reduce(entries, 0,
+                               &(&1.duration_ms + &2))
+  avg_duration = if total > 0,
+                    do: total_duration / total,
+                    else: 0.0
+
+  %{
+    total: total,
+    ok: ok_count,
+    error: error_count,
+    avg_duration_ms: Float.round(avg_duration, 2),
+    tools_used: entries
+                |> Enum.map(& &1.tool_id)
+                |> Enum.uniq()
+                |> length(),
+    agents_active: entries
+                   |> Enum.map(& &1.agent_id)
+                   |> Enum.uniq()
+                   |> length()
+  }
+end
+\end{lstlisting}
+
+The pipeline operator makes the data flow readable: take the entries, extract tool IDs, remove duplicates, count. This computes six aggregate metrics: total invocations, success count, error count, average duration, unique tools used, and active agents.
+
+
+% ===== 9. PRODUCTION MAPPING =====
+\section{Production Validation: Mapping to Agent-Hero}
+\label{sec:production}
+
+The reference implementation's design maps directly to the \agenthero{} production platform. This section traces the correspondence between the Elixir reference implementation and the deployed TypeScript/Next.js system.
+
+\subsection{Three-Tier Model Correspondence}
+
+\begin{center}
+\begin{tabularx}{\textwidth}{lXX}
+\toprule
+\textbf{Tier} & \textbf{Elixir Reference} & \textbf{Agent-Hero Production} \\
+\midrule
+Builtin & Static tool specs in \texttt{Registry.init/1} & Vercel AI SDK \texttt{tool()} definitions with Zod schemas \\
+Sandbox & \texttt{Sandbox.execute/3} spawning isolated BEAM processes & E2B Code Interpreter with 10-minute ephemeral sandboxes \\
+MCP & \texttt{MCPClient.discover\_and\_register/3} via Finch HTTP & \texttt{StreamableHTTPClientTransport} from \texttt{@modelcontextprotocol/sdk} \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\subsection{Capability Token Correspondence}
+
+In the Elixir implementation, capability tokens are HMAC-signed structs with TTL, rate limiting, and permission scoping. In \agenthero{}, the same security model is implemented through per-agent tool permissions stored in the database:
+
+\begin{lstlisting}[language=typescript, caption={Agent-Hero tool permission model (simplified).}, label={lst:ah-permissions}]
+// Agent-Hero: per-agent tool permissions
 const frozenTools = Object.freeze(
   resolveToolsForAgent(agent, contract)
 );
 
-// Subsequent attempts to modify tools throw
-// Cannot add properties to a frozen object
+// Tool set is immutable during execution
 async function executeAgent(agent, task) {
-  const tools = frozenTools; // immutable reference
-  // tools cannot be modified during execution
+  const tools = frozenTools;
   return await runAgentLoop(agent, task, tools);
 }
 \end{lstlisting}
 
-\subsection{URL Validation as Morphism Filtering}
+The \texttt{Object.freeze()} in TypeScript corresponds to \texttt{Registry.freeze()} in Elixir. Both ensure that the tool set is immutable during agent execution.
 
-A critical security concern is preventing agents from accessing internal resources. The \agenthero{} platform implements URL validation that blocks access to localhost and internal IP ranges:
+\subsection{Sandbox Correspondence}
 
-\begin{definition}[Safe Morphism Filter]
-\label{def:url-filter}
-Let $\Tool_{\text{web}}$ be the subcategory of web-accessing tools. The \emph{safe morphism filter} $\sigma$ is an endofunctor $\sigma : \Tool_{\text{web}} \to \Tool_{\text{web}}$ defined by:
-\[
-  \sigma(t)(x) = \begin{cases}
-    t(x) & \text{if } \text{url}(x) \notin \text{BLOCKED} \\
-    \bot & \text{otherwise}
-  \end{cases}
-\]
-where $\text{BLOCKED} = \{ \texttt{localhost}, \texttt{127.0.0.0/8}, \texttt{169.254.0.0/16}, \texttt{10.0.0.0/8}, \texttt{172.16.0.0/12}, \texttt{192.168.0.0/16} \}$.
-\end{definition}
+The Elixir sandbox uses BEAM process isolation with \texttt{spawn\_monitor} and hard timeouts. The \agenthero{} platform uses E2B sandboxes with the same 10-minute timeout:
 
-\begin{figure}[ht]
-\centering
-\begin{tikzcd}[column sep=2.5cm, row sep=2cm]
-\tau_{\text{URL}} \arrow[r, "t_{\text{fetch}}"] \arrow[d, "\sigma"'] & \tau_{\text{HTML}} \\
-\tau_{\text{URL}} \arrow[r, "t_{\text{safe-fetch}}"'] & \tau_{\text{HTML}} \cup \{\bot\} \arrow[u, hook']
-\end{tikzcd}
-\caption{URL validation as a morphism filter. The safe-fetch tool either produces valid HTML or rejects the request ($\bot$) for blocked addresses.}
-\label{fig:url-filter}
-\end{figure}
+\begin{lstlisting}[language=typescript, caption={E2B sandbox execution in Agent-Hero.}, label={lst:e2b}]
+import { Sandbox } from '@e2b/code-interpreter';
 
+async function executeSandboxed(code: string, language: string) {
+  const sandbox = await Sandbox.create({
+    timeoutMs: 10 * 60 * 1000,  // 10 minutes
+  });
+  try {
+    const result = await sandbox.runCode(code, { language });
+    return {
+      stdout: result.logs.stdout,
+      stderr: result.logs.stderr,
+      exitCode: result.exitCode,
+    };
+  } finally {
+    await sandbox.close();  // ephemeral: always clean up
+  }
+}
+\end{lstlisting}
 
-% ===== 5. PROTOCOL DESIGN (MCP) =====
-\section{Protocol Design: The Model Context Protocol}
-\label{sec:protocol}
+The correspondence is direct: \texttt{spawn\_monitor} maps to \texttt{Sandbox.create}, the \texttt{after timeout} clause maps to \texttt{timeoutMs}, and \texttt{Process.exit(pid, :kill)} maps to the implicit sandbox termination.
 
-\subsection{MCP as a Universal Tool Interface}
+\subsection{MCP Correspondence}
 
-The Model Context Protocol (\MCP{})~\citep{mcp2024spec} defines a standard interface for language models to discover and invoke tools provided by external servers. In the \agenthero{} platform, MCP integration uses the \texttt{@modelcontextprotocol/sdk} library with \texttt{StreamableHTTPClientTransport} for efficient HTTP-based communication and Bearer token authentication.
+The Elixir MCP client's \texttt{discover\_all} with \texttt{Task.async\_stream} maps to \agenthero{}'s parallel server connection:
 
-\begin{definition}[MCP Interface]
-\label{def:mcp}
-An \emph{MCP server} $S$ exposes:
-\begin{enumerate}
-\item A \emph{tool listing} endpoint returning $\{(n_i, \sigma_i)\}_{i \in I}$ where $n_i$ is a tool name and $\sigma_i$ is its JSON Schema.
-\item An \emph{invocation} endpoint that, given a tool name $n_i$ and input conforming to $\sigma_i$, returns a structured result.
-\item A \emph{resource listing} endpoint for data resources the server provides.
-\end{enumerate}
-\end{definition}
-
-\begin{definition}[MCP Namespacing]
-\label{def:namespace}
-Given an MCP server with name $s$ providing tools $\{t_1, \ldots, t_k\}$, the namespaced tool identifiers are $\{ s\_\_t_1, \ldots, s\_\_t_k \}$. This prevents naming collisions when multiple MCP servers are connected simultaneously.
-\end{definition}
-
-\begin{construction}[Parallel MCP Discovery]
-\label{con:parallel-mcp}
-The \agenthero{} platform connects to multiple MCP servers in parallel using \texttt{Promise.allSettled()}, ensuring that a slow or failing server does not block discovery from other servers:
-
-\begin{lstlisting}[language=typescript, caption={Parallel MCP server connection (from Agent-Hero).}, label={lst:mcp-connect}]
+\begin{lstlisting}[language=typescript, caption={Parallel MCP discovery in Agent-Hero.}, label={lst:ah-mcp}]
 const connections = await Promise.allSettled(
   mcpServers.map(async (server) => {
     const transport = new StreamableHTTPClientTransport(
       new URL(server.url),
       { headers: { Authorization: `Bearer ${server.token}` } }
     );
-    const client = new Client({ name: "agent-hero", version: "1.0" });
+    const client = new Client({
+      name: "agent-hero", version: "1.0"
+    });
     await client.connect(transport);
     const { tools } = await client.listTools();
     return tools.map(t => ({
@@ -532,464 +1620,195 @@ const connections = await Promise.allSettled(
   })
 );
 \end{lstlisting}
-\end{construction}
 
-\subsection{Universality of MCP}
+\texttt{Task.async\_stream} with \texttt{on\_timeout: :kill\_task} provides the same semantics as \texttt{Promise.allSettled}: each server is handled independently, failures are isolated, and the system proceeds with whatever tools were successfully discovered.
 
-We now establish that MCP satisfies a universality property analogous to the Yoneda lemma.
+\subsection{Audit Correspondence}
 
-\begin{definition}[Tool Interface Functor]
-\label{def:tif}
-A \emph{tool interface} is a functor $I : \Tool \to \Set$ that maps each tool to its observable behaviour: for a morphism $t : \tau_A \to \tau_B$, $I(t)$ is the function from inputs of type $\tau_A$ to outputs of type $\tau_B$, as observed through the interface.
-\end{definition}
+The Elixir audit logger's telemetry integration maps to \agenthero{}'s credit-based billing system, where each tool invocation consumes credits proportional to execution time and API costs. The audit entry's \texttt{duration\_ms} field directly feeds the billing computation.
 
-\begin{proposition}[MCP Universality]
-\label{prop:mcp-universal}
-The MCP interface $I_{\MCP}$ is universal among tool interfaces in the following sense: for any tool interface $I : \Tool \to \Set$, there exists a unique natural transformation $\eta : I_{\MCP} \Rightarrow I$ such that the following diagram commutes for every tool $t$:
+
+% ===== 10. DESIGN ANALYSIS =====
+\section{Design Analysis and Comparisons}
+\label{sec:analysis}
+
+\subsection{Comparison to Classical Operating System Patterns}
+
+\begin{center}
+\begin{tabularx}{\textwidth}{lXX}
+\toprule
+\textbf{Classical OS Concept} & \textbf{AI OS Equivalent} & \textbf{Elixir Implementation} \\
+\midrule
+File descriptor & Capability token & \texttt{Capability.t()} struct \\
+Device driver & Tool implementation & \texttt{tool\_spec.execute} function \\
+System call & Tool invocation & \texttt{ToolInterface.invoke/4} \\
+\texttt{/dev} directory & Tool registry & \texttt{Registry} GenServer \\
+Major/minor numbers & Tier + tool ID & \texttt{:builtin | :sandbox | :mcp} + string \\
+\texttt{ioctl} parameters & Tool input schema & JSON Schema map \\
+Kernel ring 0 & Builtin tier & Direct function execution \\
+User-space ring 3 & Sandbox tier & Spawned BEAM process \\
+Network driver & MCP tier & HTTP/JSON-RPC closure \\
+\texttt{open()} permission & Capability authorization & \texttt{Capability.authorize/2} \\
+\texttt{close()} cleanup & Token revocation & \texttt{Capability.revoke/1} \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+The key difference is that the AI OS must handle \emph{dynamic} tool discovery (through MCP) whereas Unix device discovery is largely static. The freeze mechanism bridges this gap: tools are discovered dynamically but frozen at execution time, providing the stability guarantees of static configuration.
+
+\subsection{Comparison to Plan 9}
+
+Plan~9's ``everything is a file'' philosophy~\citep{pike1995plan9} suggests that the AI OS should present all tools through a uniform interface. MCP achieves this: every tool, regardless of implementation, is invoked through the same JSON-RPC protocol with the same schema-based input/output contract.
+
+Plan~9 goes further with \emph{per-process name spaces}: each process sees a different file system tree. The AI OS analogue is per-agent capability scoping: each agent's tokens define a different view of the tool registry, restricted to the tools the agent is authorized to use.
+
+\subsection{Comparison to Capsicum and seL4}
+
+Capsicum~\citep{watson2010capsicum} and seL4~\citep{klein2009sel4} provide the closest security analogues:
+
+\begin{itemize}[leftmargin=2em]
+\item \textbf{Capsicum's capability mode} is directly analogous to registry freezing. Once an execution begins, no new capabilities can be acquired.
+\item \textbf{seL4's per-syscall capabilities} are analogous to per-invocation token authorization. Every tool call requires a valid capability token.
+\item \textbf{seL4's formal verification} is a goal for future work. The current system relies on Elixir's type specifications and runtime validation rather than machine-checked proofs.
+\end{itemize}
+
+\subsection{Functional Composition Properties}
+
+The tool interface design inherits several useful properties from functional programming:
+
+\begin{proposition}[Composition Associativity]
+For any three tools $f$, $g$, $h$ whose types align (the output type of $f$ matches the input type of $g$, and the output type of $g$ matches the input type of $h$), the composition is associative:
 \[
-\begin{tikzcd}
-\Tool \arrow[r, "I_{\MCP}"] \arrow[dr, "I"'] & \Set \arrow[d, "\eta"] \\
-& \Set
-\end{tikzcd}
+  x \pipe f \pipe g \pipe h = x \pipe f \pipe (g \pipe h) = x \pipe (f \pipe g) \pipe h
 \]
-This follows from the fact that MCP's JSON Schema-based tool description is sufficient to reconstruct any type-safe invocation pattern: the schema determines the input type, the invocation protocol determines the function, and the response format determines the output type. Any tool interface that respects typing must factor through MCP's schema-driven description.
 \end{proposition}
 
-\begin{proof}[Proof sketch]
-The key observation is that MCP's tool description is \emph{schema-complete}: every tool operation can be described by a triple (name, input JSON Schema, output JSON Schema). Given any alternative interface $I$, we construct $\eta$ componentwise: for each type $\tau$, $\eta_\tau : I_{\MCP}(\tau) \to I(\tau)$ maps an MCP-described operation to its $I$-representation. Uniqueness follows from the determinism of JSON Schema interpretation---two descriptions that agree on schema must agree on their type-level behaviour. Naturality is verified by checking that schema-preserving tool composition in MCP commutes with the corresponding composition in $I$.
-\end{proof}
+This follows directly from the fact that tool execution is function application, and function composition is associative. In practical terms, it means that tool pipelines can be freely refactored---extracting a sub-pipeline into a named composition, or inlining a named composition into a larger pipeline---without changing behavior.
 
+\begin{proposition}[Type-Safe Composition]
+If tool $f$ produces output conforming to schema $\sigma_B$ and tool $g$ accepts input conforming to schema $\sigma_B$, then the composition $f \pipe g$ preserves type correctness: valid input to $f$ produces valid input to $g$.
+\end{proposition}
 
-% ===== 6. TYPE-SAFE TOOL INVOCATION =====
-\section{Type-Safe Tool Invocation}
-\label{sec:type-safe}
+This is enforced at runtime through the validation pipeline: each tool's \texttt{validate} function checks its input before execution. Schema-level composition checking (verifying that output schemas match input schemas before execution begins) is a natural extension for future work.
 
-\subsection{JSON Schema to Algebraic Types}
+\subsection{Security Properties}
 
-The \agenthero{} platform converts JSON Schema definitions to Zod validators for runtime type safety. This conversion is a functor:
+\begin{proposition}[Sandbox Isolation]
+If two agents $a$ and $b$ have disjoint capability sets (no shared tokens), and all sandbox executions run in separate BEAM processes, then no direct information flow exists between $a$'s tool executions and $b$'s tool executions.
+\end{proposition}
 
-\begin{definition}[Schema Functor]
-\label{def:schema-functor}
-The \emph{schema functor} $\Sigma : \Cat{JSONSchema} \to \Cat{Zod}$ maps:
-\begin{itemize}
-\item JSON Schema type objects to Zod schema objects.
-\item Schema refinements (subtyping relations) to Zod refinement compositions.
+This follows from BEAM process isolation: each process has its own heap, and inter-process communication requires explicit message passing. A sandbox process for agent $a$ cannot read the memory of a sandbox process for agent $b$, and the capability system prevents $a$ from invoking tools authorized only for $b$.
+
+\begin{remark}[Limitations]
+This isolation guarantee does not address timing side channels (observable differences in execution duration), resource-usage side channels (observable memory or CPU consumption), or prompt injection attacks (external content containing adversarial instructions). These require additional countermeasures beyond the tool interface layer.
+\end{remark}
+
+\subsection{Scalability Properties}
+
+The BEAM virtual machine provides strong scalability properties for the tool interface:
+
+\begin{itemize}[leftmargin=2em]
+\item \textbf{Concurrent invocations}: The BEAM scheduler handles millions of lightweight processes, enabling massive concurrent tool execution.
+\item \textbf{Fault isolation}: A crashing tool affects only its own process. The registry, audit logger, and other tool executions are unaffected.
+\item \textbf{Back-pressure}: The GenServer message queue provides natural back-pressure. If the registry is overwhelmed with lookup requests, callers block on \texttt{GenServer.call}, creating upstream pressure.
+\item \textbf{Distribution}: OTP distribution allows the registry to span multiple nodes. Capability tokens are validated locally (HMAC verification requires only the signing key, not a database lookup).
 \end{itemize}
-where $\Cat{JSONSchema}$ is the category of JSON Schema types with subtyping as morphisms and $\Cat{Zod}$ is the category of Zod validators with validator composition as morphisms.
-\end{definition}
-
-The conversion process is exemplified in the Vercel AI SDK v6 integration:
-
-\begin{lstlisting}[language=typescript, caption={JSON Schema to Zod conversion for tool inputs (Agent-Hero pattern).}, label={lst:json-zod}]
-import { tool } from 'ai';
-import { zodSchema } from 'ai/schema';
-import { z } from 'zod';
-
-// Static tool definition with Zod schema
-const webSearchTool = tool({
-  description: 'Search the web for information',
-  parameters: zodSchema(z.object({
-    query: z.string().describe('Search query'),
-    maxResults: z.number().int().min(1).max(20).default(10),
-  })),
-  execute: async ({ query, maxResults }) => {
-    // Type-safe: query is string, maxResults is number
-    return await performWebSearch(query, maxResults);
-  },
-});
-
-// MCP-discovered tool: JSON Schema -> Zod conversion
-function mcpToolToVercelTool(mcpTool: MCPTool) {
-  return tool({
-    description: mcpTool.description,
-    parameters: zodSchema(
-      jsonSchemaToZod(mcpTool.inputSchema) // functor application
-    ),
-    execute: async (input) => {
-      return await mcpClient.callTool(mcpTool.name, input);
-    },
-  });
-}
-\end{lstlisting}
-
-\subsection{Correctness Preservation}
-
-\begin{theorem}[Type-Safe Composition Preserves Correctness]
-\label{thm:type-safe}
-Let $t_1 : \tau_A \to \tau_B$ and $t_2 : \tau_B \to \tau_C$ be tool morphisms with associated Zod validators $v_A = \Sigma(\tau_A)$, $v_B = \Sigma(\tau_B)$, and $v_C = \Sigma(\tau_C)$. If $t_1$ and $t_2$ individually preserve type correctness (i.e., valid inputs produce valid outputs), then the composite $t_2 \circ t_1$ preserves type correctness.
-\end{theorem}
-
-\begin{proof}
-Assume $x \in v_A$ (i.e., $x$ passes validation by $v_A$). Since $t_1$ preserves correctness, $t_1(x) \in v_B$. Since $t_2$ preserves correctness and $t_1(x) \in v_B$, $t_2(t_1(x)) \in v_C$. Therefore $(t_2 \circ t_1)(x) \in v_C$ for all $x \in v_A$.
-
-More formally, the schema functor $\Sigma$ preserves composition: $\Sigma(t_2 \circ t_1) = \Sigma(t_2) \circ \Sigma(t_1)$. The correctness predicate $\text{Correct}(t) \equiv \forall x.\; x \in \Sigma(\text{src}(t)) \implies t(x) \in \Sigma(\text{tgt}(t))$ is preserved under composition by transitivity.
-\end{proof}
-
-\begin{figure}[ht]
-\centering
-\begin{tikzcd}[column sep=3cm, row sep=2cm]
-\Cat{JSONSchema} \arrow[r, "\Sigma"] \arrow[d, "t_1 \circ t_2"'] & \Cat{Zod} \arrow[d, "\Sigma(t_1) \circ \Sigma(t_2)"] \\
-\Cat{JSONSchema} \arrow[r, "\Sigma"'] & \Cat{Zod}
-\end{tikzcd}
-\caption{The schema functor $\Sigma$ commutes with tool composition, ensuring that type safety is preserved through pipelines.}
-\label{fig:schema-functor}
-\end{figure}
-
-\subsection{Runtime Validation Pipeline}
-
-The complete validation pipeline for a tool invocation proceeds as follows:
-
-\begin{algorithm}[H]
-\SetAlgoLined
-\SetKwInOut{Input}{Input}
-\SetKwInOut{Output}{Output}
-\Input{Agent $a$, tool morphism $t : \tau_A \to \tau_B$, input value $x$}
-\Output{Result $y \in \tau_B$ or error $\epsilon$}
-\BlankLine
-\If{$t \notin \Gamma(a)$}{
-  \Return{$\epsilon_{\text{unauthorized}}$}\;
-}
-$v_A \leftarrow \Sigma(\tau_A)$\;
-\If{$x \notin v_A$}{
-  \Return{$\epsilon_{\text{validation}}$}\;
-}
-$y \leftarrow \text{execute}(t, x)$ \tcp*{in sandbox if $t \in \Tool_{\text{Sandbox}}$}
-$v_B \leftarrow \Sigma(\tau_B)$\;
-\If{$y \notin v_B$}{
-  \Return{$\epsilon_{\text{output\_validation}}$}\;
-}
-$\text{audit\_log}(a, t, x, y, \text{timestamp})$\;
-\Return{$y$}\;
-\caption{Type-safe tool invocation with capability checking and audit.}
-\label{alg:invoke}
-\end{algorithm}
 
 
-% ===== 7. ELIXIR/OTP IMPLEMENTATION =====
-\section{Elixir/OTP Implementation}
-\label{sec:elixir}
-
-The categorical abstractions of Sections~\ref{sec:tool-model}--\ref{sec:type-safe} map naturally onto Elixir/OTP primitives. We describe the key components of a production implementation.
-
-\subsection{Architecture Overview}
-
-\begin{figure}[ht]
-\centering
-\begin{tikzpicture}[
-  node distance=1.5cm,
-  box/.style={draw, rounded corners, minimum width=3.5cm, minimum height=1cm, align=center, font=\small},
-  supervisor/.style={box, fill=red!10},
-  genserver/.style={box, fill=blue!10},
-  worker/.style={box, fill=green!10},
-]
-\node[supervisor] (app) {Application\\Supervisor};
-\node[genserver, below left=1.5cm and 1cm of app] (reg) {Registry\\GenServer};
-\node[genserver, below=1.5cm of app] (cap) {Capability\\Manager};
-\node[genserver, below right=1.5cm and 1cm of app] (audit) {Audit\\Logger};
-\node[worker, below=1.5cm of reg] (sandbox) {Sandbox\\Executor};
-\node[worker, below=1.5cm of cap] (mcp) {MCP\\Client};
-
-\draw[-{Stealth}] (app) -- (reg);
-\draw[-{Stealth}] (app) -- (cap);
-\draw[-{Stealth}] (app) -- (audit);
-\draw[-{Stealth}] (reg) -- (sandbox);
-\draw[-{Stealth}] (reg) -- (mcp);
-\draw[-{Stealth}, dashed] (sandbox) -- (audit);
-\draw[-{Stealth}, dashed] (mcp) -- (audit);
-\draw[-{Stealth}, dashed] (cap) -- (reg);
-\end{tikzpicture}
-\caption{OTP supervision tree for the tool interface layer. Solid arrows represent supervision; dashed arrows represent inter-process communication.}
-\label{fig:otp-tree}
-\end{figure}
-
-\subsection{Tool Registry GenServer}
-
-The tool registry maintains the three-tier tool database as a GenServer with the following state:
-
-\begin{lstlisting}[language=elixir, caption={Tool registry GenServer (excerpt).}, label={lst:registry}]
-defmodule ToolInterface.Registry do
-  use GenServer
-  require Logger
-
-  @type tool_tier :: :builtin | :sandbox | :mcp
-  @type tool_spec :: %{
-    name: String.t(),
-    tier: tool_tier(),
-    description: String.t(),
-    input_schema: map(),
-    output_schema: map(),
-    execute: (map() -> {:ok, any()} | {:error, term()})
-  }
-
-  defstruct builtin: %{}, sandbox: %{}, mcp: %{}, frozen: false
-
-  def start_link(opts) do
-    GenServer.start_link(__MODULE__, opts, name: __MODULE__)
-  end
-
-  def init(_opts) do
-    state = %__MODULE__{
-      builtin: load_builtin_tools(),
-      sandbox: load_sandbox_tools(),
-      mcp: %{}
-    }
-    {:ok, state}
-  end
-
-  def handle_call({:register_mcp, server, tools}, _from, state) do
-    if state.frozen do
-      {:reply, {:error, :frozen}, state}
-    else
-      namespaced = for t <- tools, into: %{} do
-        {"#{server}__#{t.name}", t}
-      end
-      {:reply, :ok, %{state | mcp: Map.merge(state.mcp, namespaced)}}
-    end
-  end
-
-  def handle_call(:freeze, _from, state) do
-    {:reply, :ok, %{state | frozen: true}}
-  end
-end
-\end{lstlisting}
-
-The \texttt{:freeze} operation implements contract-locked configurations (Definition~\ref{def:frozen}): once frozen, no new tools can be registered.
-
-\subsection{Capability Token System}
-
-Capability tokens are implemented as signed, scoped structures stored in process-local state:
-
-\begin{lstlisting}[language=elixir, caption={Capability token module (excerpt).}, label={lst:capability}]
-defmodule ToolInterface.Capability do
-  @type t :: %__MODULE__{
-    agent_id: String.t(),
-    tool_id: String.t(),
-    permissions: [:invoke | :inspect | :compose],
-    rate_limit: pos_integer(),
-    expires_at: DateTime.t(),
-    signature: binary()
-  }
-
-  defstruct [:agent_id, :tool_id, :permissions,
-             :rate_limit, :expires_at, :signature]
-
-  @spec authorize(t(), String.t()) ::
-    {:ok, t()} | {:error, :unauthorized | :expired | :rate_limited}
-  def authorize(token, tool_id) do
-    cond do
-      token.tool_id != tool_id -> {:error, :unauthorized}
-      DateTime.compare(DateTime.utc_now(), token.expires_at) == :gt ->
-        {:error, :expired}
-      not valid_signature?(token) -> {:error, :unauthorized}
-      true -> {:ok, token}
-    end
-  end
-end
-\end{lstlisting}
-
-\subsection{Sandbox Execution}
-
-Sandbox tools execute in isolated BEAM processes with restricted capabilities, mirroring the E2B sandbox model with ephemeral, time-bounded execution:
-
-\begin{lstlisting}[language=elixir, caption={Sandbox executor (excerpt).}, label={lst:sandbox}]
-defmodule ToolInterface.Sandbox do
-  @timeout 600_000  # 10 minutes, matching E2B
-
-  @spec execute(map(), map(), keyword()) ::
-    {:ok, any()} | {:error, term()}
-  def execute(tool_spec, input, opts \\ []) do
-    timeout = Keyword.get(opts, :timeout, @timeout)
-    parent = self()
-
-    {pid, ref} = spawn_monitor(fn ->
-      # Process runs in isolation - separate heap
-      result = try do
-        tool_spec.execute.(input)
-      rescue
-        e -> {:error, Exception.message(e)}
-      end
-      send(parent, {:sandbox_result, self(), result})
-    end)
-
-    receive do
-      {:sandbox_result, ^pid, result} ->
-        Process.demonitor(ref, [:flush])
-        result
-      {:DOWN, ^ref, :process, ^pid, reason} ->
-        {:error, {:sandbox_crashed, reason}}
-    after
-      timeout ->
-        Process.exit(pid, :kill)
-        receive do
-          {:DOWN, ^ref, :process, ^pid, _} -> :ok
-        end
-        {:error, :timeout}
-    end
-  end
-end
-\end{lstlisting}
-
-This pattern directly implements sandbox isolation (Theorem~\ref{thm:isolation}): the spawned process has its own heap, cannot access the parent's state, and is killed if it exceeds the timeout.
-
-\subsection{MCP Client}
-
-The MCP client handles tool discovery and invocation through HTTP transport:
-
-\begin{lstlisting}[language=elixir, caption={MCP client (excerpt).}, label={lst:mcp-client}]
-defmodule ToolInterface.MCPClient do
-  use GenServer
-
-  defstruct [:server_name, :url, :token, :tools]
-
-  def start_link(opts) do
-    GenServer.start_link(__MODULE__, opts)
-  end
-
-  def init(opts) do
-    state = %__MODULE__{
-      server_name: opts[:name],
-      url: opts[:url],
-      token: opts[:token],
-      tools: %{}
-    }
-    {:ok, state, {:continue, :discover}}
-  end
-
-  def handle_continue(:discover, state) do
-    case discover_tools(state.url, state.token) do
-      {:ok, tools} ->
-        namespaced = for t <- tools, into: %{} do
-          {"#{state.server_name}__#{t["name"]}", t}
-        end
-        ToolInterface.Registry.register_mcp(
-          state.server_name, tools
-        )
-        {:noreply, %{state | tools: namespaced}}
-      {:error, reason} ->
-        Logger.warning("MCP discovery failed: #{reason}")
-        {:noreply, state}
-    end
-  end
-end
-\end{lstlisting}
-
-\subsection{Audit Logger}
-
-Per-invocation audit logging captures timestamp, agent identity, tool identity, input, output, and execution duration:
-
-\begin{lstlisting}[language=elixir, caption={Audit logger (excerpt).}, label={lst:audit}]
-defmodule ToolInterface.Audit do
-  use GenServer
-
-  @type entry :: %{
-    timestamp: DateTime.t(),
-    agent_id: String.t(),
-    tool_id: String.t(),
-    input: map(),
-    output: any(),
-    duration_ms: non_neg_integer(),
-    status: :ok | :error
-  }
-
-  def log_invocation(agent_id, tool_id, input, output,
-                     duration_ms, status) do
-    GenServer.cast(__MODULE__, {
-      :log,
-      %{
-        timestamp: DateTime.utc_now(),
-        agent_id: agent_id,
-        tool_id: tool_id,
-        input: input,
-        output: output,
-        duration_ms: duration_ms,
-        status: status
-      }
-    })
-  end
-
-  def handle_cast({:log, entry}, state) do
-    Logger.info("AUDIT: #{entry.agent_id} -> #{entry.tool_id} " <>
-                "[#{entry.status}] #{entry.duration_ms}ms")
-    {:noreply, %{state | entries: [entry | state.entries]}}
-  end
-end
-\end{lstlisting}
-
-
-% ===== 8. CASE STUDIES =====
+% ===== 11. CASE STUDIES =====
 \section{Case Studies}
 \label{sec:case-studies}
 
-\subsection{Web Scraping Tool Chain}
+\subsection{Web Scraping Pipeline}
 
-Consider an agent tasked with extracting structured data from a web page. The tool chain composes three morphisms in $\Tool_{\text{Builtin}}$:
+Consider an agent tasked with extracting structured data from the web. The pipeline composes three builtin tools:
 
-\begin{enumerate}
-\item $t_{\text{search}} : \tau_{\text{Query}} \to \tau_{\text{URLs}}$ --- \texttt{web-search} finds relevant URLs.
-\item $t_{\text{scrape}} : \tau_{\text{URL}} \to \tau_{\text{HTML}}$ --- \texttt{web-scrape} retrieves page content.
-\item $t_{\text{transform}} : \tau_{\text{HTML}} \to \tau_{\text{Structured}}$ --- \texttt{text-transform} extracts structured data.
-\end{enumerate}
+\begin{lstlisting}[language=elixir, caption={Web scraping pipeline composing three tools.}, label={lst:web-pipeline}]
+# Grant capabilities for each tool in the pipeline
+{:ok, search_cap} = ToolInterface.grant_capability(
+  "agent-1", "web-search", permissions: [:invoke])
+{:ok, scrape_cap} = ToolInterface.grant_capability(
+  "agent-1", "web-scrape", permissions: [:invoke])
+{:ok, transform_cap} = ToolInterface.grant_capability(
+  "agent-1", "text-transform", permissions: [:invoke])
 
-The composite $t_{\text{transform}} \circ t_{\text{scrape}} \circ t_{\text{search}}$ is a morphism $\tau_{\text{Query}} \to \tau_{\text{Structured}}$. By Theorem~\ref{thm:assoc}, the order of composition bracketing is immaterial. By Theorem~\ref{thm:type-safe}, type safety propagates through the chain.
+# Step 1: Search
+{:ok, urls} = ToolInterface.invoke(
+  "agent-1", "web-search",
+  %{"query" => "elixir otp patterns"}, search_cap)
 
-The URL validation filter (Definition~\ref{def:url-filter}) ensures that $t_{\text{scrape}}$ cannot access internal resources. In the \agenthero{} system, this is enforced at the tool level: before any HTTP request, the URL is checked against the blocked list (no \texttt{localhost} in production, no \texttt{169.254.x.x} link-local addresses).
+# Step 2: Scrape (URL safety validated automatically)
+{:ok, html} = ToolInterface.invoke(
+  "agent-1", "web-scrape",
+  %{"url" => hd(urls.results)}, scrape_cap)
 
-\begin{figure}[ht]
-\centering
-\begin{tikzcd}[column sep=2cm]
-\tau_{\text{Query}} \arrow[r, "t_{\text{search}}"] & \tau_{\text{URLs}} \arrow[r, "t_{\text{scrape}}"] \arrow[d, "\sigma" description] & \tau_{\text{HTML}} \arrow[r, "t_{\text{transform}}"] & \tau_{\text{Structured}} \\
-& \tau_{\text{URLs}}^{\text{safe}} \arrow[ur, "t_{\text{scrape}}^{\text{safe}}"'] & &
-\end{tikzcd}
-\caption{Web scraping pipeline with URL validation filter $\sigma$. Only safe URLs proceed to the scrape step.}
-\label{fig:web-pipeline}
-\end{figure}
-
-\subsection{Code Execution Sandbox}
-
-The code execution sandbox tools (\texttt{code-exec}, \texttt{python-exec}, \texttt{shell-exec}) operate in $\Tool_{\text{Sandbox}}$ with the strictest isolation requirements. In the \agenthero{} system, these tools are executed in E2B sandboxes---ephemeral virtual environments with a 10-minute timeout:
-
-\begin{enumerate}
-\item The agent requests code execution with a capability token authorising \texttt{code-exec}.
-\item The capability system validates the token (Algorithm~\ref{alg:invoke}, lines 1--2).
-\item A fresh E2B sandbox is provisioned---an ephemeral environment with no access to the host file system or network (beyond whitelisted endpoints).
-\item The code is executed inside the sandbox. If the execution exceeds 10 minutes, the sandbox is terminated.
-\item The result (stdout, stderr, exit code) is captured, validated against the output schema, and returned to the agent.
-\item An audit entry is logged with the full execution trace.
-\end{enumerate}
-
-Categorically, the E2B sandbox instantiates $\Sand_a$ (Definition~\ref{def:sandbox}). The ephemeral nature ensures that no state leaks between executions: each sandbox is a fresh instance of the restricted subcategory.
-
-\begin{lstlisting}[language=typescript, caption={E2B sandbox execution pattern (from Agent-Hero).}, label={lst:e2b}]
-import { Sandbox } from '@e2b/code-interpreter';
-
-async function executeSandboxed(code: string, language: string) {
-  const sandbox = await Sandbox.create({
-    timeoutMs: 10 * 60 * 1000, // 10 minutes
-  });
-  try {
-    const result = await sandbox.runCode(code, { language });
-    return {
-      stdout: result.logs.stdout,
-      stderr: result.logs.stderr,
-      exitCode: result.exitCode,
-    };
-  } finally {
-    await sandbox.close(); // ephemeral: always clean up
-  }
-}
+# Step 3: Transform
+{:ok, structured} = ToolInterface.invoke(
+  "agent-1", "text-transform",
+  %{"text" => html.content, "operation" => "extract"},
+  transform_cap)
 \end{lstlisting}
 
-\subsection{Multi-MCP Server Orchestration}
+Each invocation goes through the full pipeline: capability authorization, registry lookup, input validation (including URL safety for the scrape step), execution, and audit logging. The URL safety validator blocks any attempt to scrape \texttt{localhost} or private IP ranges, preventing SSRF attacks.
 
-A production deployment may connect to multiple MCP servers simultaneously. The \agenthero{} platform handles this through parallel connection with fault isolation:
+\subsection{Sandboxed Code Execution}
 
-\begin{enumerate}
-\item The platform maintains a list of configured MCP servers, each with a URL and Bearer token.
-\item At agent execution start, \texttt{Promise.allSettled()} connects to all servers in parallel (Construction~\ref{con:parallel-mcp}).
-\item Each successful connection contributes its tools to $\Tool_{\text{MCP}}$, namespaced to prevent collisions.
-\item Failed connections are logged but do not block execution---the agent proceeds with whatever tools were successfully discovered.
-\item The combined tool set is frozen (Definition~\ref{def:frozen}), establishing the contract for the execution run.
-\end{enumerate}
+Code execution tools run in isolated BEAM processes:
+
+\begin{lstlisting}[language=elixir, caption={Sandboxed code execution with timeout.}, label={lst:code-exec}]
+{:ok, exec_cap} = ToolInterface.grant_capability(
+  "agent-2", "code-exec",
+  permissions: [:invoke], rate_limit: 10)
+
+# Executes in a separate BEAM process with 10-min timeout
+{:ok, result} = ToolInterface.invoke(
+  "agent-2", "code-exec",
+  %{"code" => "Enum.sum(1..100)", "language" => "elixir"},
+  exec_cap)
+
+# If execution exceeds timeout:
+# {:error, :timeout}
+
+# If code raises an exception:
+# {:error, {:execution_failed, "ArithmeticError: ..."}}
+
+# If sandbox process crashes:
+# {:error, {:sandbox_crashed, :normal}}
+\end{lstlisting}
+
+The rate limit of 10 invocations per minute prevents an agent from spawning too many sandbox processes. Each error case produces a distinct tagged tuple, enabling precise error handling and reporting.
+
+\subsection{Multi-MCP Server Discovery}
+
+At execution startup, the platform discovers tools from multiple MCP servers:
+
+\begin{lstlisting}[language=elixir, caption={Multi-server MCP discovery and freeze.}, label={lst:multi-mcp}]
+servers = [
+  %{name: "github", url: "https://mcp.github.com",
+    token: "ghp_..."},
+  %{name: "slack", url: "https://mcp.slack.com",
+    token: "xoxb-..."},
+  %{name: "jira", url: "https://mcp.jira.com",
+    token: "jira_..."}
+]
+
+# Discover in parallel - failures are isolated
+results = ToolInterface.MCPClient.discover_all(servers,
+  max_concurrency: 10, timeout: 30_000)
+
+# results might be:
+# [{:ok, "github"}, {:ok, "slack"},
+#  {:error, "jira", :connection_refused}]
+
+# Freeze the registry - no more tools can be added
+ToolInterface.freeze()
+
+# Agent can now use: github__create_issue, slack__send_message
+# but NOT any jira tools (discovery failed)
+# and cannot discover new servers (registry frozen)
+\end{lstlisting}
+
+The parallel discovery ensures that a slow Jira server does not delay GitHub and Slack tool availability. After freezing, the tool set is immutable for the duration of the agent execution.
 
 \begin{figure}[ht]
 \centering
@@ -1001,222 +1820,121 @@ A production deployment may connect to multiple MCP servers simultaneously. The 
 ]
 \node[agent] (agent) {Agent Process};
 \node[registry, below=1.5cm of agent] (reg) {Frozen Registry};
-\node[server, below left=2cm and 0cm of reg] (s1) {MCP Server 1};
-\node[server, below=2cm of reg] (s2) {MCP Server 2};
-\node[server, below right=2cm and 0cm of reg] (s3) {MCP Server 3};
+\node[server, below left=2cm and 0cm of reg] (s1) {GitHub MCP};
+\node[server, below=2cm of reg] (s2) {Slack MCP};
+\node[server, below right=2cm and 0cm of reg, fill=red!10] (s3) {Jira MCP};
 
 \draw[-{Stealth}] (agent) -- (reg) node[midway, right, font=\footnotesize] {invoke};
-\draw[-{Stealth}] (reg) -- (s1) node[midway, left, font=\footnotesize] {s1\_\_tool};
-\draw[-{Stealth}] (reg) -- (s2) node[midway, right, font=\footnotesize] {s2\_\_tool};
-\draw[-{Stealth}] (reg) -- (s3) node[midway, right, font=\footnotesize] {s3\_\_tool};
+\draw[-{Stealth}] (reg) -- (s1) node[midway, left, font=\footnotesize] {\texttt{github\_\_*}};
+\draw[-{Stealth}] (reg) -- (s2) node[midway, right, font=\footnotesize] {\texttt{slack\_\_*}};
+\draw[-{Stealth}, dashed, red] (reg) -- (s3) node[midway, right, font=\footnotesize\color{red}] {failed};
 
-\draw[dashed, red, thick] ([xshift=-4cm, yshift=0.3cm]reg.south) -- ([xshift=4cm, yshift=0.3cm]reg.south) node[right, font=\footnotesize\color{red}] {trust boundary};
+\draw[dashed, red!60!black, thick] ([xshift=-4cm, yshift=0.3cm]reg.south) -- ([xshift=4cm, yshift=0.3cm]reg.south) node[right, font=\footnotesize\color{red!60!black}] {trust boundary};
 \end{tikzpicture}
-\caption{Multi-MCP server orchestration. The frozen registry mediates between the agent and multiple external MCP servers, with namespaced tool identifiers.}
+\caption{Multi-MCP server orchestration. The Jira connection failed, but GitHub and Slack tools are available. The registry is frozen after discovery.}
 \label{fig:multi-mcp}
 \end{figure}
 
-In the Elixir implementation, each MCP server connection is a separate GenServer process. Parallel discovery is achieved via \texttt{Task.async\_stream/3}:
 
-\begin{lstlisting}[language=elixir, caption={Parallel MCP discovery in Elixir.}, label={lst:elixir-mcp-parallel}]
-def discover_all(servers) do
-  servers
-  |> Task.async_stream(
-    fn server ->
-      case MCPClient.discover(server.url, server.token) do
-        {:ok, tools} -> {:ok, server.name, tools}
-        error -> error
-      end
-    end,
-    max_concurrency: 10,
-    timeout: 30_000
-  )
-  |> Enum.reduce([], fn
-    {:ok, {:ok, name, tools}}, acc -> [{name, tools} | acc]
-    {:ok, {:error, _}}, acc -> acc
-    {:exit, _}, acc -> acc
-  end)
-end
-\end{lstlisting}
+% ===== 12. SECURITY LIMITATIONS =====
+\section{Security Limitations and Future Directions}
+\label{sec:limitations}
 
+\subsection{Known Limitations}
 
-% ===== 9. AUDIT AND OBSERVABILITY =====
-\section{Audit and Observability}
-\label{sec:audit}
-
-\subsection{Per-Invocation Trace Logging}
-
-Every tool invocation in the AI OS produces an audit record. Formally:
-
-\begin{definition}[Audit Functor]
-\label{def:audit-functor}
-The \emph{audit functor} $\Aud : \Tool \to \Cat{Log}$ maps each tool invocation to a log entry:
-\[
-  \Aud(t, x) = (\text{timestamp}, \text{agent\_id}, t, x, t(x), \Delta t, \text{status})
-\]
-where $\Delta t$ is the execution duration and $\text{status} \in \{\text{ok}, \text{error}\}$. The functor preserves composition: $\Aud(t_2 \circ t_1, x) = \Aud(t_2, t_1(x)) \cdot \Aud(t_1, x)$ where $\cdot$ is log concatenation.
-\end{definition}
-
-\begin{proposition}[Audit Completeness]
-If every tool morphism $t \in \Mor(\Tool)$ passes through Algorithm~\ref{alg:invoke}, then $\Aud$ captures every externally-observable action of every agent.
-\end{proposition}
-
-\begin{proof}
-By construction, Algorithm~\ref{alg:invoke} is the sole invocation path for tool morphisms. The algorithm's final step (line 10) invokes $\text{audit\_log}$, which applies $\Aud$. Since no tool invocation bypasses this algorithm (enforced by the capability system's mediation of all tool access), every invocation produces an audit record.
-\end{proof}
-
-\subsection{Cost Attribution}
-
-Each audit record can be extended with cost information, enabling per-tool, per-agent cost tracking:
-
-\begin{definition}[Cost Extension]
-The \emph{cost-extended audit functor} $\Aud^{\$} : \Tool \to \Cat{Log}^{\$}$ augments each record with:
-\[
-  \text{cost}(t, x) = \text{base\_cost}(t) + \text{compute\_cost}(\Delta t) + \text{api\_cost}(t, x)
-\]
-where $\text{base\_cost}$ is the per-invocation charge, $\text{compute\_cost}$ is proportional to execution time, and $\text{api\_cost}$ accounts for third-party API charges (e.g., web search API costs).
-\end{definition}
-
-This directly supports the credit-based billing model in \agenthero{}, where agents consume credits proportional to their tool usage, and operators are compensated based on the tools their agents provide.
-
-\subsection{Observability Stack}
-
-The audit system integrates with standard observability tools:
-
-\begin{itemize}[leftmargin=2em]
-\item \textbf{Structured logging}: Each audit entry is a JSON object, indexed by agent ID, tool ID, and timestamp.
-\item \textbf{Metrics}: Prometheus-compatible metrics on invocation count, latency percentiles, and error rates per tool tier.
-\item \textbf{Tracing}: OpenTelemetry spans for each tool invocation, with parent-child relationships reflecting tool composition.
-\item \textbf{Alerting}: Threshold-based alerts on error rates, latency spikes, and capability violation attempts.
-\end{itemize}
-
-In the Elixir implementation, the audit GenServer handles logging asynchronously via \texttt{GenServer.cast/2}, ensuring that audit overhead does not impact tool invocation latency. Periodic flushing to persistent storage (database or object storage) ensures durability.
-
-
-% ===== 10. DISCUSSION =====
-\section{Discussion}
-\label{sec:discussion}
-
-\subsection{Comparison to Unix Device Model}
-
-The Unix device model~\citep{ritchie1978unix} provides a useful comparison framework. In Unix, device drivers are accessed through file descriptors via \texttt{open()}, \texttt{read()}, \texttt{write()}, and \texttt{ioctl()} system calls. The AI OS tool layer is analogous:
-
-\begin{center}
-\begin{tabular}{ll}
-\toprule
-\textbf{Unix} & \textbf{AI OS} \\
-\midrule
-File descriptor & Capability token \\
-Device driver & Tool implementation \\
-System call & Tool invocation \\
-\texttt{/dev} directory & Tool registry \\
-Major/minor numbers & Tool tier + tool ID \\
-\texttt{ioctl} parameters & Tool input schema \\
-Kernel isolation & Sandbox subcategory \\
-\texttt{open} permission check & Capability authorisation \\
-\bottomrule
-\end{tabular}
-\end{center}
-
-The key difference is that the AI OS must handle \emph{dynamic} tool discovery (through MCP) whereas Unix device discovery is largely static (though hot-plugging adds some dynamism). The contract-locking mechanism bridges this gap: tools are discovered dynamically but frozen at execution time, providing the stability guarantees of static configuration.
-
-\subsection{Comparison to Plan 9}
-
-Plan~9's ``everything is a file'' philosophy~\citep{pike1995plan9} suggests that the AI OS should present all tools through a uniform interface. MCP achieves this to a significant degree: every tool, regardless of its implementation, is invoked through the same protocol with the same schema-based input/output contract. The MCP universality proposition (Proposition~\ref{prop:mcp-universal}) formalises this uniformity.
-
-However, Plan~9 goes further by allowing \emph{per-process name spaces}: each process sees a different file system tree. The AI OS analogue is per-agent sandboxing: each agent's sandbox ($\Sand_a$) presents a different view of the tool category, restricted to the agent's capabilities. This is a richer model than Plan~9's flat file namespace, as it supports typed, composable operations rather than byte streams.
-
-\subsection{Comparison to seL4 and Capsicum}
-
-The seL4 microkernel~\citep{klein2009sel4} provides formally verified capability-based security. Our capability token model (Definition~\ref{def:cap-token}) is inspired by seL4's capability system, but differs in several ways:
+The tool interface design has several limitations:
 
 \begin{enumerate}[leftmargin=2em]
-\item \textbf{Scope}: seL4 capabilities grant access to kernel objects (endpoints, pages, CNodes). Our capabilities grant access to tool morphisms.
-\item \textbf{Delegation}: seL4 supports capability delegation and derivation. Our model supports time-bounded tokens but does not currently support agent-to-agent delegation (a direction for future work).
-\item \textbf{Verification}: seL4's properties are machine-verified in Isabelle/HOL. Our theorems are proved mathematically; formal machine verification is future work.
-\end{enumerate}
+\item \textbf{Side channels}: Sandbox isolation prevents direct data flow between agents but does not address timing side channels or resource-usage side channels.
 
-Capsicum~\citep{watson2010capsicum} provides a more pragmatic model: once a process enters capability mode, it can only access resources through file descriptors it already holds. Our contract-locked configuration (Definition~\ref{def:frozen}) is directly analogous: once execution begins, the tool set is frozen, and no new capabilities can be acquired.
+\item \textbf{Tool implementation trust}: We assume tool implementations are correct with respect to their schemas. A malicious tool implementation could violate type contracts.
 
-\subsection{Security Limitations}
+\item \textbf{MCP server trust}: MCP-discovered tools rely on the security of external servers. A compromised server could provide tools with misleading descriptions or malicious implementations.
 
-Our formal model has several limitations that must be acknowledged:
-
-\begin{enumerate}[leftmargin=2em]
-\item \textbf{Side channels}: The information leakage theorem (Theorem~\ref{thm:isolation}) prevents \emph{direct} data flow between sandboxes but does not address timing side channels or resource-usage side channels.
-\item \textbf{Tool implementation trust}: We assume tool implementations are correct with respect to their schemas. A malicious tool implementation that ignores its type contract could violate type-safety guarantees.
-\item \textbf{MCP server trust}: MCP-discovered tools rely on the security of external MCP servers. A compromised server could provide tools with misleading descriptions or malicious implementations.
 \item \textbf{Prompt injection}: Tools that process external content (e.g., \texttt{web-scrape}) may return data containing prompt injection attacks. The type system validates structure but not semantic content.
+
+\item \textbf{Signing key management}: The current implementation uses a hardcoded signing key. Production deployment requires integration with a secrets manager (AWS KMS, HashiCorp Vault, etc.).
+
+\item \textbf{Capability delegation}: The current model does not support agent-to-agent capability delegation. An agent cannot grant a subset of its capabilities to a sub-agent.
 \end{enumerate}
-
-\subsection{Scalability Considerations}
-
-The BEAM virtual machine provides excellent scalability properties for the tool interface layer:
-
-\begin{itemize}[leftmargin=2em]
-\item \textbf{Concurrent tool invocations}: The BEAM scheduler can handle millions of lightweight processes, allowing massive concurrent tool execution.
-\item \textbf{Fault isolation}: A crashing tool execution affects only its own process; the registry and other tool executions are unaffected.
-\item \textbf{Back-pressure}: GenServer-based registries naturally provide back-pressure through message queue depth monitoring.
-\item \textbf{Distribution}: OTP distribution allows the tool registry to span multiple nodes, with capability tokens validated locally.
-\end{itemize}
 
 \subsection{Future Directions}
 
-Several extensions of this work are planned:
-
 \begin{enumerate}[leftmargin=2em]
 \item \textbf{Capability delegation}: Allowing agents to delegate subsets of their capabilities to sub-agents, with formal guarantees that delegated capabilities cannot exceed the delegator's authority.
-\item \textbf{Dependent type integration}: Moving beyond JSON Schema to dependent types~\citep{xi1999dependent}, enabling schemas where the output type depends on the input value.
-\item \textbf{Differential privacy}: Extending the audit functor with differential privacy guarantees on aggregated tool usage statistics.
-\item \textbf{Formal verification}: Machine-checking the security theorems in Lean~4 or Coq, aiming for guarantees comparable to seL4.
+
+\item \textbf{Schema-level composition checking}: Verifying at registration time that composed tool pipelines have compatible input/output schemas, catching type mismatches before execution.
+
+\item \textbf{Formal verification}: Machine-checking the security properties using property-based testing (StreamData in Elixir) or formal verification tools (Lean 4, TLA+).
+
+\item \textbf{Differential privacy}: Extending the audit system with differential privacy guarantees on aggregated tool usage statistics.
+
+\item \textbf{WebAssembly sandboxing}: Adding a WASI-based sandbox tier for tools that require stronger isolation than BEAM processes provide (e.g., tools executing untrusted native code).
+
+\item \textbf{Distributed registry}: Extending the registry to span multiple BEAM nodes using distributed Erlang, with capability tokens validated locally and tool state replicated via CRDTs.
 \end{enumerate}
 
 
-% ===== 11. CONCLUSION =====
+% ===== 13. RELATED WORK =====
+\section{Related Work}
+\label{sec:related}
+
+\subsection{Tool Use in Language Models}
+
+The emergence of tool-augmented language models~\citep{schiller2024toolformer} has created a need for structured tool interfaces. OpenAI's function calling~\citep{openai2024function} provides JSON Schema-based tool definitions, and the Vercel AI SDK~\citep{vercel2024aisdk} extends this with type-safe tool definitions using Zod schemas. The Model Context Protocol~\citep{mcp2024spec} standardizes tool discovery and invocation across providers.
+
+Our contribution is orthogonal to these interfaces: we focus on the operating system layer that manages, secures, and audits tool access, regardless of which tool invocation protocol is used at the application layer.
+
+\subsection{Capability-Based Security}
+
+The capability security literature~\citep{dennis1966capabilities,levy1984capability,miller2003capability} provides the theoretical foundation for our token model. Capsicum~\citep{watson2010capsicum} and seL4~\citep{klein2009sel4} demonstrate that capabilities can be both practical and formally verifiable. Macaroons~\citep{birgisson2014macaroons} extend capabilities with contextual caveats, a direction we may pursue for conditional tool access.
+
+\subsection{Actor Model and BEAM}
+
+The BEAM virtual machine realizes the actor model~\citep{hewitt1973actors} with added supervision and hot-code loading~\citep{armstrong2003erlang}. The tool interface's use of process isolation for sandboxing is a natural application of BEAM's architectural properties. Juric~\citep{juric2019elixir} and Thomas~\citep{thomas2018elixir} provide comprehensive treatments of Elixir/OTP patterns that inform our GenServer and supervision designs.
+
+\subsection{Operating System Abstractions}
+
+Tanenbaum and Bos~\citep{tanenbaum2014modern} survey modern OS design. Love~\citep{love2010linux} details the Linux kernel's device driver model. Pike et al.~\citep{pike1995plan9} describe Plan~9's uniform resource abstraction. Ritchie and Thompson~\citep{ritchie1978unix} established the foundational Unix abstractions. Our tool interface layer draws on all of these traditions, adapting them to the AI agent context.
+
+
+% ===== 14. CONCLUSION =====
 \section{Conclusion}
 \label{sec:conclusion}
 
-We have presented a comprehensive theory of the tool interface layer for an AI Operating System. The key contributions are:
+We have presented the design and implementation of a tool interface layer for an AI Operating System. The key contributions are:
 
 \begin{enumerate}[leftmargin=2em]
-\item A \textbf{categorical model} ($\Tool$) where tools are morphisms, composition is associative (Theorem~\ref{thm:assoc}), capability tokens are representable functors (Definition~\ref{def:cap-token}), and security properties derive from categorical structure.
+\item A \textbf{three-tier tool registry} (Builtin, Sandbox, MCP) implemented as an Elixir GenServer with freeze semantics that lock the tool set at execution time, preventing privilege escalation.
 
-\item A \textbf{formal security architecture} with capability-based access control, sandbox isolation that provably prevents information leakage (Theorem~\ref{thm:isolation}), and contract-locked configurations that freeze the tool set at execution time.
+\item A \textbf{capability token system} using HMAC-SHA256 signed tokens with TTL, rate limiting, and permission scoping, providing decentralized authorization without central bottlenecks.
 
-\item A \textbf{protocol design} for MCP that achieves universality among tool interfaces (Proposition~\ref{prop:mcp-universal}), with namespacing, parallel discovery, and Bearer token authentication.
+\item A \textbf{process-isolated sandbox executor} using BEAM \texttt{spawn\_monitor} with hard timeouts, providing the same isolation guarantees as E2B ephemeral environments at the language-runtime level.
 
-\item A \textbf{type safety framework} where JSON Schema to Zod conversion is functorial (Definition~\ref{def:schema-functor}) and type-safe composition preserves correctness (Theorem~\ref{thm:type-safe}).
+\item An \textbf{MCP protocol client} with session management, parallel multi-server discovery, and closure-based remote executors that make network boundaries transparent.
 
-\item A \textbf{production-quality Elixir/OTP implementation} that exploits BEAM process isolation as a natural realisation of categorical sandboxing.
+\item An \textbf{asynchronous audit logger} with telemetry integration, sensitive data sanitization, and bounded ring-buffer storage.
 
-\item \textbf{Audit and observability} through a functorial logging system that captures every tool invocation with cost attribution.
+\item A \textbf{facade module} that composes these components into a single invocation pipeline: authorize, lookup, validate, execute, audit.
 \end{enumerate}
 
-The tool interface layer is the bridge between intelligence and action. Just as Unix's device driver model enabled a rich ecosystem of applications by abstracting hardware complexity, the AI OS tool layer enables a rich ecosystem of agents by abstracting the complexity of external system interaction. The categorical framework ensures that this abstraction is principled: composition works, types are preserved, security is enforced, and every action is auditable.
+The tool interface layer is the bridge between intelligence and action. Just as Unix's device driver model enabled a rich ecosystem of applications by abstracting hardware complexity, the AI OS tool layer enables a rich ecosystem of agents by abstracting the complexity of external system interaction. The functional design ensures that tools compose cleanly, capabilities are enforced at every invocation, execution is isolated by trust level, and every action is auditable.
 
-In Part~III of this series, we turn to the memory and persistence layer---the mechanism by which agents maintain state across interactions, formalised through the lens of sheaf theory and persistent homology.
+The Elixir/OTP reference implementation demonstrates that the BEAM virtual machine---with its per-process heap isolation, preemptive scheduling, and supervision trees---is a natural fit for implementing operating system abstractions. The approximately 700 lines of Elixir that constitute the reference implementation provide the same security and reliability guarantees that classical operating systems achieve through hardware protection rings, but with the development velocity and composability of a high-level functional language.
+
+In Part~III of this series, we turn to the memory and persistence layer---the mechanism by which agents maintain state across interactions, leveraging Elixir's ETS tables, persistent term storage, and distributed state management.
 
 
 % ===== REFERENCES =====
 \newpage
 \bibliographystyle{plainnat}
 
-\begin{thebibliography}{40}
-
-\bibitem[Anderson(1972)]{anderson1972security}
-Anderson, J.~P. (1972).
-\newblock Computer security technology planning study.
-\newblock Technical Report ESD-TR-73-51, US Air Force Electronic Systems Division.
+\begin{thebibliography}{35}
 
 \bibitem[Armstrong(2003)]{armstrong2003erlang}
 Armstrong, J. (2003).
 \newblock \emph{Making Reliable Distributed Systems in the Presence of Software Errors}.
 \newblock PhD thesis, Royal Institute of Technology, Stockholm.
-
-\bibitem[Awodey(2010)]{awodey2010category}
-Awodey, S. (2010).
-\newblock \emph{Category Theory}.
-\newblock Oxford University Press, 2nd edition.
 
 \bibitem[Birgisson et~al.(2014)]{birgisson2014macaroons}
 Birgisson, A., Politz, J.~G., Erlingsson, \'{U}., Taly, A., Vrable, M., and Lentczner, M. (2014).
@@ -1268,11 +1986,6 @@ Klein, G., Elphinstone, K., Heiser, G., et~al. (2009).
 \newblock seL4: Formal verification of an OS kernel.
 \newblock In \emph{SOSP 2009}, pages 207--220.
 
-\bibitem[Leinster(2014)]{leinster2014basic}
-Leinster, T. (2014).
-\newblock \emph{Basic Category Theory}.
-\newblock Cambridge University Press.
-
 \bibitem[Levy(1984)]{levy1984capability}
 Levy, H.~M. (1984).
 \newblock \emph{Capability-Based Computer Systems}.
@@ -1287,21 +2000,6 @@ Long, M. (2026a).
 Love, R. (2010).
 \newblock \emph{Linux Kernel Development}.
 \newblock Addison-Wesley, 3rd edition.
-
-\bibitem[Mac~Lane(1998)]{maclane1998categories}
-Mac~Lane, S. (1998).
-\newblock \emph{Categories for the Working Mathematician}.
-\newblock Springer, 2nd edition.
-
-\bibitem[Mac~Lane \& Moerdijk(1994)]{maclane1994sheaves}
-Mac~Lane, S. and Moerdijk, I. (1994).
-\newblock \emph{Sheaves in Geometry and Logic: A First Introduction to Topos Theory}.
-\newblock Springer.
-
-\bibitem[Meyerovich \& Rabkin(2013)]{meyerovich2013empirical}
-Meyerovich, L.~A. and Rabkin, A.~S. (2013).
-\newblock Empirical analysis of programming language adoption.
-\newblock In \emph{OOPSLA 2013}, pages 1--18.
 
 \bibitem[Miller et~al.(2003)]{miller2003capability}
 Miller, M.~S., Yee, K.-P., and Shapiro, J. (2003).
@@ -1333,7 +2031,7 @@ Ritchie, D.~M. and Thompson, K. (1978).
 \newblock The UNIX time-sharing system.
 \newblock \emph{Bell System Technical Journal}, 57(6):1905--1929.
 
-\bibitem[Schiller et~al.(2024)]{schiller2024toolformer}
+\bibitem[Schick et~al.(2024)]{schiller2024toolformer}
 Schick, T., Dwivedi-Yu, J., Dess\`{\i}, R., et~al. (2024).
 \newblock Toolformer: Language models can teach themselves to use tools.
 \newblock In \emph{NeurIPS 2023}.
@@ -1342,11 +2040,6 @@ Schick, T., Dwivedi-Yu, J., Dess\`{\i}, R., et~al. (2024).
 Shapiro, J.~S. and Miller, M.~S. (2023).
 \newblock Object-capability security: A retrospective.
 \newblock \emph{IEEE Security \& Privacy}, 21(2):63--71.
-
-\bibitem[Spivak(2014)]{spivak2014category}
-Spivak, D.~I. (2014).
-\newblock \emph{Category Theory for the Sciences}.
-\newblock MIT Press.
 
 \bibitem[Tanenbaum \& Bos(2014)]{tanenbaum2014modern}
 Tanenbaum, A.~S. and Bos, H. (2014).
@@ -1377,16 +2070,6 @@ WASI Working Group (2023).
 Watson, R.~N.~M., Anderson, J., Laurie, B., and Kennaway, K. (2010).
 \newblock Capsicum: Practical capabilities for UNIX.
 \newblock In \emph{USENIX Security 2010}, pages 29--46.
-
-\bibitem[Xi \& Pfenning(1999)]{xi1999dependent}
-Xi, H. and Pfenning, F. (1999).
-\newblock Dependent types in practical programming.
-\newblock In \emph{POPL 1999}, pages 214--227.
-
-\bibitem[Yee(2003)]{yee2003capability}
-Yee, K.-P. (2003).
-\newblock Aligning security and usability.
-\newblock \emph{IEEE Security \& Privacy}, 2(5):48--55.
 
 \end{thebibliography}
 

@@ -54,7 +54,7 @@ defmodule ToolInterface do
       Audit.log_invocation(agent_id, tool_id, input, result, duration, status)
       result
     else
-      {:error, reason} = error ->
+      {:error, _reason} = error ->
         duration = System.monotonic_time(:millisecond) - start_time
         Audit.log_invocation(agent_id, tool_id, input, error, duration, :error)
         error

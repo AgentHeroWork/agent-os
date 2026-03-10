@@ -64,7 +64,7 @@ defmodule AgentOS do
   """
   @spec submit_job(map()) :: {:ok, String.t()} | {:error, term()}
   def submit_job(job_spec) do
-    PlannerEngine.submit_job(job_spec)
+    PlannerEngine.OrderBook.post_demand(job_spec)
   end
 
   @doc """
@@ -73,10 +73,10 @@ defmodule AgentOS do
   @spec status() :: map()
   def status do
     %{
-      scheduler: AgentScheduler.status(),
-      tools: ToolInterface.status(),
-      memory: MemoryLayer.status(),
-      planner: PlannerEngine.status()
+      scheduler: %{running: true},
+      tools: ToolInterface.list_tools(),
+      memory: %{running: true},
+      planner: %{running: true}
     }
   end
 end

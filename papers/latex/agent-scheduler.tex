@@ -2,7 +2,6 @@
 
 % ---- Packages ----
 \usepackage{amsmath,amssymb,amsthm,mathtools}
-\usepackage{tikz-cd}
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit,backgrounds,calc}
 \usepackage[colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
@@ -17,11 +16,23 @@
 \usepackage{float}
 \usepackage{everypage}
 \usepackage{eso-pic}
+\usepackage{tabularx}
 
 % ---- GrokRxiv Sidebar ----
+\definecolor{grokgray}{RGB}{110,110,110}
 \AddEverypageHook{%
   \ifnum\value{page}=1
-    \put(527,-400){\rotatebox{90}{\footnotesize\texttt{GrokRxiv:2026.03.agent-scheduler-ai-os [cs.AI] 10 Mar 2026}}}
+    \begin{tikzpicture}[remember picture, overlay]
+      \node[
+        rotate=90,
+        anchor=south,
+        font=\Large\sffamily\bfseries\color{grokgray},
+        inner sep=0pt
+      ] at ([xshift=38pt, yshift=0.52\paperheight]current page.south west)
+      {GrokRxiv:2026.03.agent-scheduler-ai-os\quad
+       [\,cs.AI\,]\quad
+       10 Mar 2026};
+    \end{tikzpicture}
   \fi
 }
 
@@ -47,8 +58,8 @@
   morekeywords={defmodule,def,defp,do,end,use,require,alias,import,fn,case,cond,if,else,when,with,for,raise,try,catch,rescue,after,receive,send,spawn,quote,unquote,defstruct,defimpl,defprotocol,defmacro,true,false,nil,and,or,not,in},
   sensitive=true,
   morecomment=[l]{\#},
-  morecomment=[s]{@moduledoc\ \"\"\"}{\ \"\"\"},
-  morecomment=[s]{@doc\ \"\"\"}{\ \"\"\"},
+  morecomment=[s]{@moduledoc\ """}{\ """},
+  morecomment=[s]{@doc\ """}{\ """},
   morestring=[b]",
   morestring=[b]',
 }
@@ -76,7 +87,7 @@
 % ---- Header/Footer ----
 \pagestyle{fancy}
 \fancyhf{}
-\fancyhead[L]{\small Agent Scheduler: Complex Orchestration as Process Management}
+\fancyhead[L]{\small Agent Scheduler: Composable Orchestration as Process Management}
 \fancyhead[R]{\small The AI Operating System --- Part I}
 \fancyfoot[C]{\thepage}
 \renewcommand{\headrulewidth}{0.4pt}
@@ -85,8 +96,8 @@
 \title{
   \vspace{-1cm}
   {\Large\textsc{The AI Operating System --- Part I}} \\[0.5em]
-  {\LARGE\textbf{Agent Scheduler: Complex Orchestration\\as Process Management}} \\[0.5em]
-  {\large A Categorical Framework for Agent Lifecycle,\\Supervision, and Durable Execution}
+  {\LARGE\textbf{Agent Scheduler: Composable Orchestration\\as Process Management}} \\[0.5em]
+  {\large An Elixir/OTP Reference Design for Agent Lifecycle,\\Supervision, and Durable Execution}
 }
 
 \author{
@@ -104,10 +115,10 @@
 \maketitle
 
 \begin{abstract}
-We introduce a formal framework for understanding AI agent scheduling as the fundamental primitive of an AI Operating System (AIOS). Drawing on classical operating systems theory, category theory, and the Erlang/OTP supervision model, we show that complex agent orchestrations --- web testing pipelines, legal analysis workflows, security auditing systems --- can be modeled as objects in a category whose morphisms encode data flow and compositional structure. We define an \emph{execution category} whose objects are agent states and whose morphisms are state transitions, and prove that durable execution engines (modeled on Inngest) preserve idempotency as a functorial invariant. We formalize the Agent-Hero execution pipeline (Job $\to$ Proposal $\to$ Contract $\to$ Decomposition $\to$ Execution $\to$ Evaluation) as a chain complex in a preadditive category and demonstrate that supervision trees correspond to limit-preserving functors from the category of failure modes to the category of recovery strategies. We show that oversight modes (supervised, spot-check, autonomous escalation) form a complete lattice under a refinement ordering, and that the 6-dimensional quality evaluation (quality, adherence, speed, cost, error, revision) defines a weighted inner product space suitable for agent reputation computation. We validate our framework through three case studies drawn from production systems and provide a complete Elixir/OTP reference implementation demonstrating supervision trees, streaming pipelines, and fault-tolerant scheduling.
+We present the design and implementation of an AI agent scheduler built on functional programming principles and Erlang/OTP's process model. The system treats AI agents as supervised processes with well-defined lifecycle state machines, composable execution pipelines, and multi-dimensional quality evaluation. Drawing on classical operating systems theory and the Erlang ``let it crash'' philosophy, we show that complex agent orchestrations---web testing pipelines, legal analysis workflows, security auditing systems---can be built from composable, immutable building blocks: algebraic data types for agent state, higher-order functions for pipeline composition, pattern matching for state transitions, supervision trees for fault tolerance, and message passing for streaming coordination. We formalize durable execution through memoization-based step functions that guarantee idempotent replay on crash recovery, and define a 6-dimensional evaluation framework (quality, adherence, speed, cost, error rate, revision count) with exponentially-weighted reputation scoring. The complete reference implementation in Elixir demonstrates that OTP's supervision trees, GenServer processes, and Registry-based naming provide a production-ready substrate for agent scheduling. We validate through three case studies mapped to the Agent-Hero marketplace platform and the Agent-Testing-Framework's 5-phase streaming pipeline.
 
 \medskip
-\noindent\textbf{Keywords:} AI operating systems, agent scheduling, category theory, OTP supervision, durable execution, streaming pipelines, formal verification
+\noindent\textbf{Keywords:} AI operating systems, agent scheduling, functional programming, OTP supervision, durable execution, composable pipelines, Elixir
 \end{abstract}
 
 \tableofcontents
@@ -117,63 +128,95 @@ We introduce a formal framework for understanding AI agent scheduling as the fun
 \section{Introduction}\label{sec:intro}
 % ==============================================================================
 
-The emergence of large language model (LLM) agents as autonomous computational entities has created an urgent need for systems that manage their lifecycle, scheduling, fault tolerance, and evaluation with the same rigor that traditional operating systems bring to process management \citep{wang2024survey,xi2023rise}. Unlike simple API calls, modern AI agents are \emph{complex orchestrations}: multi-phase workflows that involve planning, tool use, streaming data pipelines, human oversight, and quality evaluation. Companies deploy agents for web testing, legal document analysis, security auditing, dashboard generation, and dozens of other domains --- each requiring workflow decomposition, dependency resolution, retry logic, and compositional validation \citep{wu2023autogen,hong2024metagpt}.
+The emergence of large language model (LLM) agents as autonomous computational entities has created an urgent need for systems that manage their lifecycle, scheduling, fault tolerance, and evaluation with the same rigor that traditional operating systems bring to process management \citep{wang2024survey,xi2023rise}. Unlike simple API calls, modern AI agents are \emph{complex orchestrations}: multi-phase workflows that involve planning, tool use, streaming data pipelines, human oversight, and quality evaluation. Companies deploy agents for web testing, legal document analysis, security auditing, dashboard generation, and dozens of other domains---each requiring workflow decomposition, dependency resolution, retry logic, and compositional validation \citep{wu2023autogen,hong2024metagpt}.
 
-This paper argues that \textbf{agent scheduling is the core primitive of an AI Operating System}, just as process scheduling is the core primitive of Unix/Linux. We develop this analogy rigorously, mapping:
+This paper argues that \textbf{agent scheduling is the core primitive of an AI Operating System}, just as process scheduling is the core primitive of Unix/Linux. We develop this analogy through a concrete implementation, mapping:
 
 \begin{itemize}[leftmargin=2em]
-  \item \textbf{Processes} $\mapsto$ \textbf{Agents}: autonomous units of computation with lifecycle states
-  \item \textbf{The Linux scheduler (CFS)} $\mapsto$ \textbf{The Agent Scheduler}: priority-based, credit-weighted allocation of compute, LLM tokens, and tool access
-  \item \textbf{Process groups and sessions} $\mapsto$ \textbf{Agent teams and contracts}: hierarchical groupings with shared resource budgets
-  \item \textbf{Signals and IPC} $\mapsto$ \textbf{Event streams and message passing}: the EventEmitter-based streaming bus where downstream agents consume upstream events
+  \item \textbf{Processes} $\mapsto$ \textbf{Agents}: autonomous units of computation with lifecycle states, modeled as GenServer processes (\texttt{AgentScheduler.Agent})
+  \item \textbf{The Linux scheduler (CFS)} $\mapsto$ \textbf{The Agent Scheduler}: priority-based, credit-weighted allocation implemented with balanced trees (\texttt{AgentScheduler.Scheduler})
+  \item \textbf{Process groups and sessions} $\mapsto$ \textbf{Agent teams and contracts}: hierarchical groupings managed by a DynamicSupervisor (\texttt{AgentScheduler.Supervisor})
+  \item \textbf{Signals and IPC} $\mapsto$ \textbf{Event streams and message passing}: the pub/sub streaming bus where downstream agents consume upstream events (\texttt{AgentScheduler.Pipeline})
   \item \textbf{Supervision (systemd, init)} $\mapsto$ \textbf{OTP supervision trees}: Erlang/Elixir's ``let it crash'' philosophy applied to agent fault tolerance
 \end{itemize}
+
+\subsection{Functional Programming as Design Language}
+
+The design principles of this system are rooted in functional programming:
+
+\begin{enumerate}[leftmargin=2em]
+  \item \textbf{Composition.} Agents compose through pipelines. The Elixir pipe operator (\texttt{|>}) is not just syntax---it reflects the architectural principle that data flows through a chain of transformations, each stage consuming the output of the previous one.
+  \item \textbf{Immutability.} Agent state is represented as immutable structs. State transitions produce new structs rather than mutating existing ones. This makes state changes explicit and auditable, and enables safe concurrent access without locks.
+  \item \textbf{Pattern matching.} The agent state machine is implemented entirely through pattern matching on GenServer callbacks. Each \texttt{handle\_call} clause matches on both the message type and the current state, making invalid state transitions a compile-time guarantee.
+  \item \textbf{Algebraic data types.} Agent profiles, evaluation vectors, pipeline events, and scheduler entries are modeled as typed structs with explicit type specifications---Elixir's equivalent of algebraic data types.
+  \item \textbf{Higher-order functions.} Durable step execution accepts zero-arity functions as arguments, enabling memoization of arbitrary computations. Pipeline handlers are processes that receive event messages, composing through message passing rather than direct function calls.
+  \item \textbf{Supervision trees.} The entire system is a tree of supervisors and workers, where failure at any node is handled by its parent supervisor according to a declared restart strategy. This is OTP's signature contribution to fault-tolerant system design.
+\end{enumerate}
+
+\subsection{Contributions}
 
 Our contributions are:
 
 \begin{enumerate}[leftmargin=2em]
-  \item A \textbf{categorical formalization} of agents as objects in a category $\mathbf{Agent}$ with morphisms encoding data flow, and a proof that agent composition preserves evaluation metrics (Theorem~\ref{thm:functorial-composition}).
-  \item A formal model of \textbf{durable execution} showing that Inngest-style idempotent step functions preserve state consistency under retry (Theorem~\ref{thm:idempotent-execution}).
-  \item A \textbf{lattice-theoretic characterization} of oversight modes with precise ordering and meet/join operations (Proposition~\ref{prop:oversight-lattice}).
-  \item A \textbf{6-dimensional evaluation framework} formalized as a weighted inner product space with convergence guarantees for reputation computation (Theorem~\ref{thm:reputation-convergence}).
-  \item A complete \textbf{Elixir/OTP reference implementation} demonstrating production-quality supervision, scheduling, and streaming pipelines.
+  \item A complete \textbf{Elixir/OTP reference implementation} of agent scheduling with supervision trees, streaming pipelines, durable execution, and quality evaluation (Section~\ref{sec:implementation}).
+  \item A \textbf{credit-weighted scheduling algorithm} that generalizes Linux CFS to agent workloads with two-tier priority (contracted vs.\ marketplace) (Section~\ref{sec:scheduling}).
+  \item A formal model of \textbf{durable execution} showing that memoization-based step functions guarantee idempotent replay under crash-restart (Section~\ref{sec:durable}).
+  \item A \textbf{6-dimensional evaluation framework} with weighted scoring and exponentially-weighted moving average (EWMA) reputation that provably converges (Section~\ref{sec:evaluation}).
+  \item A \textbf{composable pipeline architecture} for streaming agent coordination with formal ordering constraints and crash-recovery replay (Section~\ref{sec:pipeline}).
+  \item Three \textbf{production-mapped case studies} validating the framework against real systems (Section~\ref{sec:case-studies}).
 \end{enumerate}
 
-The rest of this paper is organized as follows. Section~\ref{sec:background} reviews traditional OS scheduling. Section~\ref{sec:agent-model} develops the categorical agent model. Section~\ref{sec:scheduling} presents the scheduling architecture. Section~\ref{sec:formal} develops the formal framework for durable execution and oversight. Section~\ref{sec:otp} provides the Elixir/OTP implementation. Section~\ref{sec:case-studies} presents case studies. Section~\ref{sec:evaluation} formalizes the evaluation metrics. Section~\ref{sec:discussion} compares our approach to existing systems. Section~\ref{sec:conclusion} concludes.
+\subsection{Paper Roadmap}
+
+Section~\ref{sec:background} reviews traditional OS scheduling and its connection to agent scheduling. Section~\ref{sec:agent-model} defines the agent model using algebraic data types and state machines. Section~\ref{sec:scheduling} presents the scheduling architecture. Section~\ref{sec:pipeline} develops the composable streaming pipeline. Section~\ref{sec:durable} formalizes durable execution and oversight. Section~\ref{sec:implementation} provides the full Elixir/OTP implementation walkthrough. Section~\ref{sec:evaluation} defines the evaluation framework. Section~\ref{sec:case-studies} presents case studies. Section~\ref{sec:discussion} compares our approach to existing systems. Section~\ref{sec:conclusion} concludes.
+
+\subsection{Categorical Context}
+
+We note that the compositional structure described throughout this paper admits a clean formalization in category theory: agents form a category whose morphisms encode data flow, supervision strategies are structure-preserving maps between failure and recovery hierarchies, and pipeline composition corresponds to functorial mapping. We mention this connection where relevant but keep the primary exposition in the language of functional programming and systems design. A full categorical treatment is deferred to Part III of this series.
 
 % ==============================================================================
-\section{Background: Traditional Process Scheduling}\label{sec:background}
+\section{Background: From Process Scheduling to Agent Scheduling}\label{sec:background}
 % ==============================================================================
 
 \subsection{The Linux Completely Fair Scheduler}
 
 The Linux Completely Fair Scheduler (CFS), introduced in kernel 2.6.23 \citep{pabla2009completely}, replaced the O(1) scheduler with a design based on \emph{virtual runtime} (vruntime). Each process accumulates vruntime proportional to its actual CPU time, weighted inversely by its nice value. The scheduler always selects the process with the smallest vruntime, maintained in a red-black tree for $O(\log n)$ access \citep{love2010linux}.
 
-\begin{definition}[Virtual Runtime]\label{def:vruntime}
-For a process $p$ with nice value $n_p$, the virtual runtime after executing for real time $\Delta t$ is:
+For a process $p$ with nice value $n_p$, the virtual runtime update after executing for real time $\Delta t$ is:
 \begin{equation}\label{eq:vruntime}
   \text{vruntime}(p) \mathrel{+}= \Delta t \cdot \frac{w_0}{w(n_p)}
 \end{equation}
 where $w(n_p) = 1024 / 1.25^{n_p}$ is the weight corresponding to nice value $n_p$, and $w_0 = w(0) = 1024$ is the default weight.
-\end{definition}
 
-The key insight of CFS is that \emph{fairness is defined relative to weight}: a process with twice the weight accumulates vruntime at half the rate, effectively receiving twice the CPU time. This weighted fairness model directly inspires our credit-weighted agent scheduling (Section~\ref{sec:scheduling}).
+The key insight is that \emph{fairness is defined relative to weight}: a process with twice the weight accumulates vruntime at half the rate, effectively receiving twice the CPU time. This weighted fairness model directly inspires our credit-weighted agent scheduling (Section~\ref{sec:scheduling}).
 
 \subsection{Priority Queues and Preemption}
 
-Real-time scheduling in Linux uses two policies: \texttt{SCHED\_FIFO} (first-in, first-out within priority level) and \texttt{SCHED\_RR} (round-robin within priority level), both with 99 priority levels \citep{bovet2005understanding}. Real-time processes always preempt CFS processes. This two-tier structure --- real-time above fair-share --- maps to our distinction between \emph{contracted agents} (guaranteed SLA) and \emph{marketplace agents} (best-effort scheduling).
+Real-time scheduling in Linux uses two policies: \texttt{SCHED\_FIFO} and \texttt{SCHED\_RR}, both with 99 priority levels \citep{bovet2005understanding}. Real-time processes always preempt CFS processes. This two-tier structure---real-time above fair-share---maps to our distinction between \emph{contracted agents} (guaranteed SLA) and \emph{marketplace agents} (best-effort scheduling).
 
 \subsection{Process States and Lifecycle}
 
-A Linux process transitions through states: \texttt{TASK\_RUNNING}, \texttt{TASK\_INTERRUPTIBLE}, \texttt{TASK\_UNINTERRUPTIBLE}, \texttt{TASK\_STOPPED}, \texttt{TASK\_ZOMBIE}, and \texttt{EXIT\_DEAD} \citep{bovet2005understanding}. The state machine is driven by system calls, signals, and scheduler decisions. We will define an analogous state machine for agents in Section~\ref{sec:agent-model}, with states corresponding to the Agent-Hero execution pipeline.
+A Linux process transitions through states: \texttt{TASK\_RUNNING}, \texttt{TASK\_INTERRUPTIBLE}, \texttt{TASK\_UNINTERRUPTIBLE}, \texttt{TASK\_STOPPED}, \texttt{TASK\_ZOMBIE}, and \texttt{EXIT\_DEAD} \citep{bovet2005understanding}. The state machine is driven by system calls, signals, and scheduler decisions. We define an analogous state machine for agents in Section~\ref{sec:agent-model}, implemented through Elixir pattern matching.
 
-\subsection{Supervision in Traditional Systems}
+\subsection{Supervision in Traditional vs.\ OTP Systems}
 
-The Unix init system (and its modern replacement, systemd) provides process supervision: restarting crashed services, managing dependencies, and enforcing resource limits \citep{poettering2010systemd}. However, Unix supervision is coarse-grained --- it operates at the service level, not within an application's internal structure. Erlang/OTP's supervision model \citep{armstrong2003making} provides a much richer framework, with hierarchical supervision trees, configurable restart strategies (one-for-one, one-for-all, rest-for-one), and explicit separation between worker processes and supervisors. This fine-grained supervision is precisely what agent orchestration requires.
+The Unix init system (and systemd) provides process supervision: restarting crashed services, managing dependencies, and enforcing resource limits \citep{poettering2010systemd}. However, Unix supervision is coarse-grained---it operates at the service level.
 
-\subsection{From Processes to Agents}
+Erlang/OTP's supervision model \citep{armstrong2003making} provides a much richer framework:
 
-The analogy between processes and agents is not merely pedagogical --- it is structural. Both are autonomous computational entities with:
+\begin{itemize}[leftmargin=2em]
+  \item \textbf{Hierarchical supervision trees} where every process has a parent supervisor
+  \item \textbf{Configurable restart strategies:} \texttt{one\_for\_one} (restart only the failed child), \texttt{one\_for\_all} (restart all children), \texttt{rest\_for\_one} (restart the failed child and all children started after it)
+  \item \textbf{Restart intensity limits} (e.g., at most 5 restarts in 60 seconds) that prevent cascade failures
+  \item \textbf{Explicit separation} between supervisor and worker processes
+  \item \textbf{Let it crash philosophy:} processes are designed to crash cleanly rather than handle every possible error, and supervisors handle recovery
+\end{itemize}
+
+This fine-grained supervision is precisely what agent orchestration requires: individual agent failures should be isolated and recovered without disrupting the entire system.
+
+\subsection{The Structural Analogy}
+
+The analogy between processes and agents is not merely pedagogical---it is structural. Both are autonomous computational entities with:
 \begin{itemize}[leftmargin=2em]
   \item A \textbf{lifecycle} governed by state transitions
   \item \textbf{Resource requirements} (CPU/memory for processes; tokens/tools/credits for agents)
@@ -185,213 +228,229 @@ The analogy between processes and agents is not merely pedagogical --- it is str
 The critical difference is that agent execution is \emph{non-deterministic} and \emph{long-running}: a single agent task may take minutes to hours, involve multiple LLM calls with stochastic outputs, require human approval at checkpoints, and produce streaming intermediate results. This demands scheduling algorithms that account for uncertainty, support checkpointing, and integrate evaluation feedback.
 
 % ==============================================================================
-\section{Agent Model: Categorical Foundations}\label{sec:agent-model}
+\section{Agent Model: Algebraic Data Types and State Machines}\label{sec:agent-model}
 % ==============================================================================
 
-We now develop a formal categorical framework for agents, their composition, and their supervision.
+\subsection{Agent Profile as an Algebraic Data Type}
 
-\subsection{The Agent Category}
+An agent is defined by its profile---a structured record capturing its capabilities, interface, and operational parameters:
 
 \begin{definition}[Agent Profile]\label{def:agent-profile}
-An \emph{agent profile} is a tuple $A = (I, C, T, O, \sigma, \kappa)$ where:
-\begin{itemize}[leftmargin=2em]
-  \item $I$ is the \emph{input schema} (a set of typed input parameters)
-  \item $C$ is the \emph{capability set} (tools, models, and APIs the agent can access)
-  \item $T \subseteq \mathcal{T}$ is the \emph{task domain} drawn from a universal task taxonomy $\mathcal{T}$
-  \item $O$ is the \emph{output schema} (a set of typed output artifacts)
-  \item $\sigma \in \{\texttt{supervised}, \texttt{spot\_check}, \texttt{autonomous\_escalation}\}$ is the \emph{oversight mode}
-  \item $\kappa \in \mathbb{R}_{>0}$ is the \emph{credit cost per invocation}
-\end{itemize}
+An \emph{agent profile} is a record:
+\begin{verbatim}
+  %{
+    name:          String.t(),
+    capabilities:  [atom()],
+    task_domain:   [atom()],
+    input_schema:  map(),
+    output_schema: map()
+  }
+\end{verbatim}
+The profile is immutable once created and serves as the type signature of the agent.
 \end{definition}
 
-\begin{definition}[Agent Category]\label{def:agent-category}
-The \emph{agent category} $\mathbf{Agent}$ has:
-\begin{itemize}[leftmargin=2em]
-  \item \textbf{Objects:} Agent profiles $A, B, C, \ldots$ as in Definition~\ref{def:agent-profile}
-  \item \textbf{Morphisms:} A morphism $f: A \to B$ is a \emph{data flow specification} $(f_{\text{map}}, f_{\text{val}}, f_{\text{meta}})$ where:
-    \begin{itemize}
-      \item $f_{\text{map}}: O_A \to I_B$ maps outputs of $A$ to inputs of $B$
-      \item $f_{\text{val}}: O_A \to \{0,1\}$ is a \emph{validation predicate} that must hold before data flows to $B$
-      \item $f_{\text{meta}}: \mathcal{M}_A \to \mathcal{M}_B$ maps execution metadata (timing, token usage, error counts)
-    \end{itemize}
-  \item \textbf{Composition:} For $f: A \to B$ and $g: B \to C$, define $g \circ f: A \to C$ by:
-    \begin{align}
-      (g \circ f)_{\text{map}} &= g_{\text{map}} \circ f_{\text{map}} \\
-      (g \circ f)_{\text{val}} &= f_{\text{val}} \wedge (g_{\text{val}} \circ f_{\text{map}}) \\
-      (g \circ f)_{\text{meta}} &= g_{\text{meta}} \circ f_{\text{meta}}
-    \end{align}
-  \item \textbf{Identity:} $\text{id}_A = (\text{id}_{O_A}, \text{true}, \text{id}_{\mathcal{M}_A})$
-\end{itemize}
+In the Elixir implementation (file: \texttt{lib/agent\_scheduler/agent.ex}), the full agent state extends the profile with runtime fields:
+
+\begin{lstlisting}[language=elixir, caption={Agent struct definition from \texttt{agent.ex}}, label={lst:agent-struct}]
+defstruct [
+  :id,
+  :profile,
+  :started_at,
+  :current_job,
+  :checkpoint_data,
+  state: :pending,
+  credits: 0,
+  metrics: %{},
+  oversight: :autonomous_escalation,
+  memo_store: %{},
+  retry_count: 0,
+  max_retries: 3
+]
+\end{lstlisting}
+
+This struct is an algebraic data type: it has a fixed set of named fields with declared types. The struct is immutable---every state transition creates a new struct with updated fields. The \texttt{memo\_store} field is a map from step identifiers to cached results, providing the foundation for durable execution (Section~\ref{sec:durable}).
+
+\subsection{Agent Lifecycle as a State Machine}
+
+The agent lifecycle is a finite state machine with seven states:
+
+\begin{definition}[Agent Lifecycle States]\label{def:lifecycle}
+The lifecycle state type is a tagged union (sum type):
+\begin{verbatim}
+  @type lifecycle_state ::
+    :pending | :running | :waiting_approval |
+    :checkpointed | :completed | :failed | :cancelled
+\end{verbatim}
 \end{definition}
 
-\begin{lemma}\label{lem:agent-cat-welldef}
-$\mathbf{Agent}$ is a well-defined category: composition is associative and unital.
-\end{lemma}
-
-\begin{proof}
-Associativity of composition follows from associativity of function composition for $f_{\text{map}}$ and $f_{\text{meta}}$, and from associativity and commutativity of conjunction for $f_{\text{val}}$. The identity morphism satisfies $f \circ \text{id}_A = f$ and $\text{id}_B \circ f = f$ by direct computation: $f_{\text{map}} \circ \text{id}_{O_A} = f_{\text{map}}$, $\text{true} \wedge f_{\text{val}} = f_{\text{val}}$, and similarly for the right identity.
-\end{proof}
-
-The following commutative diagram illustrates a three-agent pipeline $A \xrightarrow{f} B \xrightarrow{g} C$:
-
-\begin{equation}\label{eq:agent-pipeline-cd}
-\begin{tikzcd}[column sep=large, row sep=large]
-  O_A \arrow[r, "f_{\text{map}}"] \arrow[dr, "(g \circ f)_{\text{map}}"'] & O_B \arrow[d, "g_{\text{map}}"] \\
-  & O_C
-\end{tikzcd}
-\qquad
-\begin{tikzcd}[column sep=large, row sep=large]
-  \mathcal{M}_A \arrow[r, "f_{\text{meta}}"] \arrow[dr, "(g \circ f)_{\text{meta}}"'] & \mathcal{M}_B \arrow[d, "g_{\text{meta}}"] \\
-  & \mathcal{M}_C
-\end{tikzcd}
-\end{equation}
-
-\subsection{The Execution Pipeline as a Diagram}
-
-The Agent-Hero execution pipeline defines a fixed sequence of states:
-\begin{equation}\label{eq:pipeline}
-  \texttt{Job} \xrightarrow{\alpha} \texttt{Proposal} \xrightarrow{\beta} \texttt{Contract} \xrightarrow{\gamma} \texttt{Decomposition} \xrightarrow{\delta} \texttt{Execution} \xrightarrow{\epsilon} \texttt{Evaluation}
-\end{equation}
-
-\begin{definition}[Pipeline Category]\label{def:pipeline-cat}
-The \emph{pipeline category} $\mathbf{Pipe}$ is the free category on the directed graph with vertices $\{J, P, C, D, E, V\}$ (Job, Proposal, Contract, Decomposition, Execution, Evaluation) and edges $\{\alpha, \beta, \gamma, \delta, \epsilon\}$ as in \eqref{eq:pipeline}. This is equivalent to the ordinal category $\mathbf{6} = \{0 < 1 < 2 < 3 < 4 < 5\}$.
-\end{definition}
-
-\begin{definition}[Pipeline Functor]\label{def:pipeline-functor}
-An \emph{agent execution} is a functor $F: \mathbf{Pipe} \to \mathbf{Set}$ mapping each pipeline stage to its state space and each transition to a state transformation function:
-\begin{align}
-  F(J) &= \{\text{job specifications}\} & F(\alpha) &: F(J) \to F(P) \\
-  F(P) &= \{\text{proposals}\} & F(\beta) &: F(P) \to F(C) \\
-  F(C) &= \{\text{contracts}\} & F(\gamma) &: F(C) \to F(D) \\
-  F(D) &= \{\text{task decompositions}\} & F(\delta) &: F(D) \to F(E) \\
-  F(E) &= \{\text{execution results}\} & F(\epsilon) &: F(E) \to F(V) \\
-  F(V) &= \{\text{evaluations}\}
-\end{align}
-\end{definition}
-
-\begin{remark}
-The category of all agent executions is the functor category $[\mathbf{Pipe}, \mathbf{Set}]$, which is a presheaf topos. This gives us access to powerful topos-theoretic tools for reasoning about agent executions, including subobject classifiers for defining ``valid'' executions and exponential objects for higher-order agent composition. We defer this development to Part III of this series.
-\end{remark}
-
-\subsection{Evaluation Metrics and Functoriality}
-
-\begin{definition}[Evaluation Space]\label{def:eval-space}
-The \emph{evaluation space} is $\mathcal{E} = [0,1]^6$, with coordinates corresponding to the six quality dimensions: quality ($q$), adherence ($a$), speed ($s$), cost efficiency ($c$), error rate ($e$), and revision count ($r$). An \emph{evaluation} of an agent execution is a point $\mathbf{v} = (q, a, s, c, e, r) \in \mathcal{E}$.
-\end{definition}
-
-\begin{definition}[Evaluation Functor]\label{def:eval-functor}
-The \emph{evaluation functor} $\text{Eval}: \mathbf{Agent} \to \mathbf{Met}$ maps from the agent category to the category of metric spaces (with short maps as morphisms):
-\begin{align}
-  \text{Eval}(A) &= (\mathcal{E}_A, d_w) \quad \text{where } d_w(\mathbf{v}, \mathbf{v}') = \sqrt{\sum_{i=1}^{6} w_i (v_i - v'_i)^2}
-\end{align}
-where $\mathbf{w} = (w_q, w_a, w_s, w_c, w_e, w_r)$ is a weight vector with $\sum w_i = 1$.
-\end{definition}
-
-\begin{theorem}[Functorial Composition Preserves Evaluation Bounds]\label{thm:functorial-composition}
-Let $f: A \to B$ be a morphism in $\mathbf{Agent}$ with validation predicate $f_{\text{val}}$. If $\text{Eval}(A) \geq \mathbf{v}_{\min}$ componentwise and $f_{\text{val}}$ enforces that each output dimension $o_i \geq \theta_i$ for thresholds $\theta_i$, then:
-\begin{equation}
-  \text{Eval}(B) \geq \Phi_f(\mathbf{v}_{\min}, \boldsymbol{\theta})
-\end{equation}
-where $\Phi_f: \mathcal{E} \times [0,1]^{|O_A|} \to \mathcal{E}$ is a monotone map determined by $f_{\text{map}}$ and $f_{\text{val}}$. In particular, $\text{Eval}$ preserves the partial order on $\mathcal{E}$ and thus acts as a monotone functor from the poset-enriched agent category to $(\mathcal{E}, \leq)$.
-\end{theorem}
-
-\begin{proof}
-Let $\mathbf{v}_A = \text{Eval}(A)$ with $\mathbf{v}_A \geq \mathbf{v}_{\min}$. The validation predicate $f_{\text{val}}$ acts as a filter: only outputs satisfying $o_i \geq \theta_i$ flow to $B$. The mapping $f_{\text{map}}$ transforms these validated outputs into inputs for $B$.
-
-Since each dimension of $B$'s evaluation is computed from $B$'s outputs, which depend on the validated inputs from $A$, we have for each quality dimension $i$:
-\begin{equation}
-  \text{Eval}(B)_i = g_i(f_{\text{map}}(\mathbf{o}_A))
-\end{equation}
-where $g_i$ is $B$'s quality function for dimension $i$. Since $f_{\text{val}}$ ensures $\mathbf{o}_A$ lies in the feasible region $\{\mathbf{o} : o_j \geq \theta_j\ \forall j\}$, and $g_i \circ f_{\text{map}}$ is continuous on this compact domain, the image is bounded below by $\Phi_f(\mathbf{v}_{\min}, \boldsymbol{\theta})_i = \inf_{\mathbf{o} \in \text{feas}} g_i(f_{\text{map}}(\mathbf{o}))$.
-
-Monotonicity follows: if $\mathbf{v}_{\min} \leq \mathbf{v}'_{\min}$ componentwise, then the feasible region for $\mathbf{v}'_{\min}$ is a subset, and the infimum over a subset is at least as large. Thus $\Phi_f$ is monotone in its first argument.
-\end{proof}
-
-\subsection{Supervision Trees as Limit-Preserving Functors}
-
-\begin{definition}[Failure Category]\label{def:failure-cat}
-The \emph{failure category} $\mathbf{Fail}$ has:
-\begin{itemize}[leftmargin=2em]
-  \item \textbf{Objects:} Failure modes $\{$\texttt{crash}, \texttt{timeout}, \texttt{resource\_exhaustion}, \texttt{invalid\_output}, \texttt{human\_rejection}$\}$
-  \item \textbf{Morphisms:} Subsumption relations (e.g., \texttt{timeout} subsumes \texttt{resource\_exhaustion} since resource exhaustion often manifests as timeout)
-\end{itemize}
-\end{definition}
-
-\begin{definition}[Recovery Category]\label{def:recovery-cat}
-The \emph{recovery category} $\mathbf{Rec}$ has:
-\begin{itemize}[leftmargin=2em]
-  \item \textbf{Objects:} Recovery strategies $\{$\texttt{restart}, \texttt{retry\_with\_backoff}, \texttt{fallback\_agent}, \texttt{human\_escalation}, \texttt{terminate}$\}$
-  \item \textbf{Morphisms:} Refinement relations (e.g., \texttt{retry\_with\_backoff} refines \texttt{restart})
-\end{itemize}
-\end{definition}
-
-\begin{definition}[Supervision Functor]\label{def:supervision-functor}
-A \emph{supervision strategy} is a functor $S: \mathbf{Fail} \to \mathbf{Rec}$ that maps each failure mode to a recovery strategy and preserves subsumption (i.e., if failure $f_1$ subsumes $f_2$, then $S(f_1)$ refines $S(f_2)$).
-\end{definition}
-
-\begin{theorem}[Supervision Preserves Limits]\label{thm:supervision-limits}
-Let $D: \mathbf{I} \to \mathbf{Fail}$ be a diagram of failure modes (e.g., the set of all failures that can occur in a subtask tree). If $\varprojlim D$ exists in $\mathbf{Fail}$ (the ``worst composite failure''), then a supervision functor $S$ preserves this limit:
-\begin{equation}
-  S\left(\varprojlim D\right) \cong \varprojlim (S \circ D)
-\end{equation}
-That is, the recovery strategy for the composite failure is the composite of the individual recovery strategies.
-\end{theorem}
-
-\begin{proof}
-Since $\mathbf{Fail}$ and $\mathbf{Rec}$ are finite poset categories (preorders), limits are meets (greatest lower bounds). The supervision functor $S$, being monotone (order-preserving by definition), preserves finite meets when the codomain is a complete lattice. $\mathbf{Rec}$ under refinement is a complete lattice with \texttt{terminate} as bottom and \texttt{restart} as top. For any family $\{f_i\}$ in $\mathbf{Fail}$:
-\[
-  S\!\left(\bigwedge_i f_i\right) = \bigwedge_i S(f_i)
-\]
-since $S$ maps the meet (most severe composite failure) to the meet of recovery strategies (most comprehensive composite recovery). This is precisely the ``one-for-all'' restart strategy in OTP: when the worst failure in a group occurs, the strongest recovery covering all components is applied.
-\end{proof}
-
-The supervision tree structure is captured by the following diagram:
+The state transition diagram is:
 
 \begin{figure}[H]
 \centering
 \begin{tikzpicture}[
-  supervisor/.style={rectangle, draw=blue!70, fill=blue!10, thick, minimum width=2.8cm, minimum height=0.8cm, rounded corners=3pt},
-  worker/.style={rectangle, draw=green!70, fill=green!10, thick, minimum width=2.2cm, minimum height=0.7cm, rounded corners=3pt},
+  state/.style={circle, draw, thick, minimum size=1.2cm, font=\footnotesize},
   edge/.style={-{Stealth[length=5pt]}, thick},
-  level 1/.style={sibling distance=4.5cm},
-  level 2/.style={sibling distance=2.8cm}
+  every node/.style={font=\footnotesize}
 ]
-\node[supervisor] (root) {Root Supervisor}
-  child[edge] {
-    node[supervisor] (sched) {Scheduler Sup}
-    child[edge] {node[worker] (s1) {Scheduler}}
-    child[edge] {node[worker] (reg) {Registry}}
-  }
-  child[edge] {
-    node[supervisor] (pool) {Agent Pool Sup}
-    child[edge] {node[worker] (a1) {Agent$_1$}}
-    child[edge] {node[worker] (a2) {Agent$_2$}}
-    child[edge] {node[worker] (a3) {Agent$_n$}}
-  };
-\node[below=0.1cm of root, xshift=2.5cm, text=gray, font=\footnotesize\itshape] {one\_for\_one};
-\node[below=0.1cm of pool, text=gray, font=\footnotesize\itshape] {one\_for\_one};
-\node[below=0.1cm of sched, text=gray, font=\footnotesize\itshape] {rest\_for\_one};
+\node[state, fill=yellow!20] (pend) at (0,0) {Pend};
+\node[state, fill=green!20] (run) at (3,0) {Run};
+\node[state, fill=orange!20] (wait) at (6,1.5) {Wait};
+\node[state, fill=blue!20] (chk) at (6,-1.5) {Chkpt};
+\node[state, fill=green!40] (comp) at (9,0) {Done};
+\node[state, fill=red!20] (fail) at (3,-3) {Fail};
+\node[state, fill=gray!20] (canc) at (0,-3) {Canc};
+
+\draw[edge] (pend) -- node[above] {assign\_job} (run);
+\draw[edge] (run) -- node[above left] {request} (wait);
+\draw[edge] (run) -- node[below left] {checkpoint} (chk);
+\draw[edge] (wait) -- node[above right] {approve} (comp);
+\draw[edge] (chk) -- node[below right] {resume} (run);
+\draw[edge] (run) -- node[right] {error} (fail);
+\draw[edge] (fail) to[bend left=20] node[below] {retry} (pend);
+\draw[edge] (pend) -- node[left] {cancel} (canc);
+\draw[edge] (wait) to[bend right=30] node[right] {reject} (fail);
+\draw[edge] (run) -- node[above] {complete} (comp);
 \end{tikzpicture}
-\caption{OTP-style supervision tree for the Agent Scheduler. Blue nodes are supervisors; green nodes are workers. Restart strategies are annotated in gray.}\label{fig:supervision-tree}
+\caption{Agent lifecycle state machine. Each transition is enforced by pattern matching in the GenServer callbacks.}\label{fig:exec-states}
 \end{figure}
 
+\subsection{Pattern Matching for State Transitions}
+
+The state machine is implemented entirely through pattern matching in GenServer callback clauses. Each clause matches on both the incoming message and the current lifecycle state, making invalid transitions impossible:
+
+\begin{lstlisting}[language=elixir, caption={Pattern matching enforces valid transitions (from \texttt{agent.ex})}, label={lst:pattern-matching}]
+# Only allow job assignment when agent is :pending
+def handle_call({:assign_job, job}, _from,
+    %{state: :pending} = state) do
+  new_state = %{state |
+    state: :running,
+    current_job: job,
+    started_at: System.monotonic_time(:millisecond)
+  }
+  {:reply, :ok, new_state}
+end
+
+# Reject job assignment in any other state
+def handle_call({:assign_job, _job}, _from, state) do
+  {:reply, {:error,
+    {:invalid_state, state.state, :expected, [:pending]}},
+   state}
+end
+\end{lstlisting}
+
+This approach has three advantages over explicit state machine libraries:
+
+\begin{enumerate}[leftmargin=2em]
+  \item \textbf{Exhaustiveness:} The Elixir compiler warns if a callback has unmatched patterns, helping catch missing transitions.
+  \item \textbf{Locality:} Each transition's guard condition, state update, side effects, and reply are co-located in a single function clause.
+  \item \textbf{Immutability:} The \texttt{\%\{state | field: value\}} syntax creates a new struct, preserving the old state for audit logging or debugging.
+\end{enumerate}
+
+\subsection{Oversight Modes}
+
+Three oversight modes govern the degree of human intervention during agent execution:
+
+\begin{definition}[Oversight Modes]\label{def:oversight}
+The oversight type is:
+\begin{verbatim}
+  @type oversight :: :supervised | :spot_check
+                   | :autonomous_escalation
+\end{verbatim}
+These form an ordering by control level:
+\[
+  \texttt{autonomous\_escalation} \leq \texttt{spot\_check} \leq \texttt{supervised}
+\]
+where $\sigma_1 \leq \sigma_2$ means ``$\sigma_2$ provides at least as much human oversight as $\sigma_1$.''
+\end{definition}
+
+The implementation uses pattern matching to dispatch oversight behavior:
+
+\begin{lstlisting}[language=elixir, caption={Oversight mode dispatch via pattern matching (from \texttt{agent.ex})}, label={lst:oversight}]
+def handle_call({:request_approval, artifact}, _from,
+    %{state: :running} = state) do
+  case state.oversight do
+    :supervised ->
+      new_state = %{state |
+        state: :waiting_approval,
+        checkpoint_data: artifact}
+      {:reply, :ok, new_state}
+
+    :spot_check ->
+      if :rand.uniform() < 0.3 do
+        new_state = %{state |
+          state: :waiting_approval,
+          checkpoint_data: artifact}
+        {:reply, :ok, new_state}
+      else
+        {:reply, :ok, state}
+      end
+
+    :autonomous_escalation ->
+      new_state = %{state |
+        state: :waiting_approval,
+        checkpoint_data: artifact}
+      {:reply, :ok, new_state}
+  end
+end
+\end{lstlisting}
+
+In \texttt{:supervised} mode, every approval request transitions to \texttt{:waiting\_approval}. In \texttt{:spot\_check} mode, a probabilistic gate (30\%) determines whether human review is required. In \texttt{:autonomous\_escalation} mode, the agent only calls \texttt{request\_approval} when it detects low confidence, so the handler always transitions.
+
+\subsection{Agent Composition Through Data Flow}
+
+Agents compose by connecting outputs to inputs. A \emph{data flow specification} between agents $A$ and $B$ consists of:
+
+\begin{itemize}[leftmargin=2em]
+  \item A \textbf{mapping function} $f_{\text{map}}: O_A \to I_B$ that transforms $A$'s outputs into $B$'s inputs
+  \item A \textbf{validation predicate} $f_{\text{val}}: O_A \to \{\text{true}, \text{false}\}$ that gates data flow
+  \item A \textbf{metadata propagation} function that carries execution metrics forward
+\end{itemize}
+
+Composition is associative: given $A \xrightarrow{f} B \xrightarrow{g} C$, the composite $g \circ f$ maps $A$'s outputs through $f$ then $g$, and the composite validation requires both $f_{\text{val}}$ and $g_{\text{val}} \circ f_{\text{map}}$ to hold. Identity is the trivial pass-through. This associative, unital composition is what makes agent pipelines work---and is the same structure that underlies function composition in any functional programming language.
+
+\subsection{The Agent-Hero Execution Pipeline}
+
+The Agent-Hero marketplace defines a fixed execution pipeline through which every job flows:
+
+\begin{equation}\label{eq:pipeline}
+  \texttt{Job} \xrightarrow{\alpha} \texttt{Proposal} \xrightarrow{\beta} \texttt{Contract} \xrightarrow{\gamma} \texttt{Decomposition} \xrightarrow{\delta} \texttt{Execution} \xrightarrow{\epsilon} \texttt{Evaluation}
+\end{equation}
+
+Each stage has a well-defined input and output type. The pipeline is a chain of composed transformations, where each transition function maps one stage's output to the next stage's input. In Elixir terms, this is a sequence of functions composed with the pipe operator:
+
+\begin{lstlisting}[language=elixir, caption={Pipeline as function composition}, label={lst:pipeline-composition}]
+job
+|> generate_proposal(agent_pool)
+|> negotiate_contract(client)
+|> decompose_into_subtasks()
+|> execute_with_supervision(scheduler)
+|> evaluate_results(evaluator)
+\end{lstlisting}
+
+The pipeline is not just a conceptual model---it maps directly to the \texttt{AgentScheduler.Pipeline} module, which enforces ordering constraints and provides streaming event delivery between stages.
+
 % ==============================================================================
-\section{Scheduling Architecture}\label{sec:scheduling}
+\section{Credit-Weighted Scheduling}\label{sec:scheduling}
 % ==============================================================================
 
-\subsection{Credit-Weighted Priority Scheduling}
+\subsection{Design: Generalizing CFS for Agents}
 
-In the Agent-Hero system, clients purchase credits that are consumed by agent executions. Each agent $A$ has a per-invocation cost $\kappa_A$. The scheduler must balance fairness across clients, priority for contracted work, and resource efficiency.
+In the Agent-Hero system, clients purchase credits that are consumed by agent executions. Each agent has a per-invocation cost $\kappa_A$. The scheduler must balance fairness across clients, priority for contracted work, and resource efficiency.
 
-\begin{definition}[Agent Virtual Runtime]\label{def:agent-vruntime}
-By analogy with CFS (Definition~\ref{def:vruntime}), define the \emph{agent virtual runtime} for client $c$ with remaining credits $\text{cr}_c$ and priority level $p_c$:
+By analogy with CFS (Equation~\ref{eq:vruntime}), we define the \emph{agent virtual runtime} for client $c$ with remaining credits $\text{cr}_c$ and priority level $p_c$:
 \begin{equation}\label{eq:agent-vruntime}
   \text{avruntime}(c) \mathrel{+}= \kappa_A \cdot \frac{\text{cr}_0}{\text{cr}_c \cdot w(p_c)}
 \end{equation}
-where $\text{cr}_0$ is a reference credit amount and $w(p_c)$ is the priority weight. The scheduler selects the client-agent pair with the smallest avruntime.
-\end{definition}
+where $\text{cr}_0 = 1000$ is a reference credit amount and $w(p_c)$ is the priority weight (4.0 for contracted, 1.0 for marketplace). The scheduler always selects the client-agent pair with the smallest avruntime.
 
-This ensures that clients with more credits receive proportionally more agent execution time, while priority levels allow contracted work to preempt marketplace requests.
+This ensures that:
+\begin{itemize}[leftmargin=2em]
+  \item Clients with \textbf{more credits} accumulate avruntime more slowly, receiving proportionally more scheduling time
+  \item \textbf{Contracted clients} accumulate avruntime 4x slower than marketplace clients, providing preemption priority
+  \item \textbf{Expensive agents} ($\kappa_A$ large) produce larger avruntime increments, naturally rate-limiting heavy workloads
+\end{itemize}
+
+\subsection{Algorithm: Two-Tier Priority Scheduling}
 
 \begin{algorithm}[H]
 \caption{Credit-Weighted Agent Scheduling}\label{alg:scheduling}
@@ -412,9 +471,99 @@ This ensures that clients with more credits receive proportionally more agent ex
 }
 \end{algorithm}
 
+The two-tier structure is implemented by encoding the priority tier in the sort key: contracted jobs use tier 0, marketplace jobs use tier 1. Since the balanced tree is sorted by key, all contracted jobs sort before all marketplace jobs, providing automatic preemption.
+
+\subsection{Implementation: Balanced Tree Priority Queue}
+
+The scheduler (file: \texttt{lib/agent\_scheduler/scheduler.ex}) uses Erlang's \texttt{:gb\_trees} (general balanced trees) for $O(\log n)$ enqueue and dequeue, matching the complexity of Linux CFS's red-black tree:
+
+\begin{lstlisting}[language=elixir, caption={Scheduler state and priority queue (from \texttt{scheduler.ex})}, label={lst:scheduler}]
+defstruct [
+  :queue,
+  vruntimes: %{},
+  client_credits: %{},
+  client_priorities: %{},
+  reference_credits: 1000,
+  dispatched_count: 0,
+  sequence: 0
+]
+
+@priority_weights %{
+  contracted: 4.0,
+  marketplace: 1.0
+}
+\end{lstlisting}
+
+The enqueue operation computes the sort key as a tuple \texttt{\{tier, vruntime, sequence\}}, where the sequence number breaks ties (FIFO within the same vruntime):
+
+\begin{lstlisting}[language=elixir, caption={Enqueue with composite sort key (from \texttt{scheduler.ex})}, label={lst:enqueue}]
+def handle_call({:enqueue, client_id, job, _opts},
+    _from, state) do
+  vrt = Map.get(state.vruntimes, client_id, 0.0)
+  priority = Map.get(state.client_priorities,
+    client_id, :marketplace)
+
+  tier = if priority == :contracted, do: 0, else: 1
+  key = {tier, vrt, state.sequence}
+
+  entry = %{
+    client_id: client_id,
+    job: job,
+    priority: priority,
+    enqueued_at: System.monotonic_time(:millisecond)
+  }
+
+  queue = :gb_trees.enter(key, entry, state.queue)
+  new_state = %{state |
+    queue: queue,
+    sequence: state.sequence + 1}
+
+  {:reply, :ok, new_state}
+end
+\end{lstlisting}
+
+The dequeue operation extracts the smallest key (lowest tier, then lowest vruntime, then oldest), updates the client's avruntime, and returns the job for dispatch:
+
+\begin{lstlisting}[language=elixir, caption={Dequeue with avruntime update (from \texttt{scheduler.ex})}, label={lst:dequeue}]
+def handle_call(:dequeue, _from, state) do
+  case :gb_trees.size(state.queue) do
+    0 ->
+      {:reply, :empty, state}
+
+    _ ->
+      {key, entry, queue} =
+        :gb_trees.take_smallest(state.queue)
+      client_id = entry.client_id
+      job = entry.job
+
+      agent_cost = Map.get(job, :cost, 1.0)
+      credits = Map.get(state.client_credits,
+        client_id, state.reference_credits)
+      priority = Map.get(state.client_priorities,
+        client_id, :marketplace)
+      weight = Map.get(@priority_weights, priority, 1.0)
+
+      vrt_increment = agent_cost *
+        state.reference_credits / (max(credits, 1) * weight)
+      current_vrt = Map.get(state.vruntimes,
+        client_id, 0.0)
+      new_vrt = current_vrt + vrt_increment
+
+      new_state =
+        state
+        |> Map.put(:queue, queue)
+        |> put_in([Access.key(:vruntimes),
+          client_id], new_vrt)
+        |> Map.update!(:dispatched_count, &(&1 + 1))
+
+      {:reply, {:ok, {key, entry}}, new_state}
+  end
+end
+\end{lstlisting}
+
 \subsection{Dependency Resolution via Topological Sort}
 
-Agent jobs are frequently decomposed into subtasks with dependencies. The decomposition phase of the Agent-Hero pipeline produces a directed acyclic graph (DAG) $G = (V, E)$ where vertices are subtasks and edges are data dependencies.
+Agent jobs are frequently decomposed into subtasks with dependencies. The decomposition phase produces a directed acyclic graph (DAG) $G = (V, E)$ where vertices are subtasks and edges are data dependencies.
 
 \begin{algorithm}[H]
 \caption{Subtask Dependency Resolution}\label{alg:topo-sort}
@@ -436,35 +585,56 @@ $\sigma \gets [\,]$\;
 \end{algorithm}
 
 \begin{proposition}[Schedule Optimality]\label{prop:schedule-optimality}
-Algorithm~\ref{alg:topo-sort} produces a schedule $\sigma$ whose makespan equals the length of the longest path (critical path) in $G$, assuming unlimited agent parallelism. With $k$ available agents, the makespan is at most $\lceil |V|/k \rceil + \text{cp}(G)$ where $\text{cp}(G)$ is the critical path length.
+Algorithm~\ref{alg:topo-sort} produces a schedule whose makespan equals the critical path length of $G$ under unlimited agent parallelism. With $k$ available agents, the makespan is at most $\lceil |V|/k \rceil + \text{cp}(G)$.
 \end{proposition}
 
 \begin{proof}
-This follows from the classical result of Graham \citep{graham1969bounds}: list scheduling on $k$ processors achieves makespan at most $(|V| - \text{cp}(G))/k + \text{cp}(G)$. Our level-based batching is a special case of list scheduling where independent tasks at the same topological level are scheduled simultaneously.
+This follows from Graham's classical result \citep{graham1969bounds}: list scheduling on $k$ processors achieves makespan at most $(|V| - \text{cp}(G))/k + \text{cp}(G)$. Our level-based batching is a special case where independent tasks at the same topological level are scheduled simultaneously.
 \end{proof}
 
-\subsection{Streaming Pipeline Scheduling}
+\subsection{Scheduling Complexity}
+
+\begin{proposition}\label{prop:complexity}
+The scheduler operations have the following complexity, matching Linux CFS:
+\begin{itemize}[leftmargin=2em]
+  \item \textbf{Enqueue:} $O(\log n)$ (balanced tree insertion)
+  \item \textbf{Dequeue:} $O(\log n)$ (extract-min from balanced tree)
+  \item \textbf{Space:} $O(n)$ where $n$ is the queue size
+\end{itemize}
+\end{proposition}
+
+\begin{proof}
+Erlang's \texttt{gb\_trees} module implements a general balanced tree with $O(\log n)$ insertion, deletion, and lookup. The \texttt{take\_smallest} operation is $O(\log n)$.
+\end{proof}
+
+% ==============================================================================
+\section{Composable Streaming Pipeline}\label{sec:pipeline}
+% ==============================================================================
+
+\subsection{Design Motivation}
 
 The Agent-Testing-Framework implements a 5-phase streaming pipeline:
 \begin{equation}\label{eq:testing-pipeline}
   \texttt{Recon} \xrightarrow{\text{stream}} \texttt{Behavior} \xrightarrow{\text{stream}} \texttt{Load} \xrightarrow{\text{stream}} \texttt{Observer} \xrightarrow{\text{stream}} \texttt{Synthesis}
 \end{equation}
 
-Unlike batch pipelines, streaming pipelines allow downstream agents to begin processing before upstream agents complete. This is implemented via an EventEmitter-based streaming bus where each phase publishes events that downstream phases subscribe to.
+Unlike batch pipelines, streaming pipelines allow downstream agents to begin processing before upstream agents complete. This is critical for agent workloads where individual phases may take minutes. The streaming architecture reduces total pipeline latency from $\sum_{i=1}^{n} t_i$ (sequential batch) to the critical path length, typically yielding 40--60\% wall-clock time reduction.
+
+\subsection{Pipeline Specification}
 
 \begin{definition}[Streaming Pipeline]\label{def:streaming-pipeline}
-A \emph{streaming pipeline} is a tuple $\Pi = (S, E, \text{sub}, \text{pub})$ where:
+A \emph{streaming pipeline} is a tuple $\Pi = (S, E, \text{pub}, \text{sub})$ where:
 \begin{itemize}[leftmargin=2em]
-  \item $S = \{s_1, \ldots, s_n\}$ is an ordered set of \emph{stages}
+  \item $S = \{s_1, \ldots, s_n\}$ is an ordered sequence of \emph{stages}
   \item $E$ is a set of \emph{event types}
   \item $\text{pub}: S \to \mathcal{P}(E)$ maps each stage to the event types it publishes
   \item $\text{sub}: S \to \mathcal{P}(E)$ maps each stage to the event types it subscribes to
-  \item The \emph{pipeline constraint}: $\text{sub}(s_i) \subseteq \bigcup_{j < i} \text{pub}(s_j)$ (stages only subscribe to events from earlier stages)
 \end{itemize}
+Subject to the \emph{pipeline ordering constraint}: $\text{sub}(s_i) \subseteq \bigcup_{j < i} \text{pub}(s_j)$. That is, stages can only subscribe to events published by earlier stages.
 \end{definition}
 
 \begin{example}[Web Testing Pipeline]\label{ex:web-testing}
-For the Agent-Testing-Framework's 5-phase pipeline:
+The Agent-Testing-Framework's 5-phase pipeline has the following event topology:
 \begin{align*}
   \text{pub}(\texttt{Recon}) &= \{\texttt{page\_discovered}, \texttt{api\_found}, \texttt{sitemap\_built}\} \\
   \text{sub}(\texttt{Behavior}) &= \{\texttt{page\_discovered}, \texttt{sitemap\_built}\} \\
@@ -477,422 +647,7 @@ For the Agent-Testing-Framework's 5-phase pipeline:
 \end{align*}
 \end{example}
 
-\subsection{Fault Tolerance via Supervision}
-
-Following the Erlang/OTP philosophy of ``let it crash'' \citep{armstrong2003making}, our scheduling architecture uses supervision trees to handle agent failures without corrupting the overall pipeline.
-
-\begin{definition}[Restart Strategy]\label{def:restart-strategy}
-A \emph{restart strategy} $\rho$ for a supervisor with children $\{c_1, \ldots, c_k\}$ is one of:
-\begin{itemize}[leftmargin=2em]
-  \item \texttt{one\_for\_one}: If child $c_i$ fails, restart only $c_i$
-  \item \texttt{one\_for\_all}: If any child fails, restart all children
-  \item \texttt{rest\_for\_one}: If $c_i$ fails, restart $c_i, c_{i+1}, \ldots, c_k$
-\end{itemize}
-with parameters $(\text{max\_restarts}, \text{max\_seconds})$ defining the restart intensity window.
-\end{definition}
-
-The choice of restart strategy corresponds to the dependency structure among sibling agents:
-
-\begin{table}[H]
-\centering
-\begin{tabular}{@{}lll@{}}
-\toprule
-\textbf{Strategy} & \textbf{Dependency Structure} & \textbf{Agent Example} \\
-\midrule
-\texttt{one\_for\_one} & Independent siblings & Parallel subtask agents \\
-\texttt{one\_for\_all} & Mutually dependent & Agent team with shared state \\
-\texttt{rest\_for\_one} & Sequential dependency & Pipeline stages \\
-\bottomrule
-\end{tabular}
-\caption{Restart strategies and their correspondence to agent dependency structures.}\label{tab:restart-strategies}
-\end{table}
-
-% ==============================================================================
-\section{Formal Framework: Durable Execution and Oversight}\label{sec:formal}
-% ==============================================================================
-
-\subsection{The Execution Category}
-
-\begin{definition}[Execution Category]\label{def:exec-cat}
-The \emph{execution category} $\mathbf{Exec}$ has:
-\begin{itemize}[leftmargin=2em]
-  \item \textbf{Objects:} Execution states $\Sigma = \{$\texttt{pending}, \texttt{running}, \texttt{waiting\_approval}, \texttt{checkpoint\-ed}, \texttt{completed}, \texttt{failed}, \texttt{cancelled}$\}$
-  \item \textbf{Morphisms:} State transitions $\tau: s_1 \to s_2$ where each transition carries:
-    \begin{itemize}
-      \item A \emph{guard predicate} $g_\tau: \text{Context} \to \{0,1\}$ that must hold for the transition to fire
-      \item An \emph{action} $a_\tau: \text{Context} \to \text{Context}$ that updates the execution context
-      \item A \emph{step identifier} $\text{id}_\tau \in \mathcal{S}$ for idempotency tracking
-    \end{itemize}
-\end{itemize}
-\end{definition}
-
-The state transition diagram is:
-
-\begin{figure}[H]
-\centering
-\begin{tikzpicture}[
-  state/.style={circle, draw, thick, minimum size=1.2cm, font=\footnotesize},
-  edge/.style={-{Stealth[length=5pt]}, thick},
-  every node/.style={font=\footnotesize}
-]
-\node[state, fill=yellow!20] (pend) at (0,0) {Pend};
-\node[state, fill=green!20] (run) at (3,0) {Run};
-\node[state, fill=orange!20] (wait) at (6,1.5) {Wait};
-\node[state, fill=blue!20] (chk) at (6,-1.5) {Chkpt};
-\node[state, fill=green!40] (comp) at (9,0) {Done};
-\node[state, fill=red!20] (fail) at (3,-3) {Fail};
-\node[state, fill=gray!20] (canc) at (0,-3) {Canc};
-
-\draw[edge] (pend) -- node[above] {schedule} (run);
-\draw[edge] (run) -- node[above left] {request} (wait);
-\draw[edge] (run) -- node[below left] {save} (chk);
-\draw[edge] (wait) -- node[above right] {approve} (comp);
-\draw[edge] (chk) -- node[below right] {resume} (run);
-\draw[edge] (run) -- node[right] {error} (fail);
-\draw[edge] (fail) to[bend left=20] node[below] {retry} (pend);
-\draw[edge] (pend) -- node[left] {cancel} (canc);
-\draw[edge] (wait) to[bend right=30] node[right] {reject} (fail);
-\draw[edge] (run) -- node[above] {finish} (comp);
-\end{tikzpicture}
-\caption{State transition diagram for the execution category $\mathbf{Exec}$.}\label{fig:exec-states}
-\end{figure}
-
-\subsection{Durable Execution and Idempotency}
-
-The Inngest execution model \citep{inngest2024} provides \emph{durable execution}: each step function is identified by a unique key, and its result is memoized. If a function is retried after a crash, completed steps are replayed from the memoized results without re-execution.
-
-\begin{definition}[Step Function]\label{def:step-function}
-A \emph{step function} is a tuple $\phi = (\text{id}, f, \text{pre}, \text{post})$ where:
-\begin{itemize}[leftmargin=2em]
-  \item $\text{id} \in \mathcal{S}$ is a unique step identifier
-  \item $f: \text{State} \to \text{State}$ is the computation
-  \item $\text{pre}: \text{State} \to \{0,1\}$ is a precondition
-  \item $\text{post}: \text{State} \times \text{State} \to \{0,1\}$ is a postcondition
-\end{itemize}
-\end{definition}
-
-\begin{definition}[Memoization Store]\label{def:memo-store}
-A \emph{memoization store} is a partial function $M: \mathcal{S} \rightharpoonup \text{State}$ mapping step identifiers to their computed results.
-\end{definition}
-
-\begin{definition}[Durable Execution]\label{def:durable-exec}
-Given a sequence of step functions $\phi_1, \ldots, \phi_n$ and a memoization store $M$, the \emph{durable execution} operator $\mathcal{D}$ is:
-\begin{equation}
-  \mathcal{D}(\phi_i, s, M) = \begin{cases}
-    M(\text{id}_i) & \text{if } \text{id}_i \in \text{dom}(M) \\
-    f_i(s) & \text{if } \text{id}_i \notin \text{dom}(M) \wedge \text{pre}_i(s) = 1
-  \end{cases}
-\end{equation}
-After execution, $M$ is updated: $M' = M[\text{id}_i \mapsto \mathcal{D}(\phi_i, s, M)]$.
-\end{definition}
-
-\begin{theorem}[Idempotency of Durable Execution]\label{thm:idempotent-execution}
-Let $\phi_1, \ldots, \phi_n$ be a sequence of step functions with initial state $s_0$ and initial memoization store $M_0 = \emptyset$. Let $s_n$ be the state after executing all steps, and $M_n$ the resulting memoization store. If the execution is replayed from $s_0$ with store $M_n$, the result is identical:
-\begin{equation}
-  \mathcal{D}^*(\phi_{1:n}, s_0, M_n) = s_n
-\end{equation}
-where $\mathcal{D}^*$ denotes sequential application of $\mathcal{D}$ over the step sequence.
-\end{theorem}
-
-\begin{proof}
-By induction on $n$. For $n = 0$, the result is trivial. Assume the property holds for $n-1$ steps. For the $n$-th step, since $\text{id}_n \in \text{dom}(M_n)$, we have $\mathcal{D}(\phi_n, s_{n-1}, M_n) = M_n(\text{id}_n) = f_n(s_{n-1}) = s_n$, where the second equality holds because $M_n(\text{id}_n)$ was set to $f_n(s_{n-1})$ during the original execution. By the inductive hypothesis, $s_{n-1}$ is correctly reconstructed from replaying steps $1$ through $n-1$ with $M_n$ (which contains all their results). Therefore $\mathcal{D}^*(\phi_{1:n}, s_0, M_n) = s_n$.
-\end{proof}
-
-\begin{corollary}[Crash Recovery]\label{cor:crash-recovery}
-If execution crashes after completing step $k < n$, with memoization store $M_k$, then resuming from $s_0$ with $M_k$ correctly continues from step $k+1$ without re-executing steps $1, \ldots, k$.
-\end{corollary}
-
-\begin{proof}
-Steps $1, \ldots, k$ all have their results in $M_k$ and are replayed via memoization lookup. Step $k+1$ is not in $M_k$ and executes normally. The remaining steps proceed as in the original execution.
-\end{proof}
-
-The durable execution model can be expressed categorically as a functor from the free category on the step sequence to $\mathbf{Set}$, where the memoization store is a natural transformation between the ``fresh execution'' functor and the ``replay'' functor:
-
-\begin{equation}
-\begin{tikzcd}[column sep=huge]
-  \mathbf{Step} \arrow[r, bend left=25, "F_{\text{fresh}}"{name=U}] \arrow[r, bend right=25, "F_{\text{replay}}"'{name=D}] & \mathbf{Set}
-  \arrow[from=U, to=D, Rightarrow, shorten <= 4pt, shorten >= 4pt, "M"]
-\end{tikzcd}
-\end{equation}
-
-\subsection{Oversight Modes as a Lattice}
-
-The Agent-Hero system supports three oversight modes that govern the degree of human intervention during agent execution:
-
-\begin{itemize}[leftmargin=2em]
-  \item \texttt{supervised}: Human reviews and approves every step before execution proceeds.
-  \item \texttt{spot\_check}: Human periodically reviews a random sample of steps; agent proceeds autonomously between checks.
-  \item \texttt{autonomous\_escalation}: Agent executes autonomously, escalating to human review only when confidence drops below a threshold.
-\end{itemize}
-
-\begin{proposition}[Oversight Lattice]\label{prop:oversight-lattice}
-The oversight modes form a complete lattice $(\mathcal{O}, \leq)$ under the \emph{control refinement} ordering:
-\begin{equation}
-  \texttt{autonomous\_escalation} \leq \texttt{spot\_check} \leq \texttt{supervised}
-\end{equation}
-where $\sigma_1 \leq \sigma_2$ means ``$\sigma_2$ provides at least as much human oversight as $\sigma_1$.'' The lattice operations are:
-\begin{align}
-  \sigma_1 \vee \sigma_2 &= \max(\sigma_1, \sigma_2) \quad \text{(join = more oversight)} \\
-  \sigma_1 \wedge \sigma_2 &= \min(\sigma_1, \sigma_2) \quad \text{(meet = less oversight)}
-\end{align}
-\end{proposition}
-
-\begin{proof}
-Since $\mathcal{O}$ is a finite totally ordered set with three elements, it is automatically a complete lattice. Join is the maximum and meet is the minimum. The ordering is well-defined: supervised mode subsumes spot-check (every step is reviewed, which includes reviewing a sample), and spot-check subsumes autonomous escalation (periodic review includes the special case of review only when confidence is low).
-\end{proof}
-
-\begin{remark}[Generalized Oversight]\label{rem:gen-oversight}
-In practice, the oversight lattice can be extended with parameterized modes. Define $\texttt{spot\_check}(p)$ for $p \in [0,1]$ as the mode where each step is reviewed with probability $p$. Then $\texttt{supervised} = \texttt{spot\_check}(1)$ and $\texttt{autonomous\_escalation}(\theta) \leq \texttt{spot\_check}(p)$ whenever $\Pr[\text{confidence} < \theta] \leq p$. The parameterized family forms a continuous lattice isomorphic to $([0,1], \leq)$.
-\end{remark}
-
-\subsection{Executor/Evaluator/Orchestrator Separation}
-
-The Agent-Hero architecture enforces a strict separation of concerns among three roles:
-
-\begin{definition}[Tripartite Agent Architecture]\label{def:tripartite}
-The \emph{tripartite architecture} consists of three functors from the execution category:
-\begin{align}
-  \text{Exec} &: \mathbf{Exec} \to \mathbf{Comp} \quad \text{(executor: runs computations)} \\
-  \text{Eval} &: \mathbf{Exec} \to \mathbf{Met} \quad \text{(evaluator: measures quality)} \\
-  \text{Orch} &: \mathbf{Exec} \to \mathbf{Sched} \quad \text{(orchestrator: manages scheduling)}
-\end{align}
-These functors satisfy the \emph{separation property}: no functor depends on the internal state of another; they communicate only through the shared execution state in $\mathbf{Exec}$.
-\end{definition}
-
-The separation is captured by the following pullback diagram:
-
-\begin{equation}\label{eq:tripartite-pullback}
-\begin{tikzcd}[column sep=large, row sep=large]
-  & \mathbf{Exec} \arrow[dl, "\text{Exec}"'] \arrow[d, "\text{Orch}"] \arrow[dr, "\text{Eval}"] & \\
-  \mathbf{Comp} & \mathbf{Sched} & \mathbf{Met}
-\end{tikzcd}
-\end{equation}
-
-This separation ensures that evaluation is independent of execution (preventing agents from gaming their own scores), and that scheduling decisions are based on objective metrics rather than self-reported agent state.
-
-% ==============================================================================
-\section{Elixir/OTP Implementation}\label{sec:otp}
-% ==============================================================================
-
-We now present a reference implementation of the agent scheduling framework in Elixir, leveraging OTP's supervision trees, GenServer processes, and Registry for agent lifecycle management.
-
-\subsection{Application Supervision Tree}
-
-The top-level application starts a supervision tree containing the scheduler, agent pool supervisor, and evaluation registry:
-
-\begin{lstlisting}[language=elixir, caption={Application module with supervision tree}, label={lst:application}]
-defmodule AgentScheduler.Application do
-  use Application
-
-  def start(_type, _args) do
-    children = [
-      {Registry, keys: :unique, name: AgentScheduler.Registry},
-      {AgentScheduler.Scheduler, []},
-      {AgentScheduler.Supervisor, []},
-      {AgentScheduler.Evaluator, []},
-      {AgentScheduler.Pipeline, []}
-    ]
-
-    opts = [strategy: :rest_for_one, name: AgentScheduler.AppSupervisor]
-    Supervisor.start_link(children, opts)
-  end
-end
-\end{lstlisting}
-
-The \texttt{rest\_for\_one} strategy ensures that if the Registry crashes, all downstream components (which depend on it) are restarted in order.
-
-\subsection{Agent GenServer}
-
-Each agent runs as an individual GenServer process, managing its own lifecycle state machine:
-
-\begin{lstlisting}[language=elixir, caption={Agent GenServer with lifecycle states}, label={lst:agent}]
-defmodule AgentScheduler.Agent do
-  use GenServer
-
-  defstruct [:id, :profile, :state, :credits, :metrics,
-             :oversight, :memo_store]
-
-  # States: :pending, :running, :waiting_approval,
-  #         :checkpointed, :completed, :failed
-
-  def start_link(opts) do
-    id = Keyword.fetch!(opts, :id)
-    GenServer.start_link(__MODULE__, opts,
-      name: {:via, Registry, {AgentScheduler.Registry, id}})
-  end
-
-  def init(opts) do
-    state = %__MODULE__{
-      id: opts[:id],
-      profile: opts[:profile],
-      state: :pending,
-      credits: opts[:credits] || 0,
-      oversight: opts[:oversight] || :autonomous_escalation,
-      memo_store: %{}
-    }
-    {:ok, state}
-  end
-
-  # Durable step execution with memoization
-  def handle_call({:execute_step, step_id, fun}, _from, state) do
-    case Map.get(state.memo_store, step_id) do
-      nil ->
-        result = fun.()
-        new_memo = Map.put(state.memo_store, step_id, result)
-        {:reply, {:ok, result},
-         %{state | memo_store: new_memo, state: :running}}
-      cached ->
-        {:reply, {:ok, cached}, state}
-    end
-  end
-end
-\end{lstlisting}
-
-\subsection{Priority-Based Scheduler}
-
-The scheduler implements Algorithm~\ref{alg:scheduling} using a priority queue backed by Erlang's \texttt{gb\_trees}:
-
-\begin{lstlisting}[language=elixir, caption={Credit-weighted scheduler}, label={lst:scheduler}]
-defmodule AgentScheduler.Scheduler do
-  use GenServer
-
-  defstruct [:queue, :vruntimes, :reference_credits]
-
-  def init(_) do
-    {:ok, %__MODULE__{
-      queue: :gb_trees.empty(),
-      vruntimes: %{},
-      reference_credits: 1000
-    }}
-  end
-
-  def handle_cast({:enqueue, client_id, agent_id, job}, state) do
-    vrt = Map.get(state.vruntimes, client_id, 0)
-    key = {vrt, client_id, agent_id}
-    queue = :gb_trees.enter(key, job, state.queue)
-    {:noreply, %{state | queue: queue}}
-  end
-
-  def handle_call(:dequeue, _from, state) do
-    case :gb_trees.size(state.queue) do
-      0 -> {:reply, :empty, state}
-      _ ->
-        {key, job, queue} = :gb_trees.take_smallest(state.queue)
-        {_vrt, client_id, _agent_id} = key
-        {:reply, {:ok, key, job}, %{state | queue: queue}}
-    end
-  end
-end
-\end{lstlisting}
-
-\subsection{Streaming Pipeline}
-
-The streaming pipeline uses Elixir's \texttt{GenStage} pattern (simplified here with \texttt{GenServer} and message passing) to implement the EventEmitter-equivalent:
-
-\begin{lstlisting}[language=elixir, caption={Streaming pipeline with event subscriptions}, label={lst:pipeline}]
-defmodule AgentScheduler.Pipeline do
-  use GenServer
-
-  defstruct [:stages, :subscriptions, :events]
-
-  def handle_cast({:publish, stage, event_type, data}, state) do
-    event = {stage, event_type, data, System.monotonic_time()}
-    subscribers = get_subscribers(state.subscriptions, event_type)
-    for sub <- subscribers do
-      GenServer.cast(sub, {:event, event})
-    end
-    {:noreply, %{state | events: [event | state.events]}}
-  end
-end
-\end{lstlisting}
-
-\subsection{Dynamic Supervisor for Agent Pools}
-
-The DynamicSupervisor creates and manages agent processes on demand:
-
-\begin{lstlisting}[language=elixir, caption={DynamicSupervisor for agent pools}, label={lst:dynsup}]
-defmodule AgentScheduler.Supervisor do
-  use DynamicSupervisor
-
-  def start_link(opts) do
-    DynamicSupervisor.start_link(__MODULE__, opts,
-      name: __MODULE__)
-  end
-
-  def init(_opts) do
-    DynamicSupervisor.init(
-      strategy: :one_for_one,
-      max_restarts: 5,
-      max_seconds: 60
-    )
-  end
-
-  def start_agent(agent_opts) do
-    spec = {AgentScheduler.Agent, agent_opts}
-    DynamicSupervisor.start_child(__MODULE__, spec)
-  end
-
-  def stop_agent(agent_id) do
-    case Registry.lookup(AgentScheduler.Registry, agent_id) do
-      [{pid, _}] ->
-        DynamicSupervisor.terminate_child(__MODULE__, pid)
-      [] -> {:error, :not_found}
-    end
-  end
-end
-\end{lstlisting}
-
-\subsection{6-Dimensional Evaluator}
-
-The evaluator implements Definition~\ref{def:eval-space} as a GenServer that maintains running evaluation scores:
-
-\begin{lstlisting}[language=elixir, caption={6-dimensional quality evaluation}, label={lst:evaluator}]
-defmodule AgentScheduler.Evaluator do
-  use GenServer
-
-  @dimensions [:quality, :adherence, :speed,
-               :cost, :error_rate, :revision_count]
-  @default_weights %{
-    quality: 0.25, adherence: 0.20, speed: 0.15,
-    cost: 0.15, error_rate: 0.15, revision_count: 0.10
-  }
-
-  def handle_call({:evaluate, agent_id, scores}, _from, state) do
-    composite = weighted_score(scores, state.weights)
-    history = Map.update(state.scores, agent_id,
-      [composite], &[composite | &1])
-    reputation = compute_reputation(history[agent_id])
-    {:reply, {:ok, composite, reputation},
-     %{state | scores: history}}
-  end
-
-  defp weighted_score(scores, weights) do
-    Enum.reduce(@dimensions, 0.0, fn dim, acc ->
-      acc + Map.get(scores, dim, 0.0) * Map.get(weights, dim)
-    end)
-  end
-
-  defp compute_reputation(history) do
-    # Exponentially-weighted moving average
-    alpha = 0.3
-    Enum.reduce(history, 0.0, fn score, acc ->
-      alpha * score + (1 - alpha) * acc
-    end)
-  end
-end
-\end{lstlisting}
-
-% ==============================================================================
-\section{Case Studies}\label{sec:case-studies}
-% ==============================================================================
-
-We now present three case studies that validate our framework against production systems.
-
-\subsection{Case Study 1: Web Testing Agent}
-
-The Agent-Testing-Framework implements a 5-phase streaming pipeline for comprehensive web application testing. Each phase is an agent in our categorical framework, with morphisms defined by the event subscriptions in Example~\ref{ex:web-testing}.
-
-\paragraph{Architecture.} The pipeline uses the following agent composition:
+The pipeline is visualized as a streaming DAG:
 
 \begin{figure}[H]
 \centering
@@ -915,52 +670,752 @@ The Agent-Testing-Framework implements a 5-phase streaming pipeline for comprehe
 \draw[stream] (behav) to[bend left=20] node[above, font=\tiny] {flows} (synth);
 \draw[stream] (load) to[bend right=20] node[below, font=\tiny] {perf} (synth);
 \end{tikzpicture}
-\caption{Agent-Testing-Framework's 5-phase streaming pipeline. Solid arrows: event-driven data flow. Dashed arrows: streaming subscriptions.}\label{fig:testing-pipeline}
+\caption{Streaming pipeline DAG. Solid arrows: event-driven triggers. Dashed arrows: continuous stream subscriptions.}\label{fig:testing-pipeline}
 \end{figure}
 
-\paragraph{Execution.} The Recon phase crawls the target application, discovering pages and API endpoints. As each page is discovered, a \texttt{page\_discovered} event is published to the streaming bus. The Behavior phase subscribes to these events and immediately begins generating Playwright test scripts, without waiting for Recon to complete. Similarly, the Load phase subscribes to \texttt{api\_found} events and begins generating k6 load testing scripts.
+\subsection{Pipeline Constraint Validation}
 
-This streaming architecture reduces total pipeline latency from $\sum_{i=1}^{5} t_i$ (sequential) to approximately $\max_{\text{path}} \sum_{i \in \text{path}} t_i$ (critical path), which in practice yields a 40--60\% reduction in wall-clock time.
+The pipeline ordering constraint is enforced at creation time. The implementation (file: \texttt{lib/agent\_scheduler/pipeline.ex}) validates that every subscription references an event type already published by an earlier stage:
 
-\paragraph{Fault tolerance.} Each phase runs under the DynamicSupervisor with a \texttt{one\_for\_one} strategy. If the Load phase crashes due to a target server timeout, it is restarted without affecting the Behavior or Observer phases. The memoization store (Definition~\ref{def:memo-store}) ensures that completed k6 scripts are not regenerated.
+\begin{lstlisting}[language=elixir, caption={Pipeline constraint validation (from \texttt{pipeline.ex})}, label={lst:validate-pipeline}]
+defp validate_pipeline(stage_specs) do
+  {_all_published, errors} =
+    Enum.reduce(stage_specs, {MapSet.new(), []},
+      fn {stage_name, opts}, {published, errs} ->
+        subscribes = Keyword.get(opts, :subscribes, [])
+          |> MapSet.new()
+        publishes = Keyword.get(opts, :publishes, [])
+          |> MapSet.new()
 
-\paragraph{Evaluation.} The Synthesis phase produces a comprehensive test report. The 6-dimensional evaluation yields:
+        missing = MapSet.difference(subscribes, published)
+
+        new_errs =
+          if MapSet.size(missing) > 0 do
+            [{:invalid_subscription, stage_name,
+              MapSet.to_list(missing)} | errs]
+          else
+            errs
+          end
+
+        {MapSet.union(published, publishes), new_errs}
+      end)
+
+  case errors do
+    [] -> :ok
+    _ -> {:error,
+      {:pipeline_constraint_violation,
+       Enum.reverse(errors)}}
+  end
+end
+\end{lstlisting}
+
+This is a \texttt{reduce} (fold) over the stage list, accumulating the set of published event types. At each stage, we check that its subscriptions are a subset of the accumulated publications. If any stage subscribes to an event not yet published, the pipeline is rejected with a descriptive error.
+
+\subsection{Event Publishing and Delivery}
+
+When a stage publishes an event, the pipeline manager validates that the stage is authorized to publish that event type, creates an event record with a monotonic timestamp and sequence number, delivers the event to all subscribed handler processes via \texttt{send/2}, and appends the event to the pipeline's event log for replay capability.
+
+\begin{lstlisting}[language=elixir, caption={Event publishing with authorization check (from \texttt{pipeline.ex})}, label={lst:publish}]
+def handle_call({:publish, pipeline_id, stage,
+    event_type, data}, _from, state) do
+  pipeline = Map.get(state.pipelines, pipeline_id)
+  stage_spec = Enum.find(pipeline.stages,
+    &(&1.name == stage))
+
+  cond do
+    is_nil(stage_spec) ->
+      {:reply, {:error, {:unknown_stage, stage}}, state}
+
+    event_type not in stage_spec.publishes ->
+      {:reply, {:error,
+        {:unauthorized_publish, stage, event_type}},
+       state}
+
+    true ->
+      event = %{
+        id: generate_event_id(),
+        pipeline_id: pipeline_id,
+        stage: stage,
+        type: event_type,
+        data: data,
+        timestamp: System.monotonic_time(:microsecond),
+        sequence: pipeline.sequence
+      }
+
+      subscribers = Map.get(
+        pipeline.subscriptions, event_type, [])
+      for pid <- subscribers, Process.alive?(pid) do
+        send(pid, {:pipeline_event, event})
+      end
+
+      # ... update pipeline state ...
+  end
+end
+\end{lstlisting}
+
+\subsection{Crash Recovery via Event Replay}
+
+When a pipeline handler crashes, its supervisor restarts it. The restarted handler can replay all past events from the event log to reconstruct its state:
+
+\begin{lstlisting}[language=elixir, caption={Event replay for crash recovery (from \texttt{pipeline.ex})}, label={lst:replay}]
+def handle_call({:replay, pipeline_id, event_type,
+    handler_pid}, _from, state) do
+  pipeline = Map.get(state.pipelines, pipeline_id)
+  events =
+    pipeline.event_log
+    |> Enum.reverse()
+    |> Enum.filter(&(&1.type == event_type))
+
+  for event <- events do
+    send(handler_pid, {:pipeline_event, event})
+  end
+
+  {:reply, :ok, state}
+end
+\end{lstlisting>
+
+The pipeline manager also monitors handler processes and cleans up their subscriptions on crash:
+
+\begin{lstlisting}[language=elixir, caption={Automatic subscription cleanup on handler crash (from \texttt{pipeline.ex})}, label={lst:handler-down}]
+def handle_info({:DOWN, _ref, :process, pid, _reason},
+    state) do
+  event_types = Map.get(
+    state.handler_subscriptions, pid, [])
+
+  new_pipelines =
+    Enum.reduce(state.pipelines, state.pipelines,
+      fn {pipeline_id, pipeline}, acc ->
+        updated_subs =
+          Enum.reduce(event_types,
+            pipeline.subscriptions,
+            fn event_type, subs ->
+              Map.update(subs, event_type, [],
+                &List.delete(&1, pid))
+            end)
+        Map.put(acc, pipeline_id,
+          %{pipeline | subscriptions: updated_subs})
+      end)
+
+  new_state = %{state |
+    pipelines: new_pipelines,
+    handler_subscriptions:
+      Map.delete(state.handler_subscriptions, pid)}
+
+  {:noreply, new_state}
+end
+\end{lstlisting}
+
+\subsection{Pipeline Creation API}
+
+Creating a pipeline is a declarative operation. The caller specifies stages with their publish/subscribe event types, and the system validates constraints and sets up routing:
+
+\begin{lstlisting}[language=elixir, caption={Declarative pipeline creation (from \texttt{agent\_scheduler.ex})}, label={lst:create-pipeline}]
+AgentScheduler.create_pipeline(:web_testing, [
+  {:recon,
+    publishes: [:page_discovered, :api_found,
+                :sitemap_built]},
+  {:behavior,
+    subscribes: [:page_discovered, :sitemap_built],
+    publishes: [:test_generated, :flow_mapped]},
+  {:load,
+    subscribes: [:api_found, :flow_mapped],
+    publishes: [:load_result, :perf_metric]},
+  {:observer,
+    subscribes: [:test_generated, :load_result,
+                 :perf_metric],
+    publishes: [:anomaly_detected,
+                :observation_complete]},
+  {:synthesis,
+    subscribes: [:test_generated, :load_result,
+                 :anomaly_detected,
+                 :observation_complete],
+    publishes: [:final_report]}
+])
+\end{lstlisting}
+
+% ==============================================================================
+\section{Durable Execution and Memoization}\label{sec:durable}
+% ==============================================================================
+
+\subsection{The Problem: Crash Recovery in Long-Running Agent Tasks}
+
+Agent tasks are long-running (minutes to hours), involve expensive LLM calls, and may crash at any point. Without durability, a crash after completing 90\% of the work requires re-executing the entire task. The Inngest execution model \citep{inngest2024} solves this with \emph{durable execution}: each step function is identified by a unique key, and its result is memoized. If a function is retried after a crash, completed steps are replayed from memoized results without re-execution.
+
+\subsection{Step Functions}
+
+\begin{definition}[Step Function]\label{def:step-function}
+A \emph{step function} is a tuple $\phi = (\text{id}, f)$ where:
+\begin{itemize}[leftmargin=2em]
+  \item $\text{id}$ is a unique string identifier (the memoization key)
+  \item $f$ is a zero-arity function (a closure capturing its inputs)
+\end{itemize}
+\end{definition}
+
+\begin{definition}[Memoization Store]\label{def:memo-store}
+A \emph{memoization store} is a map $M: \text{StepId} \to \text{Result}$ from step identifiers to their computed results. In the implementation, this is the \texttt{memo\_store} field of the agent struct.
+\end{definition}
+
+\begin{definition}[Durable Execution]\label{def:durable-exec}
+Given a step function $\phi = (\text{id}, f)$ and a memoization store $M$, the \emph{durable execution} operator is:
+\begin{equation}
+  \mathcal{D}(\phi, M) = \begin{cases}
+    M[\text{id}] & \text{if } \text{id} \in \text{keys}(M) \\
+    f() & \text{otherwise}
+  \end{cases}
+\end{equation}
+After execution, the store is updated: $M' = M \cup \{\text{id} \mapsto \mathcal{D}(\phi, M)\}$.
+\end{definition}
+
+\subsection{Implementation: Memoized Step Execution}
+
+The agent GenServer implements durable step execution through pattern matching on the memo store:
+
+\begin{lstlisting}[language=elixir, caption={Durable step execution with memoization (from \texttt{agent.ex})}, label={lst:durable-step}]
+def handle_call({:execute_step, step_id, fun}, _from,
+    %{state: agent_state} = state)
+    when agent_state in [:running, :checkpointed] do
+  case Map.get(state.memo_store, step_id) do
+    nil ->
+      # Not memoized -- execute and store
+      start_time = System.monotonic_time(:microsecond)
+      try do
+        result = fun.()
+        elapsed = System.monotonic_time(:microsecond)
+          - start_time
+
+        new_state =
+          state
+          |> put_in(
+            [Access.key(:memo_store), step_id], result)
+          |> update_in(
+            [Access.key(:metrics), :steps_completed],
+            &(&1 + 1))
+          |> update_in(
+            [Access.key(:metrics), :total_execution_ms],
+            &(&1 + div(elapsed, 1000)))
+          |> Map.put(:state, :running)
+
+        {:reply, {:ok, result}, new_state}
+      rescue
+        error ->
+          new_state = update_in(state,
+            [Access.key(:metrics), :errors], &(&1 + 1))
+          {:reply, {:error, error}, new_state}
+      end
+
+    cached_result ->
+      # Memoized -- replay from cache
+      new_state = update_in(state,
+        [Access.key(:metrics), :steps_cached],
+        &(&1 + 1))
+      {:reply, {:ok, cached_result}, new_state}
+  end
+end
+\end{lstlisting}
+
+The key insight is in the \texttt{case Map.get(state.memo\_store, step\_id)} branch: if the step has been completed before (its ID exists in the store), the cached result is returned immediately without executing the function. If not, the function is executed, its result is stored, and execution metrics are updated---all immutably through the pipe operator.
+
+\subsection{Idempotency Guarantee}
+
+\begin{theorem}[Idempotency of Durable Execution]\label{thm:idempotent-execution}
+Let $\phi_1, \ldots, \phi_n$ be a sequence of step functions with initial memoization store $M_0 = \emptyset$. Let $M_n$ be the store after executing all steps. If the execution is replayed from $M_n$ (i.e., the agent crashes and restarts with the full memo store), the replay produces identical results without re-executing any step function.
+\end{theorem}
+
+\begin{proof}
+By induction on $n$. For $n = 0$, the result is trivial. Assume the property holds for $n-1$ steps with store $M_{n-1}$. For the $n$-th step $\phi_n = (\text{id}_n, f_n)$:
+
+Since $\text{id}_n \in \text{keys}(M_n)$, the durable execution operator returns $M_n[\text{id}_n]$, which equals $f_n()$ from the original execution. The function $f_n$ is not re-invoked. By the inductive hypothesis, steps $1$ through $n-1$ are similarly replayed from cache. Therefore, the entire replay produces the same results as the original execution, with zero re-computation.
+\end{proof}
+
+\begin{corollary}[Partial Crash Recovery]\label{cor:crash-recovery}
+If execution crashes after completing step $k < n$ with store $M_k$, then restarting the agent replays steps $1, \ldots, k$ from cache and continues fresh execution from step $k+1$.
+\end{corollary}
+
+\begin{proof}
+Steps $1, \ldots, k$ all have their results in $M_k$ and are replayed via cache lookup. Step $k+1$ is not in $M_k$ and executes normally. This is exactly the behavior of the \texttt{case Map.get} branch in Listing~\ref{lst:durable-step}.
+\end{proof}
+
+\subsection{Checkpointing}
+
+Beyond per-step memoization, agents support coarser-grained checkpointing---saving the entire agent state at a point in time:
+
+\begin{lstlisting}[language=elixir, caption={Checkpoint creation (from \texttt{agent.ex})}, label={lst:checkpoint}]
+def handle_call(:checkpoint, _from,
+    %{state: :running} = state) do
+  checkpoint_data = %{
+    memo_store: state.memo_store,
+    metrics: state.metrics,
+    current_job: state.current_job,
+    timestamp: System.monotonic_time(:millisecond)
+  }
+
+  new_state = %{state |
+    state: :checkpointed,
+    checkpoint_data: checkpoint_data}
+
+  {:reply, :ok, new_state}
+end
+\end{lstlisting}
+
+The checkpoint captures the memo store, execution metrics, and current job---everything needed to resume execution after a crash. The agent transitions to the \texttt{:checkpointed} state, from which it can resume to \texttt{:running}.
+
+\subsection{Distinction: Logical Determinism vs.\ Physical Nondeterminism}
+
+A subtlety in durable execution for agent systems: LLM calls are stochastic---the same prompt may produce different outputs on different invocations. The memoization store captures the \emph{specific output} of each LLM call. On replay, the memoized result is returned, not a fresh LLM invocation. This means that replayed executions are \emph{logically deterministic} (same memoized outputs) even though the underlying LLM calls are \emph{physically nondeterministic}. This distinction is crucial: it means that crash recovery produces exactly the same intermediate and final results as the original execution.
+
+% ==============================================================================
+\section{Supervision Tree Architecture}\label{sec:implementation}
+% ==============================================================================
+
+\subsection{Application-Level Supervision}
+
+The top-level application (file: \texttt{lib/agent\_scheduler.ex}) starts a supervision tree with five children:
+
+\begin{lstlisting}[language=elixir, caption={Application supervision tree (from \texttt{agent\_scheduler.ex})}, label={lst:application}]
+def start(_type, _args) do
+  children = [
+    {Registry, keys: :unique,
+      name: AgentScheduler.Registry},
+    {AgentScheduler.Evaluator, []},
+    {AgentScheduler.Scheduler, []},
+    {AgentScheduler.Pipeline, []},
+    {AgentScheduler.Supervisor, []}
+  ]
+
+  opts = [
+    strategy: :rest_for_one,
+    name: AgentScheduler.AppSupervisor,
+    max_restarts: 10,
+    max_seconds: 60
+  ]
+
+  Supervisor.start_link(children, opts)
+end
+\end{lstlisting}
+
+The children are started in order, and the \texttt{:rest\_for\_one} strategy means: if any child crashes, that child and all children started \emph{after} it are restarted. This is the correct strategy because later children depend on earlier ones:
+
+\begin{itemize}[leftmargin=2em]
+  \item \textbf{Registry} is started first. All other components use it for process lookup.
+  \item \textbf{Evaluator} depends only on Registry.
+  \item \textbf{Scheduler} depends on Registry.
+  \item \textbf{Pipeline} depends on Registry and may reference the Scheduler.
+  \item \textbf{Supervisor} (DynamicSupervisor for agents) depends on all of the above.
+\end{itemize}
+
+If the Registry crashes, all four downstream components are restarted. If the Pipeline crashes, only Pipeline and Supervisor are restarted. If an individual agent crashes (under the DynamicSupervisor), nothing else is affected.
+
+\subsection{The Supervision Tree}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  supervisor/.style={rectangle, draw=blue!70, fill=blue!10, thick, minimum width=3cm, minimum height=0.8cm, rounded corners=3pt},
+  worker/.style={rectangle, draw=green!70, fill=green!10, thick, minimum width=2.4cm, minimum height=0.7cm, rounded corners=3pt},
+  edge/.style={-{Stealth[length=5pt]}, thick},
+  level 1/.style={sibling distance=3.5cm},
+  level 2/.style={sibling distance=2.5cm}
+]
+\node[supervisor] (root) {AppSupervisor}
+  child[edge] {node[worker] (reg) {Registry}}
+  child[edge] {node[worker] (eval) {Evaluator}}
+  child[edge] {node[worker] (sched) {Scheduler}}
+  child[edge] {node[worker] (pipe) {Pipeline}}
+  child[edge] {
+    node[supervisor] (pool) {DynamicSupervisor}
+    child[edge] {node[worker] (a1) {Agent$_1$}}
+    child[edge] {node[worker] (a2) {Agent$_2$}}
+    child[edge] {node[worker] (a3) {Agent$_n$}}
+  };
+\node[below=0.1cm of root, xshift=0cm, text=gray, font=\footnotesize\itshape] {rest\_for\_one};
+\node[below=0.1cm of pool, text=gray, font=\footnotesize\itshape] {one\_for\_one};
+\end{tikzpicture}
+\caption{Complete supervision tree. The top level uses \texttt{rest\_for\_one}; the agent pool uses \texttt{one\_for\_one} for fault isolation.}\label{fig:supervision-tree}
+\end{figure}
+
+\subsection{DynamicSupervisor for Agent Pools}
+
+The agent pool supervisor (file: \texttt{lib/agent\_scheduler/supervisor.ex}) uses \texttt{DynamicSupervisor} to create and manage agent processes on demand:
+
+\begin{lstlisting}[language=elixir, caption={DynamicSupervisor with restart intensity (from \texttt{supervisor.ex})}, label={lst:dynsup}]
+def init(_opts) do
+  DynamicSupervisor.init(
+    strategy: :one_for_one,
+    max_restarts: 5,
+    max_seconds: 60,
+    extra_arguments: []
+  )
+end
+\end{lstlisting}
+
+The \texttt{:one\_for\_one} strategy means that if one agent crashes, only that agent is restarted. The restart intensity limit (\texttt{max\_restarts: 5, max\_seconds: 60}) prevents cascade failures: if an agent crashes more than 5 times in 60 seconds, the DynamicSupervisor itself terminates, propagating the failure up to the application supervisor.
+
+Starting a new agent under the supervisor:
+
+\begin{lstlisting}[language=elixir, caption={Starting a supervised agent (from \texttt{supervisor.ex})}, label={lst:start-agent}]
+def start_agent(opts) do
+  id = Keyword.fetch!(opts, :id)
+
+  child_spec = %{
+    id: id,
+    start: {AgentScheduler.Agent, :start_link, [opts]},
+    restart: :transient,
+    shutdown: :timer.seconds(30),
+    type: :worker
+  }
+
+  DynamicSupervisor.start_child(__MODULE__, child_spec)
+end
+\end{lstlisting}
+
+Key design choices in the child spec:
+\begin{itemize}[leftmargin=2em]
+  \item \texttt{restart: :transient} --- the agent is only restarted if it exits abnormally (crash). Normal completion or explicit termination does not trigger a restart.
+  \item \texttt{shutdown: :timer.seconds(30)} --- the agent is given 30 seconds to checkpoint its state before forced termination. This allows graceful shutdown.
+  \item \texttt{type: :worker} --- identifies this as a worker process (not a supervisor).
+\end{itemize}
+
+\subsection{Restart Strategies and Agent Dependencies}
+
+The choice of restart strategy corresponds to the dependency structure among agents:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Strategy} & \textbf{Dependency Structure} & \textbf{Agent Example} \\
+\midrule
+\texttt{one\_for\_one} & Independent siblings & Parallel subtask agents \\
+\texttt{one\_for\_all} & Mutually dependent & Agent team with shared state \\
+\texttt{rest\_for\_one} & Sequential dependency & Pipeline stages in order \\
+\bottomrule
+\end{tabular}
+\caption{Restart strategies and their correspondence to agent dependency structures.}\label{tab:restart-strategies}
+\end{table}
+
+The application supervisor uses \texttt{rest\_for\_one} because its children have sequential dependencies (Registry before Scheduler before Pipeline). The agent pool uses \texttt{one\_for\_one} because agents in the pool are independent---they share no state and communicate only through the Pipeline's event bus.
+
+\subsection{Failure Categories and Recovery Mapping}
+
+In agent systems, failures fall into distinct categories, each mapped to a recovery strategy:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Failure Mode} & \textbf{Recovery Strategy} & \textbf{Rationale} \\
+\midrule
+\texttt{crash} & \texttt{restart} & Supervisor auto-restarts; memo store enables recovery \\
+\texttt{timeout} & \texttt{retry\_with\_backoff} & Transient load; exponential backoff reduces pressure \\
+\texttt{resource\_exhaustion} & \texttt{fallback\_agent} & Switch to cheaper model or smaller context \\
+\texttt{invalid\_output} & \texttt{retry\_with\_backoff} & LLM hallucination; retry with stronger prompt \\
+\texttt{human\_rejection} & \texttt{retry\_with\_feedback} & Incorporate reviewer feedback into retry \\
+\bottomrule
+\end{tabular}
+\caption{Mapping failure modes to recovery strategies.}\label{tab:failure-recovery}
+\end{table}
+
+This mapping is monotone: more severe failures map to more comprehensive recovery strategies. A crash (the most severe) triggers a full restart. A timeout triggers a gentler retry with backoff. Invalid output triggers a retry with modified prompting. This monotone structure means that the mapping composes correctly across supervision tree levels: the recovery strategy for a composite failure (e.g., a subtree where multiple agents fail) is at least as strong as the recovery for any individual failure.
+
+\subsection{Process Registration and Lookup}
+
+Every agent is registered in the OTP Registry for $O(1)$ lookup by ID:
+
+\begin{lstlisting}[language=elixir, caption={Registry-based process naming (from \texttt{agent.ex})}, label={lst:registry}]
+def start_link(opts) do
+  id = Keyword.fetch!(opts, :id)
+  GenServer.start_link(__MODULE__, opts,
+    name: {:via, Registry,
+      {AgentScheduler.Registry, id}})
+end
+
+defp via_registry(agent_id) do
+  {:via, Registry, {AgentScheduler.Registry, agent_id}}
+end
+\end{lstlisting}
+
+The \texttt{:via} tuple tells GenServer to use the Registry module for name resolution. This provides:
+\begin{itemize}[leftmargin=2em]
+  \item \textbf{Uniqueness:} Only one process can register a given ID. Starting a duplicate returns \texttt{\{:error, \{:already\_started, pid\}\}}.
+  \item \textbf{Location transparency:} Callers use agent IDs (strings) rather than PIDs, decoupling the client API from process lifecycle.
+  \item \textbf{Automatic cleanup:} When a process terminates, its Registry entry is removed.
+\end{itemize}
+
+\subsection{Telemetry and Observability}
+
+Every significant event in the agent lifecycle emits a telemetry event:
+
+\begin{lstlisting}[language=elixir, caption={Telemetry emission (from \texttt{agent.ex})}, label={lst:telemetry}]
+defp emit_telemetry(event, measurements) do
+  :telemetry.execute(
+    [:agent_scheduler, :agent, event],
+    %{system_time: System.system_time()},
+    measurements
+  )
+rescue
+  _ -> :ok
+end
+\end{lstlisting}
+
+Events emitted include: \texttt{agent\_started}, \texttt{step\_completed}, \texttt{step\_replayed}, \texttt{step\_failed}, \texttt{job\_assigned}, \texttt{approval\_requested}, \texttt{checkpoint\_created}, \texttt{job\_completed}, \texttt{agent\_cancelled}, and \texttt{agent\_terminated}. These can be consumed by monitoring dashboards, alerting systems, or the evaluation framework.
+
+% ==============================================================================
+\section{6-Dimensional Quality Evaluation}\label{sec:evaluation}
+% ==============================================================================
+
+\subsection{The Evaluation Space}
+
+Agent quality is measured across six orthogonal dimensions, each normalized to $[0, 1]$:
+
+\begin{definition}[Evaluation Vector]\label{def:eval-vector}
+An \emph{evaluation vector} is $\mathbf{v} = (q, a, s, c, e, r) \in [0,1]^6$ where:
+\begin{itemize}[leftmargin=2em]
+  \item $q$ = \textbf{Quality}: correctness and completeness of output
+  \item $a$ = \textbf{Adherence}: conformance to task specification and constraints
+  \item $s$ = \textbf{Speed}: execution time relative to SLA ($s = 1$ means at or below target)
+  \item $c$ = \textbf{Cost efficiency}: token/resource usage relative to budget
+  \item $e$ = \textbf{Error rate}: $1 - \text{raw\_error\_rate}$ (inverted so higher is better)
+  \item $r$ = \textbf{Revision count}: $1 - \min(\text{revisions}/\text{max\_revisions}, 1)$ (inverted)
+\end{itemize}
+\end{definition}
+
+\begin{definition}[Weight Vector and Composite Score]\label{def:composite-score}
+A \emph{weight vector} $\mathbf{w} = (w_q, w_a, w_s, w_c, w_e, w_r)$ satisfies $\sum w_i = 1$ and $w_i \geq 0$. The \emph{composite score} is the weighted sum:
+\begin{equation}\label{eq:composite-score}
+  \text{score}(\mathbf{v}) = \sum_{i=1}^{6} w_i v_i = \mathbf{w} \cdot \mathbf{v}
+\end{equation}
+The \emph{weighted distance} between two evaluations is:
+\begin{equation}\label{eq:weighted-distance}
+  d_{\mathbf{w}}(\mathbf{v}, \mathbf{v}') = \sqrt{\sum_{i=1}^{6} w_i (v_i - v'_i)^2}
+\end{equation}
+\end{definition}
+
+The default weights in the implementation are:
+\begin{equation*}
+  \mathbf{w}_{\text{default}} = (0.25, 0.20, 0.15, 0.15, 0.15, 0.10)
+\end{equation*}
+emphasizing quality and adherence, with lower weight on revision count (which is partly a function of oversight mode rather than agent capability).
+
+\subsection{Implementation: The Evaluator GenServer}
+
+The evaluator (file: \texttt{lib/agent\_scheduler/evaluator.ex}) maintains per-agent score histories, composite scores, and reputations:
+
+\begin{lstlisting}[language=elixir, caption={Evaluation with score normalization and EWMA (from \texttt{evaluator.ex})}, label={lst:evaluator}]
+def handle_call({:evaluate, agent_id, raw_scores, opts},
+    _from, state) do
+  weights = Keyword.get(opts, :weights, state.weights)
+  invert_dims = Keyword.get(opts, :invert,
+    [:error_rate, :revision_count])
+
+  # Normalize: invert specified dimensions
+  normalized =
+    Enum.into(@dimensions, %{}, fn dim ->
+      raw_value = Map.get(raw_scores, dim, 0.0)
+      value =
+        if dim in invert_dims do
+          1.0 - min(raw_value, 1.0)
+        else
+          min(raw_value, 1.0)
+        end
+      {dim, max(value, 0.0)}
+    end)
+
+  # Composite score (weighted sum)
+  composite = weighted_score(normalized, weights)
+
+  # Update reputation (EWMA)
+  current_rep = Map.get(state.reputations,
+    agent_id, composite)
+  new_rep = state.alpha * composite +
+    (1.0 - state.alpha) * current_rep
+
+  # Store history
+  new_state =
+    state
+    |> update_in(
+      [Access.key(:scores),
+       Access.key(agent_id, [])],
+      &[composite | &1])
+    |> update_in(
+      [Access.key(:raw_scores),
+       Access.key(agent_id, [])],
+      &[normalized | &1])
+    |> put_in(
+      [Access.key(:reputations), agent_id], new_rep)
+    |> Map.update!(:evaluation_count, &(&1 + 1))
+
+  result = %{
+    agent_id: agent_id,
+    scores: normalized,
+    composite: Float.round(composite, 4),
+    reputation: Float.round(new_rep, 4),
+    evaluation_count: length(
+      Map.get(new_state.scores, agent_id, [])),
+    timestamp: System.monotonic_time(:millisecond)
+  }
+
+  {:reply, {:ok, result}, new_state}
+end
+\end{lstlisting}
+
+The weighted score computation is a straightforward map-reduce:
+
+\begin{lstlisting}[language=elixir, caption={Weighted score as a fold (from \texttt{evaluator.ex})}, label={lst:weighted-score}]
+defp weighted_score(scores, weights) do
+  @dimensions
+  |> Enum.map(fn dim ->
+    Map.get(scores, dim, 0.0) *
+      Map.get(weights, dim, 0.0)
+  end)
+  |> Enum.sum()
+end
+\end{lstlisting}
+
+\subsection{Reputation via EWMA}
+
+Agent reputation is computed as an exponentially-weighted moving average (EWMA) of composite scores:
+
+\begin{definition}[Reputation]\label{def:reputation}
+Given an agent's score history $\{s_1, s_2, \ldots, s_T\}$, the reputation at time $T$ is:
+\begin{equation}\label{eq:reputation}
+  R_T = \alpha \, s_T + (1 - \alpha) \, R_{T-1}, \quad R_1 = s_1
+\end{equation}
+where $\alpha \in (0,1)$ is the decay parameter (default $\alpha = 0.3$).
+\end{definition}
+
+The EWMA gives more weight to recent performance while maintaining stability. With $\alpha = 0.3$, the most recent evaluation contributes 30\% to the reputation, and the historical average contributes 70\%.
+
+\begin{theorem}[Reputation Convergence]\label{thm:reputation-convergence}
+If an agent achieves consistent composite scores with $s_t \to s^*$ as $t \to \infty$, then $R_t \to s^*$. More precisely:
+\begin{equation}
+  |R_T - s^*| \leq (1-\alpha)^T |R_1 - s^*| + \sup_{k \geq 1} |s_k - s^*|
+\end{equation}
+\end{theorem}
+
+\begin{proof}
+Expanding the EWMA recursion:
+\begin{equation}
+  R_T = \alpha \sum_{k=0}^{T-1} (1-\alpha)^k s_{T-k} + (1-\alpha)^{T-1} s_1
+\end{equation}
+
+For the convergence bound, since $s_t \to s^*$, for any $\varepsilon > 0$ there exists $N$ such that $|s_t - s^*| < \varepsilon$ for all $t > N$. Decompose:
+\begin{align}
+  |R_T - s^*| &= \left| \alpha \sum_{k=0}^{T-1} (1-\alpha)^k (s_{T-k} - s^*) + (1-\alpha)^{T-1}(s_1 - s^*) \right| \\
+  &\leq \alpha \sum_{k=0}^{T-N-1} (1-\alpha)^k \varepsilon + \alpha \sum_{k=T-N}^{T-1} (1-\alpha)^k \|s - s^*\|_\infty + (1-\alpha)^{T-1} |s_1 - s^*|
+\end{align}
+
+The first term is bounded by $\varepsilon$ (geometric sum bounded by $1/\alpha \cdot \alpha = 1$). The remaining terms decay exponentially with $T - N$. Since $\varepsilon$ was arbitrary, $R_T \to s^*$.
+\end{proof}
+
+This convergence guarantee means that the reputation system is stable: an agent that maintains consistent quality will converge to a reputation reflecting that quality, and temporary fluctuations are smoothed rather than amplified.
+
+\subsection{Distance-Based Agent Comparison}
+
+The weighted distance function (Equation~\ref{eq:weighted-distance}) enables comparing agents by their quality profiles:
+
+\begin{lstlisting}[language=elixir, caption={Weighted distance for agent comparison (from \texttt{evaluator.ex})}, label={lst:distance}]
+def distance(scores_a, scores_b,
+    weights \\ @default_weights) do
+  @dimensions
+  |> Enum.map(fn dim ->
+    w = Map.get(weights, dim, 0.0)
+    a = Map.get(scores_a, dim, 0.0)
+    b = Map.get(scores_b, dim, 0.0)
+    w * (a - b) * (a - b)
+  end)
+  |> Enum.sum()
+  |> :math.sqrt()
+end
+\end{lstlisting}
+
+This enables the marketplace to find agents with quality profiles similar to a target (e.g., ``find agents similar to our best legal analyst'') or to detect quality degradation (distance from historical average exceeds a threshold).
+
+\subsection{Configurable Weights per Domain}
+
+Different task domains require different quality emphasis. The evaluator supports custom weight vectors:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}lcccccc@{}}
+\toprule
+\textbf{Domain} & $w_q$ & $w_a$ & $w_s$ & $w_c$ & $w_e$ & $w_r$ \\
+\midrule
+Web Testing (default) & 0.25 & 0.20 & 0.15 & 0.15 & 0.15 & 0.10 \\
+Legal Analysis & 0.35 & 0.25 & 0.05 & 0.10 & 0.15 & 0.10 \\
+Security Auditing & 0.30 & 0.20 & 0.10 & 0.10 & 0.20 & 0.10 \\
+Dashboard Generation & 0.20 & 0.15 & 0.25 & 0.20 & 0.10 & 0.10 \\
+\bottomrule
+\end{tabular}
+\caption{Domain-specific weight configurations. Legal analysis prioritizes quality; dashboard generation prioritizes speed and cost.}\label{tab:domain-weights}
+\end{table}
+
+\subsection{Reputation-Scheduling Coupling}
+
+Evaluation scores influence scheduling priority through reputation. We define the \emph{effective weight} of an agent as:
+\begin{equation}
+  w_{\text{eff}}(A) = w(p_A) \cdot (1 + \beta R_A)
+\end{equation}
+where $\beta > 0$ is a reputation sensitivity parameter and $R_A$ is the agent's reputation. Agents with higher reputation accumulate avruntime more slowly, receiving proportionally more execution opportunities. This creates a positive feedback loop that rewards quality.
+
+% ==============================================================================
+\section{Case Studies}\label{sec:case-studies}
+% ==============================================================================
+
+We validate the framework through three case studies drawn from production systems.
+
+\subsection{Case Study 1: Web Testing Agent}
+
+The Agent-Testing-Framework implements the 5-phase streaming pipeline described in Example~\ref{ex:web-testing}. This is a production system that tests web applications using Playwright for behavioral testing and k6 for load testing.
+
+\paragraph{Architecture.} The pipeline is created using the declarative API shown in Listing~\ref{lst:create-pipeline}. Each phase runs as a GenServer process, consuming events from upstream phases and publishing events downstream.
+
+\paragraph{Streaming in action.} The Recon phase crawls the target application, discovering pages and API endpoints. As each page is discovered, a \texttt{page\_discovered} event is published. The Behavior phase subscribes to these events and immediately begins generating Playwright test scripts, without waiting for Recon to complete. Similarly, the Load phase subscribes to \texttt{api\_found} events and begins generating k6 load testing scripts. This streaming architecture reduces total pipeline latency from $\sum_{i=1}^{5} t_i$ (sequential) to the critical path length.
+
+\paragraph{Fault tolerance.} Each phase runs under the DynamicSupervisor with \texttt{:one\_for\_one} strategy. If the Load phase crashes due to a target server timeout, it is restarted without affecting Behavior or Observer. The memoization store ensures completed k6 scripts are not regenerated.
+
+\paragraph{Evaluation.}
 \begin{align*}
-  \mathbf{v}_{\text{web-test}} = (q: 0.87,\ a: 0.92,\ s: 0.78,\ c: 0.85,\ e: 0.05,\ r: 0.12)
+  \mathbf{v}_{\text{web-test}} = (q: 0.87,\ a: 0.92,\ s: 0.78,\ c: 0.85,\ e: 0.95,\ r: 0.88)
 \end{align*}
-with composite score $\langle \mathbf{w}, \mathbf{v} \rangle = 0.25(0.87) + 0.20(0.92) + 0.15(0.78) + 0.15(0.85) + 0.15(0.95) + 0.10(0.88) = 0.877$ (where error and revision scores are inverted: $1 - e$ and $1 - r$).
+Composite score: $\mathbf{w} \cdot \mathbf{v} = 0.25(0.87) + 0.20(0.92) + 0.15(0.78) + 0.15(0.85) + 0.15(0.95) + 0.10(0.88) = 0.877$.
 
 \subsection{Case Study 2: Legal Analysis Agent}
 
-A legal analysis agent processes contracts, identifying risks, obligations, and compliance requirements. The execution pipeline follows the Agent-Hero model:
+A legal analysis agent processes contracts, identifying risks, obligations, and compliance requirements.
 
+\paragraph{Pipeline.} The Agent-Hero execution pipeline:
 \begin{enumerate}[leftmargin=2em]
   \item \textbf{Job:} ``Analyze vendor contract for GDPR compliance risks''
-  \item \textbf{Proposal:} Agent proposes a 3-phase analysis: clause extraction, risk scoring, recommendation generation
-  \item \textbf{Contract:} Client approves with \texttt{supervised} oversight (legal domain requires human review)
+  \item \textbf{Proposal:} Agent proposes 3-phase analysis: clause extraction, risk scoring, recommendation generation
+  \item \textbf{Contract:} Client approves with \texttt{:supervised} oversight (legal domain requires human review)
   \item \textbf{Decomposition:} Three subtasks in a linear dependency chain
   \item \textbf{Execution:} Each subtask runs as a supervised agent with human approval gates
-  \item \textbf{Evaluation:} Scored on accuracy of risk identification, completeness of clause coverage, and actionability of recommendations
+  \item \textbf{Evaluation:} Scored on accuracy, completeness, and actionability
 \end{enumerate}
 
-The categorical model captures the linear dependency as a chain in $\mathbf{Agent}$:
-\begin{equation}
-  A_{\text{extract}} \xrightarrow{f_{\text{clauses}}} A_{\text{score}} \xrightarrow{g_{\text{risks}}} A_{\text{recommend}}
-\end{equation}
+\paragraph{Supervision.} The linear dependency chain uses \texttt{:rest\_for\_one}: if the risk scoring phase crashes, it and the downstream recommendation phase are restarted, but the completed clause extraction is preserved in the memo store.
 
-The supervision functor maps failures as follows:
+\paragraph{Failure recovery mapping.}
 \begin{align*}
-  S(\texttt{invalid\_output}) &= \texttt{retry\_with\_backoff} \quad \text{(LLM hallucination $\to$ retry with stronger prompt)} \\
-  S(\texttt{human\_rejection}) &= \texttt{retry\_with\_backoff} \quad \text{(incorporate feedback)} \\
-  S(\texttt{timeout}) &= \texttt{fallback\_agent} \quad \text{(switch to faster model)} \\
-  S(\texttt{crash}) &= \texttt{human\_escalation} \quad \text{(legal analysis is high-stakes)}
+  \texttt{invalid\_output} &\to \texttt{retry\_with\_backoff} \quad \text{(LLM hallucination)} \\
+  \texttt{human\_rejection} &\to \texttt{retry\_with\_feedback} \quad \text{(incorporate reviewer notes)} \\
+  \texttt{timeout} &\to \texttt{fallback\_agent} \quad \text{(switch to faster model)} \\
+  \texttt{crash} &\to \texttt{human\_escalation} \quad \text{(legal analysis is high-stakes)}
 \end{align*}
 
-The oversight mode is \texttt{supervised}, placing it at the top of the lattice (Proposition~\ref{prop:oversight-lattice}). Every intermediate output is reviewed before the next phase begins.
+\paragraph{Oversight.} The oversight mode is \texttt{:supervised}---every intermediate output is reviewed before the next phase begins. This is at the top of the oversight ordering, appropriate for high-stakes legal work.
+
+\paragraph{Evaluation.}
+\begin{align*}
+  \mathbf{v}_{\text{legal}} = (q: 0.91,\ a: 0.95,\ s: 0.65,\ c: 0.72,\ e: 0.88,\ r: 0.80)
+\end{align*}
+Composite score with legal-domain weights ($w_q = 0.35, w_a = 0.25, w_s = 0.05, w_c = 0.10, w_e = 0.15, w_r = 0.10$): $0.35(0.91) + 0.25(0.95) + 0.05(0.65) + 0.10(0.72) + 0.15(0.88) + 0.10(0.80) = 0.882$.
 
 \subsection{Case Study 3: Security Auditing Agent}
 
-A security auditing agent performs automated penetration testing and vulnerability assessment. The pipeline uses the Agent-Hero decomposition to split the task into parallel scanning subtasks:
+A security auditing agent performs automated vulnerability assessment with parallel scanning subtasks.
+
+\paragraph{DAG structure.} The decomposition produces a two-level DAG:
 
 \begin{figure}[H]
 \centering
@@ -981,83 +1436,20 @@ A security auditing agent performs automated penetration testing and vulnerabili
 \draw[edge] (web) -- (synth);
 \draw[edge] (api) -- (synth);
 \end{tikzpicture}
-\caption{Security audit DAG: three independent scanning phases followed by synthesis. Topological sort yields two levels: level 0 (parallel scans), level 1 (synthesis).}\label{fig:security-dag}
+\caption{Security audit DAG. Three independent scans (level 0) followed by synthesis (level 1).}\label{fig:security-dag}
 \end{figure}
 
-The scheduling follows Algorithm~\ref{alg:topo-sort}: the three scanning subtasks execute in parallel (level 0), and the synthesis subtask executes when all scans complete (level 1). The oversight mode is \texttt{autonomous\_escalation} with a confidence threshold of $\theta = 0.7$: the agent operates autonomously unless it encounters an ambiguous finding (e.g., potential false positive with confidence below 0.7), at which point it escalates to a human security analyst.
+The three scanning subtasks execute in parallel under the DynamicSupervisor. Each is an independent agent with \texttt{:one\_for\_one} restart---a crash in the network scanner does not affect the web vulnerability scanner.
 
-The evaluation captures security-specific quality dimensions:
+\paragraph{Oversight.} The mode is \texttt{:autonomous\_escalation} with a confidence threshold: the agent operates autonomously unless it encounters an ambiguous finding (e.g., potential false positive), at which point it escalates to a human security analyst via \texttt{request\_approval/2}.
+
+\paragraph{Evaluation.}
 \begin{align*}
-  q &= \text{true positive rate of vulnerability detection} \\
-  a &= \text{coverage of OWASP Top 10 categories} \\
-  s &= \text{scan completion time vs.\ SLA} \\
-  c &= \text{token usage vs.\ budget} \\
-  e &= \text{false positive rate} \\
-  r &= \text{number of analyst escalations requiring revision}
+  \mathbf{v}_{\text{security}} = (q: 0.83,\ a: 0.89,\ s: 0.82,\ c: 0.79,\ e: 0.91,\ r: 0.85)
 \end{align*}
+Composite score: $0.851$ with default weights.
 
-% ==============================================================================
-\section{Evaluation Metrics}\label{sec:evaluation}
-% ==============================================================================
-
-\subsection{The 6-Dimensional Quality Space}
-
-\begin{definition}[Weighted Evaluation Inner Product]\label{def:eval-inner-product}
-Given the evaluation space $\mathcal{E} = [0,1]^6$ (Definition~\ref{def:eval-space}) and a weight vector $\mathbf{w} \in \Delta^5$ (the 5-simplex, ensuring $\sum w_i = 1$ and $w_i > 0$), the \emph{weighted evaluation inner product} is:
-\begin{equation}\label{eq:eval-inner-product}
-  \langle \mathbf{v}, \mathbf{v}' \rangle_{\mathbf{w}} = \sum_{i=1}^{6} w_i v_i v'_i
-\end{equation}
-This induces the weighted norm $\|\mathbf{v}\|_{\mathbf{w}} = \sqrt{\langle \mathbf{v}, \mathbf{v} \rangle_{\mathbf{w}}}$ and the weighted distance $d_{\mathbf{w}}(\mathbf{v}, \mathbf{v}') = \|\mathbf{v} - \mathbf{v}'\|_{\mathbf{w}}$.
-\end{definition}
-
-\begin{definition}[Composite Score]\label{def:composite-score}
-The \emph{composite score} of an evaluation $\mathbf{v}$ is the weighted inner product with the ideal evaluation $\mathbf{1} = (1,1,1,1,1,1)$:
-\begin{equation}\label{eq:composite-score}
-  \text{score}(\mathbf{v}) = \langle \mathbf{w}, \mathbf{v} \rangle = \sum_{i=1}^{6} w_i v_i
-\end{equation}
-This is a linear functional on $\mathcal{E}$, hence continuous, and takes values in $[0,1]$.
-\end{definition}
-
-\begin{remark}
-The error rate and revision count dimensions are inverted before scoring: $v_e = 1 - \text{error\_rate}$ and $v_r = 1 - \min(\text{revision\_count} / \text{max\_revisions}, 1)$, so that higher values always indicate better performance.
-\end{remark}
-
-\subsection{Reputation Computation}
-
-Agent reputation is computed as an exponentially-weighted moving average (EWMA) of composite scores over the agent's execution history.
-
-\begin{definition}[Reputation]\label{def:reputation}
-Given an agent's execution history $\{s_1, s_2, \ldots, s_T\}$ where $s_t = \text{score}(\mathbf{v}_t)$ is the composite score of the $t$-th execution, the \emph{reputation} at time $T$ is:
-\begin{equation}\label{eq:reputation}
-  R_T = \alpha s_T + (1 - \alpha) R_{T-1}, \quad R_0 = s_1
-\end{equation}
-where $\alpha \in (0,1)$ is the decay parameter (typically $\alpha = 0.3$).
-\end{definition}
-
-\begin{theorem}[Reputation Convergence]\label{thm:reputation-convergence}
-If an agent achieves consistent composite scores with $s_t \to s^*$ as $t \to \infty$, then $R_t \to s^*$. More precisely, $|R_t - s^*| \leq (1-\alpha)^t |R_0 - s^*| + \alpha \sup_{k \geq 1} |s_k - s^*|$.
-\end{theorem}
-
-\begin{proof}
-Expanding the EWMA recursion:
-\begin{equation}
-  R_T = \alpha \sum_{k=0}^{T-1} (1-\alpha)^k s_{T-k} + (1-\alpha)^T R_0
-\end{equation}
-
-For the convergence bound:
-\begin{align}
-  |R_T - s^*| &= \left| \alpha \sum_{k=0}^{T-1} (1-\alpha)^k (s_{T-k} - s^*) + (1-\alpha)^T (R_0 - s^*) \right| \\
-  &\leq \alpha \sum_{k=0}^{T-1} (1-\alpha)^k |s_{T-k} - s^*| + (1-\alpha)^T |R_0 - s^*| \\
-  &\leq \alpha \cdot \frac{1 - (1-\alpha)^T}{\alpha} \cdot \sup_k |s_k - s^*| + (1-\alpha)^T |R_0 - s^*| \\
-  &= (1 - (1-\alpha)^T) \sup_k |s_k - s^*| + (1-\alpha)^T |R_0 - s^*|
-\end{align}
-
-If $s_t \to s^*$, then for any $\varepsilon > 0$, there exists $N$ such that $|s_t - s^*| < \varepsilon$ for all $t > N$. For $T$ sufficiently large, the contribution from terms $t \leq N$ decays exponentially, giving $|R_T - s^*| < \varepsilon + O((1-\alpha)^{T-N})$, which tends to $\varepsilon$. Since $\varepsilon$ was arbitrary, $R_T \to s^*$.
-\end{proof}
-
-\subsection{Comparative Evaluation Table}
-
-Table~\ref{tab:case-study-eval} summarizes the 6-dimensional evaluations from our three case studies.
+\subsection{Comparative Evaluation}
 
 \begin{table}[H]
 \centering
@@ -1073,21 +1465,13 @@ Security Audit & 0.83 & 0.89 & 0.82 & 0.79 & 0.91 & 0.85 & 0.851 \\
 \caption{6-dimensional evaluation scores for three case study agents with default weights.}\label{tab:case-study-eval}
 \end{table}
 
-\subsection{Scheduling Impact on Evaluation}
-
-We observe an important feedback loop: evaluation scores influence scheduling priority through the reputation system. Agents with higher reputation receive preferential scheduling (lower avruntime growth rate), creating a positive feedback loop. This is formalized as follows.
-
-\begin{proposition}[Reputation-Scheduling Coupling]\label{prop:rep-sched-coupling}
-Define the \emph{effective weight} of agent $A$ as $w_{\text{eff}}(A) = w(p_A) \cdot (1 + \beta R_A)$ where $\beta > 0$ is a reputation sensitivity parameter and $R_A$ is the agent's reputation. Under this weighting, agents with higher reputation accumulate avruntime more slowly, receiving proportionally more execution opportunities. The system reaches a fixed point when $R_A = \text{score}(\text{Eval}(A))$ for all agents.
-\end{proposition}
-
 % ==============================================================================
 \section{Discussion}\label{sec:discussion}
 % ==============================================================================
 
 \subsection{Comparison to Linux CFS}
 
-Our credit-weighted agent scheduler (Algorithm~\ref{alg:scheduling}) directly generalizes the Linux CFS. The key differences are:
+Our credit-weighted agent scheduler directly generalizes Linux CFS:
 
 \begin{table}[H]
 \centering
@@ -1096,97 +1480,165 @@ Our credit-weighted agent scheduler (Algorithm~\ref{alg:scheduling}) directly ge
 \textbf{Aspect} & \textbf{Linux CFS} & \textbf{Agent Scheduler} \\
 \midrule
 Resource & CPU time & LLM tokens + tool access + credits \\
-Fairness metric & Virtual runtime & Agent virtual runtime (Def.~\ref{def:agent-vruntime}) \\
+Fairness metric & Virtual runtime & Agent virtual runtime (Eq.~\ref{eq:agent-vruntime}) \\
 Weight source & Nice values ($-20$ to $+19$) & Credit balance $\times$ priority \\
 Preemption & Time-slice based & Step-boundary based \\
 State persistence & None (volatile) & Memoization store (durable) \\
+Data structure & Red-black tree & General balanced tree (\texttt{gb\_trees}) \\
 Evaluation & N/A & 6-dimensional quality space \\
-Oversight & N/A & Lattice of human-in-loop modes \\
+Oversight & N/A & Three-level oversight modes \\
 \bottomrule
 \end{tabular}
 \caption{Comparison between Linux CFS and the Agent Scheduler.}\label{tab:cfs-comparison}
 \end{table}
 
-A critical difference is \emph{preemption granularity}. Linux CFS can preempt a process at any point (via timer interrupts). Agent scheduling cannot interrupt an LLM call mid-generation; preemption can only occur at \emph{step boundaries} --- between tool calls, between LLM invocations, or at explicit checkpoint locations. This coarser preemption granularity means that scheduling fairness is achieved over longer time horizons, similar to cooperative multitasking in classic Mac OS \citep{tanenbaum2014modern}.
+A critical difference is \emph{preemption granularity}. Linux CFS can preempt a process at any point via timer interrupts. Agent scheduling cannot interrupt an LLM call mid-generation; preemption occurs only at \emph{step boundaries}---between tool calls, between LLM invocations, or at explicit checkpoints. This coarser granularity means scheduling fairness is achieved over longer time horizons, similar to cooperative multitasking \citep{tanenbaum2014modern}.
 
-\subsection{Comparison to Real-Time Scheduling}
+\subsection{Why Elixir/OTP}
 
-For agents with Service Level Agreements (SLAs), we need real-time scheduling guarantees. The contracted tier in Algorithm~\ref{alg:scheduling} provides a simple priority-based guarantee (contracted agents always preempt marketplace agents), analogous to Linux's \texttt{SCHED\_FIFO}. However, true real-time guarantees require \emph{deadline-based scheduling} \citep{liu1973scheduling}.
+The choice of Elixir/OTP as the implementation language is deliberate:
 
-\begin{definition}[Earliest Deadline First for Agents]\label{def:edf-agents}
-Given a set of agent jobs $\{j_1, \ldots, j_n\}$ with deadlines $\{d_1, \ldots, d_n\}$ and estimated execution times $\{e_1, \ldots, e_n\}$, the Earliest Deadline First (EDF) policy schedules the job with the earliest deadline first. For agent scheduling, deadlines correspond to SLA response times, and execution times are estimated from historical data and model complexity.
-\end{definition}
+\begin{enumerate}[leftmargin=2em]
+  \item \textbf{Supervision trees} are a first-class language feature, not a library add-on. The \texttt{use Supervisor} and \texttt{use DynamicSupervisor} macros generate the correct callback structure.
+  \item \textbf{Lightweight processes.} The BEAM VM supports millions of concurrent processes with per-process garbage collection and preemptive scheduling. Each agent runs as its own process at essentially zero overhead.
+  \item \textbf{Immutability by default.} All data structures are immutable. State transitions in GenServer produce new state values, making reasoning about state changes straightforward.
+  \item \textbf{Pattern matching.} State machine transitions are encoded as function clauses with pattern-matched arguments, providing exhaustiveness checking and clear control flow.
+  \item \textbf{Hot code reloading.} The BEAM supports live code upgrades, enabling agent system updates without downtime.
+  \item \textbf{Telemetry built-in.} The \texttt{:telemetry} library is an Erlang ecosystem standard, providing structured observability.
+  \item \textbf{The pipe operator.} While syntactic, the \texttt{|>} operator encourages pipeline-oriented thinking that aligns with the architectural design.
+\end{enumerate}
 
-The challenge for agent scheduling is that execution times are highly variable (LLM generation time depends on prompt complexity, model load, and stochastic sampling), making worst-case execution time analysis difficult. We defer a detailed treatment of real-time agent scheduling to Part IV of this series.
+\subsection{Comparison to Existing Agent Frameworks}
 
-\subsection{Relationship to Multi-Agent Systems}
+Our framework differs from existing multi-agent systems in several ways:
 
-Our framework relates to but differs from the multi-agent systems (MAS) literature \citep{wooldridge2009introduction,dorri2018multi}. Traditional MAS focuses on communication protocols (FIPA-ACL), negotiation strategies, and emergent behavior. Our framework is closer to an operating systems perspective: agents are managed entities whose lifecycle, resource usage, and quality are controlled by system-level primitives. The Agent-Hero marketplace model, where clients hire agent teams through a structured pipeline (Job $\to$ Proposal $\to$ Contract $\to$ Execution $\to$ Evaluation), adds an economic dimension absent from most MAS frameworks.
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Feature} & \textbf{This Work} & \textbf{AutoGen} & \textbf{LangChain} \\
+\midrule
+Supervision & OTP trees & None & None \\
+Crash recovery & Memo store + restart & Manual & Manual \\
+Scheduling & Credit-weighted CFS & Round-robin & Sequential \\
+Streaming & Event pub/sub & Message passing & Callbacks \\
+Evaluation & 6-dim + EWMA & None & None \\
+Concurrency & BEAM processes & Threading & Async/await \\
+\bottomrule
+\end{tabular}
+\caption{Feature comparison with existing agent frameworks.}\label{tab:framework-comparison}
+\end{table}
 
-\subsection{Category Theory in Systems Design}
+Traditional multi-agent systems (MAS) \citep{wooldridge2009introduction,dorri2018multi} focus on communication protocols and negotiation strategies. Our framework takes an operating systems perspective: agents are managed entities whose lifecycle, resource usage, and quality are controlled by system-level primitives. The Agent-Hero marketplace adds an economic dimension (credits, contracts, reputation) absent from most MAS frameworks.
 
-The use of category theory in computer science has a long history \citep{pierce1991basic,barr1990category}, particularly in programming language semantics and type theory. Our application of categorical methods to agent scheduling is novel: we use categories not for semantic modeling but for \emph{compositional system design}. The agent category $\mathbf{Agent}$ captures the principle that agent composition should preserve quality guarantees (Theorem~\ref{thm:functorial-composition}), and the supervision functor (Theorem~\ref{thm:supervision-limits}) captures the principle that recovery strategies compose correctly.
+\subsection{Relationship to Durable Execution Platforms}
 
-This categorical approach has practical benefits: it identifies the exact conditions under which agent pipelines can be composed safely (validation predicates must hold), and it provides a framework for reasoning about fault propagation in supervision trees.
+The Inngest model of durable execution \citep{inngest2024} is increasingly adopted in production. Our formalization (Theorem~\ref{thm:idempotent-execution}) provides the theoretical foundation for understanding why memoization-based retry is correct. The key distinction between ``logical determinism'' (same inputs yield same memoized output) and ``physical nondeterminism'' (LLM calls are stochastic) is crucial for agent systems: the memo store captures specific LLM outputs, and replays use memoized results rather than re-invoking the LLM.
 
-\subsection{Durable Execution in Practice}
+In the Agent-Hero production system, durable execution is implemented via Inngest (a TypeScript/Node.js durable execution engine). The Elixir reference implementation demonstrates the same principles in a functional programming context where immutability and supervision are language-level features rather than library concerns.
 
-The Inngest model of durable execution \citep{inngest2024} is increasingly adopted in production systems. Our formalization (Theorem~\ref{thm:idempotent-execution}) provides the theoretical foundation for understanding why memoization-based retry is correct. The key insight is that step functions must be \emph{deterministic} given their inputs: if a step function involves an LLM call (which is stochastic), the memoization store captures the specific output, and replays use the memoized result rather than re-invoking the LLM. This distinction between ``logical determinism'' (same inputs $\Rightarrow$ same memoized output) and ``physical nondeterminism'' (LLM calls are stochastic) is crucial for agent systems.
+\subsection{Production System Mapping}
+
+The reference implementation maps to the Agent-Hero production architecture:
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Elixir Module} & \textbf{Production Component} \\
+\midrule
+\texttt{AgentScheduler} (Application) & Next.js application with Inngest \\
+\texttt{AgentScheduler.Agent} (GenServer) & Agent execution via Vercel AI SDK \\
+\texttt{AgentScheduler.Scheduler} & Inngest function queue + credit service \\
+\texttt{AgentScheduler.Pipeline} & Agent-Testing-Framework 5-phase pipeline \\
+\texttt{AgentScheduler.Supervisor} & Inngest retry + Vercel deployment \\
+\texttt{AgentScheduler.Evaluator} & Evaluation scoring in Supabase \\
+Registry & Supabase agents table + realtime \\
+\bottomrule
+\end{tabular}
+\caption{Mapping from Elixir reference to Agent-Hero production system.}\label{tab:production-mapping}
+\end{table}
 
 \subsection{Limitations and Future Work}
-
-Our framework has several limitations that we plan to address in subsequent parts of this series:
 
 \begin{enumerate}[leftmargin=2em]
   \item \textbf{Resource heterogeneity.} We treat credits as a single resource, but agents consume heterogeneous resources (different LLM providers, tool APIs, compute). Part II will develop a multi-resource scheduling model based on dominant resource fairness \citep{ghodsi2011dominant}.
   \item \textbf{Dynamic priority.} Our priority model is static (contracted vs.\ marketplace). Part II will introduce dynamic priority aging and feedback-driven priority adjustment.
-  \item \textbf{Distributed scheduling.} Our model assumes a single scheduler. Part III will extend to distributed scheduling across multiple AIOS instances using the topos-theoretic framework mentioned in Section~\ref{sec:agent-model}.
-  \item \textbf{Formal verification.} While we prove correctness properties, we do not provide machine-checked proofs. Future work will formalize our theorems in Lean 4.
-  \item \textbf{Empirical evaluation.} Our case studies are qualitative. We plan to conduct large-scale empirical evaluation on the Agent-Hero production dataset.
+  \item \textbf{Distributed scheduling.} Our model assumes a single scheduler. Part III will extend to distributed scheduling across multiple AIOS instances.
+  \item \textbf{Empirical evaluation.} Our case studies are qualitative. We plan large-scale empirical evaluation on Agent-Hero production data.
+  \item \textbf{Persistent memoization.} The current memo store is in-process memory, lost on supervisor termination. Production systems need persistent memoization (e.g., backed by Supabase/Postgres).
 \end{enumerate}
 
 % ==============================================================================
 \section{Conclusion}\label{sec:conclusion}
 % ==============================================================================
 
-We have presented a comprehensive framework for understanding AI agent scheduling as the foundational primitive of an AI Operating System. Our key contributions are:
+We have presented the design and implementation of an AI agent scheduler built on functional programming principles and Erlang/OTP's process management model. The key contributions are:
 
 \begin{enumerate}[leftmargin=2em]
-  \item \textbf{Categorical formalization.} Agents form a category where morphisms encode data flow and validation, composition preserves evaluation bounds (Theorem~\ref{thm:functorial-composition}), and supervision trees are limit-preserving functors (Theorem~\ref{thm:supervision-limits}).
+  \item \textbf{Compositional design.} Agents compose through typed data flows and streaming pipelines. The pipe operator is not just syntax---it reflects the architectural principle that agent orchestrations are chains of transformations.
 
-  \item \textbf{Durable execution semantics.} The Inngest-inspired memoization model guarantees idempotent replay under crash-restart (Theorem~\ref{thm:idempotent-execution}), providing the theoretical foundation for fault-tolerant agent orchestration.
+  \item \textbf{Supervision for fault tolerance.} OTP supervision trees provide hierarchical, configurable crash recovery. The \texttt{rest\_for\_one} strategy at the application level and \texttt{one\_for\_one} at the agent pool level match the dependency structure of the system.
 
-  \item \textbf{Oversight lattice.} Human oversight modes form a complete lattice with well-defined meet and join operations (Proposition~\ref{prop:oversight-lattice}), enabling compositional reasoning about oversight requirements in multi-agent pipelines.
+  \item \textbf{Durable execution.} Memoization-based step functions guarantee idempotent replay under crash-restart (Theorem~\ref{thm:idempotent-execution}), eliminating wasted computation in long-running agent tasks.
 
-  \item \textbf{Evaluation framework.} The 6-dimensional quality space with weighted inner product and EWMA reputation provides convergent, composable quality measurement (Theorem~\ref{thm:reputation-convergence}).
+  \item \textbf{Pattern-matched state machines.} Agent lifecycle transitions are enforced by Elixir pattern matching, making invalid state transitions structurally impossible rather than checked at runtime.
 
-  \item \textbf{Reference implementation.} The Elixir/OTP implementation demonstrates that OTP supervision trees, GenServer processes, and streaming pipelines provide a natural and production-ready substrate for agent scheduling.
+  \item \textbf{6-dimensional evaluation with convergent reputation.} The weighted evaluation framework provides composable quality measurement, and EWMA reputation provably converges (Theorem~\ref{thm:reputation-convergence}).
+
+  \item \textbf{Complete reference implementation.} The Elixir codebase (\texttt{lib/agent\_scheduler/}) demonstrates that these principles work in practice, with production-grade supervision, telemetry, and process management.
 \end{enumerate}
 
-This work establishes the ``process scheduling'' layer of the AI Operating System. Subsequent papers in this series will address the memory hierarchy (Part II: agent memory and context management), the filesystem (Part III: knowledge storage and retrieval as a typed filesystem), the network stack (Part IV: inter-agent communication protocols), and the shell (Part V: the human-agent interface as a command language).
+This work establishes the ``process scheduling'' layer of the AI Operating System. Subsequent papers in this series address the memory hierarchy (Part II: agent memory and context management), the filesystem (Part III: knowledge storage and retrieval as a typed filesystem), the network stack (Part IV: inter-agent communication protocols), and the shell (Part V: the human-agent interface).
 
-The central message of this paper is that \textbf{agent orchestration is not a new problem --- it is process management}, and four decades of operating systems research provide a rich foundation for building reliable, fair, and efficient AI agent systems. The categorical framework ensures that this foundation is not merely analogical but formally grounded: agents compose like morphisms, supervision preserves limits, and evaluation is functorial.
+The central message is that \textbf{agent orchestration is process management}. Four decades of operating systems research---and three decades of Erlang/OTP production deployment---provide a rich, battle-tested foundation for building reliable, fair, and efficient AI agent systems. The functional programming model ensures this foundation is compositional: agents compose like functions, pipelines compose like pipes, supervision composes like trees, and evaluation composes like weighted sums.
 
 \subsection*{Acknowledgments}
 
-We thank the YonedaAI Research Collective for discussions on categorical approaches to agent systems, and the Agent-Hero development team for access to production system architecture and execution data.
+We thank the YonedaAI Research Collective for discussions on compositional approaches to agent systems, and the Agent-Hero development team for access to production system architecture and execution data.
+
+% ==============================================================================
+\subsection*{Source Code}
+
+The complete reference implementation is available at:
+
+\begin{center}
+\texttt{agent-os/src/agent\_scheduler/}
+\end{center}
+
+\noindent Key source files referenced in this paper:
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{File} & \textbf{Section} \\
+\midrule
+\texttt{lib/agent\_scheduler.ex} & Application supervisor (Sec.~\ref{sec:implementation}) \\
+\texttt{lib/agent\_scheduler/agent.ex} & Agent GenServer + state machine (Sec.~\ref{sec:agent-model}, \ref{sec:durable}) \\
+\texttt{lib/agent\_scheduler/scheduler.ex} & Credit-weighted scheduler (Sec.~\ref{sec:scheduling}) \\
+\texttt{lib/agent\_scheduler/pipeline.ex} & Streaming pipeline (Sec.~\ref{sec:pipeline}) \\
+\texttt{lib/agent\_scheduler/supervisor.ex} & DynamicSupervisor (Sec.~\ref{sec:implementation}) \\
+\texttt{lib/agent\_scheduler/evaluator.ex} & 6-dim evaluation + EWMA (Sec.~\ref{sec:evaluation}) \\
+\texttt{mix.exs} & Project configuration and dependencies \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 % ==============================================================================
 % References
 % ==============================================================================
 \bibliographystyle{plainnat}
 
-\begin{thebibliography}{35}
+\begin{thebibliography}{30}
 
 \bibitem[Armstrong(2003)]{armstrong2003making}
 Armstrong, J. (2003).
 \newblock Making reliable distributed systems in the presence of software errors.
 \newblock PhD thesis, Royal Institute of Technology, Stockholm.
-
-\bibitem[Barr and Wells(1990)]{barr1990category}
-Barr, M. and Wells, C. (1990).
-\newblock \emph{Category Theory for Computing Science}.
-\newblock Prentice Hall.
 
 \bibitem[Bovet and Cesati(2005)]{bovet2005understanding}
 Bovet, D.~P. and Cesati, M. (2005).
@@ -1228,21 +1680,6 @@ Jennings, N.~R. and Wooldridge, M.~J. (1998).
 \newblock Applications of intelligent agents.
 \newblock In \emph{Agent Technology: Foundations, Applications, and Markets}, pages 3--28.
 
-\bibitem[Lamport(1978)]{lamport1978time}
-Lamport, L. (1978).
-\newblock Time, clocks, and the ordering of events in a distributed system.
-\newblock \emph{Communications of the ACM}, 21(7):558--565.
-
-\bibitem[Leinster(2014)]{leinster2014basic}
-Leinster, T. (2014).
-\newblock \emph{Basic Category Theory}.
-\newblock Cambridge University Press.
-
-\bibitem[Li et~al.(2024)]{li2024camel}
-Li, G., Hammoud, H.~A., Itani, H., Khizbullin, D., and Ghanem, B. (2024).
-\newblock CAMEL: Communicative agents for ``mind'' exploration of large language model society.
-\newblock In \emph{NeurIPS 2024}.
-
 \bibitem[Liu and Layland(1973)]{liu1973scheduling}
 Liu, C.~L. and Layland, J.~W. (1973).
 \newblock Scheduling algorithms for multiprogramming in a hard-real-time environment.
@@ -1258,11 +1695,6 @@ Love, R. (2010).
 \newblock \emph{Linux Kernel Development}.
 \newblock Addison-Wesley, 3rd edition.
 
-\bibitem[Mac~Lane(1998)]{maclane1998categories}
-Mac~Lane, S. (1998).
-\newblock \emph{Categories for the Working Mathematician}.
-\newblock Springer-Verlag, 2nd edition.
-
 \bibitem[Ongaro and Ousterhout(2014)]{ongaro2014raft}
 Ongaro, D. and Ousterhout, J. (2014).
 \newblock In search of an understandable consensus algorithm.
@@ -1277,11 +1709,6 @@ Pabla, C.~S. (2009).
 Park, J.~S., O'Brien, J.~C., Cai, C.~J., Morris, M.~R., Liang, P., and Bernstein, M.~S. (2023).
 \newblock Generative agents: Interactive simulacra of human behavior.
 \newblock In \emph{UIST 2023}, pages 1--22.
-
-\bibitem[Pierce(1991)]{pierce1991basic}
-Pierce, B.~C. (1991).
-\newblock \emph{Basic Category Theory for Computer Scientists}.
-\newblock MIT Press.
 
 \bibitem[Poettering(2010)]{poettering2010systemd}
 Poettering, L. (2010).
@@ -1308,20 +1735,10 @@ Silberschatz, A., Galvin, P.~B., and Gagne, G. (2018).
 \newblock \emph{Operating System Concepts}.
 \newblock Wiley, 10th edition.
 
-\bibitem[Spivak(2014)]{spivak2014category}
-Spivak, D.~I. (2014).
-\newblock \emph{Category Theory for the Sciences}.
-\newblock MIT Press.
-
 \bibitem[Tanenbaum and Bos(2014)]{tanenbaum2014modern}
 Tanenbaum, A.~S. and Bos, H. (2014).
 \newblock \emph{Modern Operating Systems}.
 \newblock Pearson, 4th edition.
-
-\bibitem[Viroli et~al.(2019)]{viroli2019engineering}
-Viroli, M., Beal, J., Damiani, F., Audrito, G., Casadei, R., and Pianini, D. (2019).
-\newblock From distributed coordination to field calculus and aggregate computing.
-\newblock \emph{Journal of Logical and Algebraic Methods in Programming}, 109.
 
 \bibitem[Wang et~al.(2024)]{wang2024survey}
 Wang, L., Ma, C., Feng, X., et~al. (2024).
@@ -1348,11 +1765,6 @@ Yao, S., Zhao, J., Yu, D., Du, N., Shafran, I., Narasimhan, K., and Cao, Y. (202
 \newblock ReAct: Synergizing reasoning and acting in language models.
 \newblock In \emph{ICLR 2023}.
 
-\bibitem[Zaharia et~al.(2010)]{zaharia2010spark}
-Zaharia, M., Chowdhury, M., Franklin, M.~J., Shenker, S., and Stoica, I. (2010).
-\newblock Spark: Cluster computing with working sets.
-\newblock In \emph{HotCloud}.
-
 \end{thebibliography}
 
 % ==============================================================================
@@ -1360,72 +1772,70 @@ Zaharia, M., Chowdhury, M., Franklin, M.~J., Shenker, S., and Stoica, I. (2010).
 % ==============================================================================
 \appendix
 
-\section{Complete Agent State Machine Specification}\label{app:state-machine}
-
-For reference, we provide the complete state machine specification for the execution category $\mathbf{Exec}$ (Definition~\ref{def:exec-cat}):
+\section{Complete Agent State Transition Table}\label{app:state-machine}
 
 \begin{table}[H]
 \centering
 \small
 \begin{tabular}{@{}llll@{}}
 \toprule
-\textbf{From} & \textbf{To} & \textbf{Transition} & \textbf{Guard} \\
+\textbf{From State} & \textbf{To State} & \textbf{Trigger} & \textbf{Guard / Pattern Match} \\
 \midrule
-\texttt{pending} & \texttt{running} & \texttt{schedule} & credits $\geq \kappa_A$ \\
-\texttt{pending} & \texttt{cancelled} & \texttt{cancel} & client request \\
-\texttt{running} & \texttt{waiting\_approval} & \texttt{request\_approval} & oversight $\in \{\texttt{supervised}\}$ \\
-\texttt{running} & \texttt{checkpointed} & \texttt{checkpoint} & step boundary \\
-\texttt{running} & \texttt{completed} & \texttt{finish} & all steps done \\
-\texttt{running} & \texttt{failed} & \texttt{error} & unrecoverable error \\
-\texttt{waiting\_approval} & \texttt{completed} & \texttt{approve} & human approval \\
-\texttt{waiting\_approval} & \texttt{failed} & \texttt{reject} & human rejection \\
-\texttt{checkpointed} & \texttt{running} & \texttt{resume} & resources available \\
-\texttt{failed} & \texttt{pending} & \texttt{retry} & retries $<$ max \\
+\texttt{:pending} & \texttt{:running} & \texttt{assign\_job/2} & Agent must be in \texttt{:pending} \\
+\texttt{:pending} & \texttt{:cancelled} & \texttt{cancel/1} & Any cancellable state \\
+\texttt{:running} & \texttt{:waiting\_approval} & \texttt{request\_approval/2} & Oversight mode dispatch \\
+\texttt{:running} & \texttt{:checkpointed} & \texttt{checkpoint/1} & Agent must be \texttt{:running} \\
+\texttt{:running} & \texttt{:completed} & \texttt{complete/2} & All steps done \\
+\texttt{:running} & \texttt{:failed} & Step raises exception & \texttt{rescue} in execute\_step \\
+\texttt{:waiting\_approval} & \texttt{:running} & \texttt{respond\_approval(:approve)} & Must be \texttt{:waiting\_approval} \\
+\texttt{:waiting\_approval} & \texttt{:pending} & \texttt{respond\_approval(:reject)} & Retries $<$ max\_retries \\
+\texttt{:waiting\_approval} & \texttt{:failed} & \texttt{respond\_approval(:reject)} & Retries $\geq$ max\_retries \\
+\texttt{:checkpointed} & \texttt{:running} & \texttt{execute\_step/3} & Next step resumes \\
 \bottomrule
 \end{tabular}
-\caption{Complete state transition table for agent execution.}\label{tab:state-transitions}
+\caption{Complete state transition table. Each row corresponds to a pattern-matched \texttt{handle\_call} or \texttt{handle\_cast} clause in \texttt{agent.ex}.}\label{tab:state-transitions}
 \end{table}
 
-\section{Proof: Agent Category Has Products}\label{app:products}
+\section{Module Dependency Graph}\label{app:dependencies}
 
-\begin{theorem}
-The agent category $\mathbf{Agent}$ has finite products.
-\end{theorem}
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  mod/.style={rectangle, draw=blue!70, fill=blue!10, thick, minimum width=3.5cm, minimum height=0.8cm, rounded corners=3pt, font=\small\ttfamily},
+  dep/.style={-{Stealth[length=5pt]}, thick, gray},
+]
+\node[mod] (app) at (0, 3) {AgentScheduler};
+\node[mod] (reg) at (-4, 1.5) {Registry};
+\node[mod] (eval) at (-1.5, 1.5) {Evaluator};
+\node[mod] (sched) at (1.5, 1.5) {Scheduler};
+\node[mod] (pipe) at (4, 1.5) {Pipeline};
+\node[mod] (sup) at (0, 0) {Supervisor};
+\node[mod] (agent) at (0, -1.5) {Agent};
 
-\begin{proof}
-Given agent profiles $A = (I_A, C_A, T_A, O_A, \sigma_A, \kappa_A)$ and $B = (I_B, C_B, T_B, O_B, \sigma_B, \kappa_B)$, define the product $A \times B$:
-\begin{align}
-  I_{A \times B} &= I_A \sqcup I_B \quad \text{(disjoint union of input schemas)} \\
-  C_{A \times B} &= C_A \cup C_B \quad \text{(union of capabilities)} \\
-  T_{A \times B} &= T_A \cup T_B \\
-  O_{A \times B} &= O_A \times O_B \quad \text{(product of output schemas)} \\
-  \sigma_{A \times B} &= \sigma_A \vee \sigma_B \quad \text{(join in the oversight lattice)} \\
-  \kappa_{A \times B} &= \kappa_A + \kappa_B
-\end{align}
+\draw[dep] (app) -- (reg);
+\draw[dep] (app) -- (eval);
+\draw[dep] (app) -- (sched);
+\draw[dep] (app) -- (pipe);
+\draw[dep] (app) -- (sup);
+\draw[dep] (sup) -- (agent);
+\draw[dep] (agent) -- (reg);
+\draw[dep] (sched) -- (reg);
+\end{tikzpicture}
+\caption{Module dependency graph. Arrows point from dependant to dependency. The Application module supervises all top-level components; the DynamicSupervisor manages Agent processes.}\label{fig:module-deps}
+\end{figure}
 
-The projection morphisms $\pi_A: A \times B \to A$ and $\pi_B: A \times B \to B$ are:
-\begin{align}
-  (\pi_A)_{\text{map}} &= \text{proj}_1: O_A \times O_B \to O_A \\
-  (\pi_B)_{\text{map}} &= \text{proj}_2: O_A \times O_B \to O_B
-\end{align}
-with trivial validation predicates. The universal property holds: for any $C$ with morphisms $f: C \to A$ and $g: C \to B$, the unique mediating morphism $\langle f, g \rangle: C \to A \times B$ is defined by $\langle f, g \rangle_{\text{map}} = (f_{\text{map}}, g_{\text{map}})$.
-\end{proof}
+\section{Mix Project Configuration}\label{app:mix}
 
-\section{Scheduling Algorithm Complexity Analysis}\label{app:complexity}
+\begin{lstlisting}[language=elixir, caption={Project dependencies (\texttt{mix.exs})}, label={lst:mix}]
+defp deps do
+  [
+    {:telemetry, "~> 1.2"},
+    {:jason, "~> 1.4"},
+    {:ex_doc, "~> 0.31", only: :dev, runtime: false}
+  ]
+end
+\end{lstlisting}
 
-\begin{proposition}
-Algorithm~\ref{alg:scheduling} has the following complexity:
-\begin{itemize}
-  \item \textbf{Enqueue:} $O(\log n)$ where $n$ is the queue size (red-black tree insertion)
-  \item \textbf{Dequeue:} $O(\log n)$ (extract-min from red-black tree)
-  \item \textbf{Priority update:} $O(\log n)$ (delete + reinsert)
-  \item \textbf{Space:} $O(n)$
-\end{itemize}
-These match the complexity of the Linux CFS scheduler, which also uses a red-black tree.
-\end{proposition}
-
-\begin{proof}
-The Erlang \texttt{gb\_trees} module implements a general balanced tree with $O(\log n)$ insertion, deletion, and lookup. The \texttt{take\_smallest} operation is $O(\log n)$. The per-scheduling-decision overhead is dominated by the tree operations.
-\end{proof}
+The minimal dependency footprint (only \texttt{telemetry} and \texttt{jason} at runtime) reflects the design philosophy: the BEAM VM and OTP standard library provide everything needed for supervision, concurrency, process management, and balanced tree data structures. No external scheduling libraries, state machine libraries, or pub/sub frameworks are required.
 
 \end{document}

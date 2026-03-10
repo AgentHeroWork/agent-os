@@ -4,10 +4,18 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>The AI Operating System — YonedaAI Research</title>
-  <meta name="description" content="A five-part research series formalizing the AI Operating System through category theory, with Erlang/Elixir prototypes. By YonedaAI Research Collective.">
+  <meta name="description" content="A five-part research series on functional design patterns for intelligent agent infrastructure, with Elixir/OTP reference implementations. By YonedaAI Research Collective.">
   <meta property="og:title" content="The AI Operating System — YonedaAI Research">
-  <meta property="og:description" content="Agents, Tools, Memory, and Planning as categorical abstractions for intelligent systems.">
+  <meta property="og:description" content="A five-part research series on functional design patterns for intelligent agent infrastructure, with Elixir/OTP reference implementations.">
   <meta property="og:type" content="website">
+  <meta property="og:image" content="https://agentherowork.github.io/agent-os/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:url" content="https://agentherowork.github.io/agent-os/">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="The AI Operating System — YonedaAI Research">
+  <meta name="twitter:description" content="Functional design patterns for intelligent agent infrastructure. 5 papers + Elixir/OTP reference implementation.">
+  <meta name="twitter:image" content="https://agentherowork.github.io/agent-os/og-image.png">
   <style>
     :root {
       --bg: #0a0a0f;
@@ -351,7 +359,7 @@
     <header>
       <div class="logo-mark">OS</div>
       <h1>The AI Operating System</h1>
-      <p class="subtitle">A five-part research series formalizing agent scheduling, tool interfaces, typed memory, and market-based planning through category theory &mdash; with Erlang/Elixir prototypes.</p>
+      <p class="subtitle">A five-part research series on functional design patterns for agent scheduling, tool interfaces, typed memory, and market-based planning &mdash; with Elixir/OTP reference implementations.</p>
       <p class="authors">Matthew Long &middot; <a href="https://yonedaai.com">YonedaAI Research Collective</a></p>
       <p class="institution">Chicago, IL &middot; matthew@yonedaai.com</p>
     </header>
@@ -364,13 +372,13 @@
 
               ┌─────────────────────────────────────────┐
               │          IV. Planner Engine              │
-              │   Natural Transformation: F ⇒ G         │
-              │   Order Book · Escrow · Decomposition   │
+              │   Market Clearing · Escrow · Reputation  │
+              │   Order Book · DAG Decomposition         │
               └───────────────────┬─────────────────────┘
                                   │
               ┌───────────────────┴─────────────────────┐
               │          I. Agent Scheduler              │
-              │   Objects in Category A                  │
+              │   GenServer Lifecycle · Pipeline |>      │
               │   Supervision · Priority · Streaming     │
               └───────────────────┬─────────────────────┘
                                   │
@@ -378,9 +386,9 @@
         │                         │                         │
 ┌───────┴────────┐    ┌──────────┴──────────┐    ┌─────────┴────────┐
 │ II. Tools      │    │ III. Memory Layer   │    │  Model Runtime   │
-│ Morphisms      │    │ Functors            │    │  (LLM Inference) │
-│ Capability     │    │ Mem[S] Typed        │    │  GPU Orchestrate │
-│ MCP Protocol   │    │ Versioned · Graph   │    │                  │
+│ 3-Tier Registry│    │ Typed Schemas       │    │  (LLM Inference) │
+│ Capabilities   │    │ Mem[S] Versioned    │    │  GPU Orchestrate │
+│ MCP Protocol   │    │ ETS · Mnesia · Graph│    │                  │
 └────────────────┘    └─────────────────────┘    └──────────────────┘
         │                         │                         │
         └─────────────────────────┼─────────────────────────┘
@@ -398,10 +406,10 @@
       <div class="papers-grid">
         <div class="paper-card">
           <span class="paper-number">Part I</span>
-          <h3>Agent Scheduler: Complex Orchestration as Process Management</h3>
-          <p>Agents are complex orchestrations &mdash; web testing, legal analysis, security auditing, dashboard generation. They all require workflow and validation patterns. We formalize agent scheduling as objects in a category with OTP supervision trees providing fault-tolerant execution.</p>
+          <h3>Agent Scheduler: Process Management via Functional Composition</h3>
+          <p>Agents are complex orchestrations &mdash; web testing, legal analysis, security auditing, dashboard generation. We design agent scheduling using GenServer lifecycle management, composable pipelines via the |&gt; operator, and OTP supervision trees for fault-tolerant execution.</p>
           <div class="paper-meta">
-            <span class="tag">Agents = Objects</span>
+            <span class="tag">GenServer &middot; Pipeline</span>
             <span class="tag green">Elixir/OTP</span>
             <span class="tag">cs.AI</span>
             <div class="paper-links">
@@ -414,10 +422,10 @@
 
         <div class="paper-card">
           <span class="paper-number">Part II</span>
-          <h3>Tool Interface Layer: Morphisms, Security, and Capability Abstraction</h3>
-          <p>Tools mediate between agents and external systems &mdash; analogous to device drivers. We formalize tools as morphisms with capability-based security, drawing on MCP protocol design and E2B sandbox isolation from production systems.</p>
+          <h3>Tool Interface Layer: Capability Security and Composable Invocation</h3>
+          <p>Tools mediate between agents and external systems &mdash; analogous to device drivers. We design a 3-tier registry (Builtin, Sandbox, MCP) with HMAC-signed capability tokens, sandboxed execution via isolated BEAM processes, and MCP protocol integration.</p>
           <div class="paper-meta">
-            <span class="tag">Tools = Morphisms</span>
+            <span class="tag">3-Tier &middot; Capabilities</span>
             <span class="tag green">Elixir/OTP</span>
             <span class="tag">cs.AI</span>
             <div class="paper-links">
@@ -431,9 +439,9 @@
         <div class="paper-card">
           <span class="paper-number">Part III</span>
           <h3>Memory Layer: Typed Filesystem for Persistent Agent Cognition</h3>
-          <p>Agent memory requires typed schemas, versioning with causal tracking, semantic search, and graph relationships. We formalize memory as a functor from schema categories to storage categories, with ContextFS as reference implementation.</p>
+          <p>Agent memory requires typed schemas, versioning with causal tracking, and graph relationships. We design a multi-backend storage system with 24 memory types, ETS working memory, Mnesia persistence, content-addressed versioning, and BFS graph traversal.</p>
           <div class="paper-meta">
-            <span class="tag">Memory = Functor</span>
+            <span class="tag">ETS &middot; Mnesia &middot; Typed</span>
             <span class="tag green">Elixir/OTP</span>
             <span class="tag">cs.AI</span>
             <div class="paper-links">
@@ -446,10 +454,10 @@
 
         <div class="paper-card">
           <span class="paper-number">Part IV</span>
-          <h3>Planner Engine: Order Book Dynamics and Natural Transformation</h3>
-          <p>The planner orchestrates everything through a marketplace mechanism &mdash; a bidding/order book where agents offer capabilities and clients request work. We formalize planning as a natural transformation with escrow as a monad.</p>
+          <h3>Planner Engine: Market Clearing and Order Book Dynamics</h3>
+          <p>The planner orchestrates everything through a marketplace mechanism &mdash; an order book where agents bid on work, Mnesia-backed atomic escrow, DAG-based task decomposition, and 6-dimensional reputation scoring with anti-gaming detection.</p>
           <div class="paper-meta">
-            <span class="tag">Planner = Nat. Trans.</span>
+            <span class="tag">OrderBook &middot; Escrow</span>
             <span class="tag green">Elixir/OTP</span>
             <span class="tag">cs.AI</span>
             <div class="paper-links">
@@ -462,10 +470,10 @@
 
         <div class="paper-card synthesis-card">
           <span class="paper-number">Part V &mdash; Synthesis</span>
-          <h3>The AI Operating System as Categorical Framework</h3>
-          <p>The synthesis paper unifies all four abstractions into a coherent operating system architecture. We prove that the composition of agent scheduling, tool interfaces, typed memory, and market-based planning forms a well-defined categorical structure with emergent properties.</p>
+          <h3>The AI Operating System: Composing Four Subsystems</h3>
+          <p>The synthesis paper shows how the four subsystems compose into a unified OS via Elixir's umbrella application pattern. We trace a complete job lifecycle through all modules and prove five formal properties: fault isolation, independence, type safety, fairness, and financial conservation.</p>
           <div class="paper-meta">
-            <span class="tag yellow">Unified Theory</span>
+            <span class="tag yellow">Unified Design</span>
             <span class="tag green">Elixir/OTP</span>
             <span class="tag">cs.AI</span>
             <div class="paper-links">
@@ -479,7 +487,7 @@
     </section>
 
     <section class="tech-section">
-      <div class="section-label">Categorical Mapping</div>
+      <div class="section-label">Design Mapping</div>
       <h2>From Linux to AI OS</h2>
 
       <table class="mapping-table">
@@ -488,7 +496,7 @@
             <th>Resource</th>
             <th>Traditional OS</th>
             <th>AI OS</th>
-            <th>Category Theory</th>
+            <th>Elixir/OTP Pattern</th>
           </tr>
         </thead>
         <tbody>
@@ -496,37 +504,37 @@
             <td>Compute</td>
             <td>CPU processes</td>
             <td>Agents (companies, freelancers)</td>
-            <td>Objects in category <strong>A</strong></td>
+            <td>GenServer + DynamicSupervisor</td>
           </tr>
           <tr>
             <td>Operations</td>
             <td>System calls / drivers</td>
             <td>Tools (MCP, sandboxed APIs)</td>
-            <td>Morphisms between objects</td>
+            <td>Higher-order functions + closures</td>
           </tr>
           <tr>
             <td>State</td>
             <td>RAM + filesystem</td>
             <td>Typed memory (Mem[S], versioned)</td>
-            <td>Functors S &rarr; St</td>
+            <td>ETS (working) + Mnesia (persistent)</td>
           </tr>
           <tr>
             <td>Coordination</td>
             <td>Scheduler / init</td>
             <td>Planner (order book, escrow)</td>
-            <td>Natural transformations</td>
+            <td>GenServer state + Mnesia transactions</td>
           </tr>
           <tr>
             <td>Composition</td>
             <td>Pipes / IPC</td>
-            <td>Agent streaming bus</td>
-            <td>Functor composition</td>
+            <td>Agent pipeline bus</td>
+            <td>Pipe operator |&gt; + message passing</td>
           </tr>
           <tr>
             <td>Fault tolerance</td>
             <td>Process restart</td>
             <td>OTP supervision trees</td>
-            <td>Limit preservation</td>
+            <td>one_for_one / rest_for_one strategies</td>
           </tr>
         </tbody>
       </table>

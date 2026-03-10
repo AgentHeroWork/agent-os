@@ -3,1245 +3,1898 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Part IV: Planner Engine — The AI Operating System</title>
+<title>Planner Engine — The AI Operating System, Part IV</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" onload="renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'\\[',right:'\\]',display:true},{left:'$',right:'$',display:false},{left:'\\(',right:'\\)',display:false}]});"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{--bg:#0a0a0f;--surface:#12121a;--surface2:#1a1a2e;--text:#e4e4ef;--text-dim:#9494a7;--accent:#6c5ce7;--accent2:#a29bfe;--accent-dim:rgba(108,92,231,0.15);--border:#2a2a3e;--code-bg:#0d0d14;--success:#00b894;--warning:#fdcb6e;--error:#e17055;--font-body:Inter,system-ui,-apple-system,sans-serif;--font-mono:'SF Mono','Fira Code','JetBrains Mono',monospace;--max-w:860px;--sidebar-w:260px}
+:root{
+  --bg:#0a0a0f;--surface:#12121a;--surface2:#1a1a2e;
+  --text:#e4e4ef;--text-dim:#9494a7;
+  --accent:#6c5ce7;--accent2:#a29bfe;--accent-dim:rgba(108,92,231,0.15);
+  --border:#2a2a3e;--code-bg:#0d0d14;
+  --success:#00b894;--warning:#fdcb6e;--error:#e17055;
+  --font-body:Inter,system-ui,-apple-system,sans-serif;
+  --font-mono:'SF Mono','Fira Code','JetBrains Mono',monospace;
+  --max-w:860px;--sidebar-w:260px
+}
 html{scroll-behavior:smooth;font-size:17px}
 body{background:var(--bg);color:var(--text);font-family:var(--font-body);line-height:1.75;-webkit-font-smoothing:antialiased}
 a{color:var(--accent2);text-decoration:none;transition:color .2s}
 a:hover{color:var(--accent);text-decoration:underline}
 
-/* Layout */
 .page-wrapper{display:flex;min-height:100vh}
 .sidebar{position:fixed;top:0;left:0;width:var(--sidebar-w);height:100vh;background:var(--surface);border-right:1px solid var(--border);padding:1.5rem 1rem;overflow-y:auto;z-index:100;transition:transform .3s}
-.sidebar h3{font-size:.75rem;text-transform:uppercase;letter-spacing:.1em;color:var(--accent2);margin-bottom:.75rem}
-.sidebar ol{list-style:none;counter-reset:toc}
-.sidebar ol li{counter-increment:toc}
-.sidebar ol li a{display:block;padding:.3rem .5rem;font-size:.82rem;color:var(--text-dim);border-radius:4px;transition:all .15s;line-height:1.4}
-.sidebar ol li a::before{content:counter(toc) ". ";color:var(--accent);font-weight:600}
-.sidebar ol li a:hover,.sidebar ol li a.active{color:var(--text);background:var(--accent-dim);text-decoration:none}
-.sidebar .back-link{display:inline-block;margin-bottom:1rem;font-size:.85rem;color:var(--accent2)}
-.main-content{margin-left:var(--sidebar-w);flex:1;padding:2.5rem 3rem;max-width:calc(var(--max-w) + 6rem)}
+.sidebar-header{margin-bottom:1.5rem;padding-bottom:1rem;border-bottom:1px solid var(--border)}
+.sidebar-header a{font-size:.85rem;color:var(--text-dim);display:flex;align-items:center;gap:.4rem}
+.sidebar-header a:hover{color:var(--accent2)}
+.sidebar-title{font-size:.8rem;font-weight:600;color:var(--accent2);margin-top:.5rem;letter-spacing:.03em}
 
-/* Hamburger */
-.hamburger{display:none;position:fixed;top:1rem;left:1rem;z-index:200;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:.5rem .6rem;cursor:pointer;color:var(--text)}
-.hamburger span{display:block;width:20px;height:2px;background:var(--text);margin:4px 0;transition:all .3s}
-.sidebar-open .sidebar{transform:translateX(0)!important}
-.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:90}
-.sidebar-open .overlay{display:block}
+.toc-nav{font-size:.82rem}
+.toc-nav ul{list-style:none;padding:0}
+.toc-nav li{margin-bottom:.25rem}
+.toc-nav a{display:block;padding:.3rem .6rem;border-radius:6px;color:var(--text-dim);transition:all .15s;font-size:.8rem;line-height:1.4}
+.toc-nav a:hover,.toc-nav a.active{background:var(--accent-dim);color:var(--accent2);text-decoration:none}
+.toc-nav ul ul{padding-left:.8rem}
+.toc-nav ul ul a{font-size:.75rem}
+
+.main-content{margin-left:var(--sidebar-w);flex:1;max-width:var(--max-w);padding:3rem 2.5rem 4rem}
+
+.paper-header{margin-bottom:3rem;padding-bottom:2rem;border-bottom:1px solid var(--border)}
+.paper-part{font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.12em;color:var(--accent);background:var(--accent-dim);padding:4px 12px;border-radius:100px;display:inline-block;margin-bottom:1rem}
+.paper-header h1{font-size:2rem;font-weight:800;letter-spacing:-.03em;line-height:1.2;margin-bottom:.5rem;background:linear-gradient(135deg,var(--text),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.paper-subtitle{font-size:1rem;color:var(--text-dim);margin-bottom:1rem}
+.paper-meta-row{display:flex;gap:1rem;flex-wrap:wrap;font-size:.82rem;color:var(--text-dim)}
+.paper-meta-row a{font-size:.82rem}
+
+h1,h2,h3,h4,h5,h6{color:var(--text);letter-spacing:-.01em;margin-top:2.5rem;margin-bottom:.8rem}
+h2{font-size:1.5rem;font-weight:700;padding-bottom:.5rem;border-bottom:1px solid var(--border)}
+h3{font-size:1.2rem;font-weight:600}
+h4{font-size:1.05rem;font-weight:600;color:var(--accent2)}
+
+p{margin-bottom:1rem}
+ul,ol{margin-bottom:1rem;padding-left:1.5rem}
+li{margin-bottom:.3rem}
+
+code{font-family:var(--font-mono);font-size:.88em;background:var(--code-bg);color:var(--accent2);padding:.15em .4em;border-radius:4px}
+pre{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;padding:1.2rem 1.5rem;overflow-x:auto;margin:1.5rem 0;line-height:1.5}
+pre code{background:none;padding:0;font-size:.85rem;color:var(--text)}
+
+.sourceCode{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;padding:1.2rem 1.5rem;overflow-x:auto;margin:1.5rem 0}
+.sourceCode pre{background:none;border:none;padding:0;margin:0}
+.sourceCode code{font-size:.85rem;color:var(--text)}
+
+blockquote{border-left:3px solid var(--accent);padding:.8rem 1.2rem;margin:1.5rem 0;background:var(--accent-dim);border-radius:0 8px 8px 0;color:var(--text-dim);font-style:italic}
+
+table{width:100%;border-collapse:collapse;margin:1.5rem 0;font-size:.88rem}
+th{text-align:left;padding:.6rem .8rem;background:var(--surface2);color:var(--accent2);font-weight:600;font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--border)}
+td{padding:.6rem .8rem;border-bottom:1px solid var(--border);color:var(--text-dim)}
+tr:hover td{background:rgba(108,92,231,0.03);color:var(--text)}
+
+.theorem,.definition,.proposition,.lemma,.corollary,.invariant,.remark{
+  background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--accent);
+  border-radius:0 8px 8px 0;padding:1.2rem 1.5rem;margin:1.5rem 0
+}
+.theorem-title,.def-title{font-weight:700;color:var(--accent2);margin-bottom:.5rem;font-size:.9rem}
+
+figure{margin:1.5rem 0;text-align:center}
+figcaption{font-size:.82rem;color:var(--text-dim);margin-top:.5rem;font-style:italic}
+img{max-width:100%;height:auto;border-radius:8px}
+
+.menu-toggle{display:none;position:fixed;top:1rem;left:1rem;z-index:200;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:.5rem .7rem;color:var(--text);cursor:pointer;font-size:1.2rem}
 
 @media(max-width:900px){
   .sidebar{transform:translateX(-100%)}
-  .main-content{margin-left:0;padding:1.5rem 1.2rem;padding-top:4rem}
-  .hamburger{display:block}
+  .sidebar.open{transform:translateX(0)}
+  .main-content{margin-left:0;padding:2rem 1.2rem}
+  .menu-toggle{display:block}
 }
 
-/* Header */
-.paper-header{text-align:center;padding-bottom:2rem;border-bottom:1px solid var(--border);margin-bottom:2.5rem}
-.paper-header .series{font-size:.9rem;text-transform:uppercase;letter-spacing:.15em;color:var(--accent2);margin-bottom:.5rem}
-.paper-header h1{font-size:2rem;font-weight:800;line-height:1.25;margin-bottom:.5rem;background:linear-gradient(135deg,var(--text),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-.paper-header .subtitle{font-size:1.05rem;color:var(--text-dim);margin-bottom:1.2rem}
-.paper-header .authors{font-size:.95rem;color:var(--text-dim);margin-bottom:.3rem}
-.paper-header .authors a{color:var(--accent2)}
-.paper-header .date{font-size:.85rem;color:var(--text-dim);margin-bottom:1rem}
-.paper-header .links{display:flex;gap:.8rem;justify-content:center;flex-wrap:wrap}
-.paper-header .links a{display:inline-flex;align-items:center;gap:.3rem;padding:.4rem 1rem;border:1px solid var(--border);border-radius:6px;font-size:.82rem;color:var(--text-dim);transition:all .2s}
-.paper-header .links a:hover{border-color:var(--accent);color:var(--accent2);text-decoration:none;background:var(--accent-dim)}
-.paper-id{font-size:.75rem;font-family:var(--font-mono);color:var(--text-dim);margin-top:.5rem}
-
-/* Sections */
-h2{font-size:1.5rem;font-weight:700;margin:2.5rem 0 1rem;padding-bottom:.4rem;border-bottom:2px solid var(--accent-dim);color:var(--text)}
-h3{font-size:1.15rem;font-weight:600;margin:1.8rem 0 .8rem;color:var(--accent2)}
-h4{font-size:1rem;font-weight:600;margin:1.3rem 0 .6rem;color:var(--text)}
-p{margin-bottom:1rem}
-ul,ol{margin:0 0 1rem 1.5rem}
-li{margin-bottom:.3rem}
-
-/* Abstract */
-.abstract{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1.5rem 1.8rem;margin-bottom:2rem}
-.abstract h3{margin-top:0;color:var(--accent);font-size:1rem;text-transform:uppercase;letter-spacing:.08em}
-.abstract p{font-size:.95rem;color:var(--text-dim);line-height:1.8}
-.keywords{font-size:.85rem;color:var(--text-dim);margin-top:.8rem}
-.keywords strong{color:var(--text)}
-
-/* Theorems, Definitions, etc */
-.theorem-box{border-left:4px solid var(--accent);background:var(--surface);padding:1.2rem 1.5rem;margin:1.2rem 0;border-radius:0 8px 8px 0}
-.theorem-box.definition{border-left-color:var(--accent2)}
-.theorem-box.proposition{border-left-color:var(--success)}
-.theorem-box.lemma{border-left-color:var(--warning)}
-.theorem-box.corollary{border-left-color:#74b9ff}
-.theorem-box.remark{border-left-color:var(--text-dim);background:transparent}
-.theorem-box.example{border-left-color:var(--warning);background:rgba(253,203,110,0.05)}
-.theorem-box.assumption{border-left-color:#fd79a8}
-.theorem-box .label{font-weight:700;color:var(--accent2);margin-bottom:.5rem;font-size:.95rem}
-.theorem-box.definition .label{color:var(--accent2)}
-.theorem-box.proposition .label{color:var(--success)}
-.theorem-box.lemma .label{color:var(--warning)}
-.theorem-box.corollary .label{color:#74b9ff}
-.theorem-box.remark .label{color:var(--text-dim)}
-.theorem-box.example .label{color:var(--warning)}
-.theorem-box.assumption .label{color:#fd79a8}
-
-/* Proof */
-.proof{margin:1rem 0 1.5rem;padding:.8rem 1.2rem;font-size:.93rem;color:var(--text-dim);border-left:2px solid var(--border)}
-.proof .proof-label{font-style:italic;font-weight:600;color:var(--text)}
-.proof::after{content:"\220E";display:block;text-align:right;color:var(--accent)}
-
-/* Code */
-pre.code-block{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;padding:1.2rem 1.5rem;overflow-x:auto;margin:1rem 0 1.5rem;font-family:var(--font-mono);font-size:.82rem;line-height:1.6}
-pre.code-block .line-num{color:#444;user-select:none;display:inline-block;width:2.5em;text-align:right;margin-right:1em}
-.kw{color:#c792ea;font-weight:600}
-.fn{color:#82aaff}
-.str{color:#c3e88d}
-.cmt{color:#546e7a;font-style:italic}
-.atom{color:#f78c6c}
-.mod{color:#ffcb6b}
-.op{color:#89ddff}
-.var{color:#e4e4ef}
-pre.code-block .caption{display:block;margin-bottom:.8rem;font-family:var(--font-body);font-size:.82rem;color:var(--text-dim);font-style:italic}
-
-/* Diagram */
-pre.diagram{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1.5rem;overflow-x:auto;font-family:var(--font-mono);font-size:.78rem;line-height:1.5;color:var(--accent2);margin:1rem 0 1.5rem;text-align:center}
-.diagram-caption{text-align:center;font-size:.85rem;color:var(--text-dim);font-style:italic;margin-top:-.8rem;margin-bottom:1.5rem}
-
-/* Tables */
-.table-wrap{overflow-x:auto;margin:1rem 0 1.5rem}
-table{width:100%;border-collapse:collapse;font-size:.9rem;background:var(--surface);border-radius:8px;overflow:hidden}
-thead{background:var(--surface2)}
-th{padding:.7rem 1rem;text-align:left;font-weight:600;color:var(--accent2);border-bottom:2px solid var(--border);font-size:.82rem;text-transform:uppercase;letter-spacing:.05em}
-td{padding:.6rem 1rem;border-bottom:1px solid var(--border);color:var(--text-dim)}
-tr:last-child td{border-bottom:none}
-table code{font-size:.82rem;background:var(--code-bg);padding:.1rem .4rem;border-radius:3px}
-
-/* Algorithm */
-.algorithm{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1.2rem 1.5rem;margin:1rem 0 1.5rem;font-size:.9rem}
-.algorithm .alg-title{font-weight:700;color:var(--accent2);margin-bottom:.8rem;font-size:.9rem}
-.algorithm pre{font-family:var(--font-mono);font-size:.82rem;line-height:1.7;color:var(--text-dim);margin:0;white-space:pre-wrap}
-
-/* Math display */
-.katex-display{overflow-x:auto;overflow-y:hidden;padding:.5rem 0}
-
-/* Series nav */
-.series-nav{margin-top:3rem;padding:1.5rem;background:var(--surface);border:1px solid var(--border);border-radius:8px}
-.series-nav h3{margin-top:0;color:var(--accent);font-size:.9rem;text-transform:uppercase;letter-spacing:.08em;margin-bottom:1rem}
-.series-nav ol{list-style:none;margin:0;padding:0;counter-reset:series}
-.series-nav ol li{counter-increment:series;padding:.4rem 0;border-bottom:1px solid var(--border)}
-.series-nav ol li:last-child{border-bottom:none}
-.series-nav ol li a,.series-nav ol li span{font-size:.9rem}
-.series-nav ol li::before{content:"Part " counter(series) ": ";font-weight:600;color:var(--accent)}
-.series-nav ol li.current{color:var(--accent2);font-weight:600}
-.series-nav ol li.current::after{content:" \2190  you are here";font-size:.75rem;color:var(--text-dim);font-weight:400}
-
-/* References */
-.references{font-size:.88rem}
-.references ol{list-style:none;counter-reset:ref;padding:0;margin:0}
-.references ol li{counter-increment:ref;padding:.4rem 0 .4rem 2.5rem;position:relative;color:var(--text-dim);border-bottom:1px solid rgba(42,42,62,0.3)}
-.references ol li::before{content:"[" counter(ref) "]";position:absolute;left:0;color:var(--accent);font-weight:600;font-size:.82rem}
-
-/* Footer */
-.paper-footer{margin-top:3rem;padding-top:1.5rem;border-top:1px solid var(--border);text-align:center;font-size:.8rem;color:var(--text-dim)}
+#TOC{display:none}
+.header-section-number{color:var(--accent);margin-right:.4rem;font-weight:600}
 </style>
 </head>
 <body>
-<button class="hamburger" onclick="document.body.classList.toggle('sidebar-open')" aria-label="Toggle navigation">
-<span></span><span></span><span></span>
-</button>
-<div class="overlay" onclick="document.body.classList.remove('sidebar-open')"></div>
-
+<button class="menu-toggle" onclick="document.querySelector('.sidebar').classList.toggle('open')">&#9776;</button>
 <div class="page-wrapper">
-<nav class="sidebar">
-<a href="../" class="back-link">&#8592; Back to Index</a>
-<h3>Table of Contents</h3>
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <a href="../index.html">&larr; All Papers</a>
+    <div class="sidebar-title">Planner Engine — The AI Operating System, Part IV</div>
+  </div>
+  <nav class="toc-nav" id="toc-nav"></nav>
+  <div style="margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--border)">
+    <a href="../latex/planner-engine.pdf" style="font-size:.8rem;color:var(--accent2);display:flex;align-items:center;gap:.4rem">PDF Version &darr;</a>
+  </div>
+</aside>
+<main class="main-content" id="content">
+  <div class="paper-header">
+    <span class="paper-part">Part IV</span>
+    <h1 style="margin-top:0">Planner Engine — The AI Operating System, Part IV</h1>
+    <div class="paper-meta-row">
+      <span>Matthew Long</span>
+      <span>&middot;</span>
+      <span>YonedaAI Research Collective</span>
+      <span>&middot;</span>
+      <span>Chicago, IL</span>
+      <span>&middot;</span>
+      <a href="../latex/planner-engine.pdf">PDF</a>
+    </div>
+  </div>
+<h1 data-number="1" id="sec:introduction"><span class="header-section-number">1</span> Introduction</h1>
+<p>Every operating system has a process that runs first and orchestrates everything else. In Unix, this is <code>init</code> (PID 1). In modern Linux, <code>systemd</code> manages service dependencies, socket activation, and lifecycle transitions. In Kubernetes, the scheduler assigns pods to nodes based on resource requests, affinity rules, and priority classes. These systems solve the same fundamental problem: given a set of work items and a set of executors, determine <em>who does what, when, and how</em>.</p>
+<p>An AI operating system faces this problem at a higher level of abstraction. The “processes” are not deterministic programs but stochastic agents with heterogeneous capabilities, varying reliability, and economic incentives. The “scheduler” must not only assign tasks but must negotiate prices, hold funds in escrow, verify quality, and update reputations. The planner engine of an AI OS is simultaneously:</p>
 <ol>
-<li><a href="#sec-intro">Introduction</a></li>
-<li><a href="#sec-background">Background</a></li>
-<li><a href="#sec-market-model">Market Model</a></li>
-<li><a href="#sec-planning-nat">Planning as Natural Transformation</a></li>
-<li><a href="#sec-decomposition">Job Decomposition</a></li>
-<li><a href="#sec-financial">Financial Mechanics</a></li>
-<li><a href="#sec-reputation">Reputation and Trust</a></li>
-<li><a href="#sec-implementation">Elixir/OTP Implementation</a></li>
-<li><a href="#sec-case-studies">Case Studies</a></li>
-<li><a href="#sec-discussion">Discussion</a></li>
-<li><a href="#sec-conclusion">Conclusion</a></li>
-<li><a href="#references">References</a></li>
-<li><a href="#app-glossary">Appendix A: Categorical Glossary</a></li>
-<li><a href="#app-lifecycle">Appendix B: Job Lifecycle</a></li>
-<li><a href="#app-full-diagram">Appendix C: Full Planning Pipeline</a></li>
+<li><p>A <strong>task decomposer</strong> that breaks complex jobs into dependency graphs of subtasks;</p></li>
+<li><p>A <strong>marketplace</strong> where agents bid on work and clients select providers;</p></li>
+<li><p>A <strong>financial system</strong> managing credits, escrow, and revenue distribution;</p></li>
+<li><p>A <strong>reputation engine</strong> that scores quality and detects gaming.</p></li>
 </ol>
-</nav>
-
-<main class="main-content">
-<header class="paper-header">
-<div class="series">The AI Operating System &mdash; Part IV</div>
-<h1>Planner Engine: Order Book Dynamics and Natural Transformation</h1>
-<div class="subtitle">A Categorical Framework for Market-Based Agent Orchestration, Escrow Monads, and Reputation Systems</div>
-<div class="authors">Matthew Long<br>The YonedaAI Collaboration &middot; YonedaAI Research Collective &middot; Chicago, IL<br><a href="mailto:matthew@yonedaai.com">matthew@yonedaai.com</a> &middot; <a href="https://yonedaai.com">yonedaai.com</a></div>
-<div class="date">March 10, 2026</div>
-<div class="links">
-<a href="https://github.com/AgentHeroWork/agent-os/blob/main/papers/pdf/planner-engine.pdf">&#128196; Download PDF</a>
-<a href="../">&#8592; Paper Index</a>
-</div>
-<div class="paper-id">GrokRxiv:2026.03.planner-engine-ai-os [cs.AI] 10 Mar 2026</div>
-</header>
-
-<!-- Abstract -->
-<div class="abstract">
-<h3>Abstract</h3>
-<p>We present a categorical framework for the <em>planner engine</em> of an AI operating system, establishing it as the highest-level orchestration primitive analogous to <code>systemd</code>/<code>init</code> in classical operating systems. The planner is formalized as a <em>natural transformation</em> \(\eta: F \Rightarrow G\) between the <em>task functor</em> \(F\), mapping jobs to requirement specifications, and the <em>capability functor</em> \(G\), mapping agents to offered capabilities. We introduce an <em>order book</em> structure modeled as a profunctor \(P: \mathcal{A}^{\mathrm{op}} \times \mathcal{T} \to \mathbf{Set}\), through which agents (sellers) and clients (buyers) interact via a bidding protocol. Market clearing is characterized as a colimit in the transaction category, and the escrow mechanism is shown to satisfy the monad laws, guaranteeing financial consistency of credit operations. Job decomposition into directed acyclic graphs with topological execution ordering is proven to be functorial, preserving job semantics under decomposition. We validate the framework through an Elixir/OTP implementation featuring GenServer-based order books, Mnesia-backed escrow transactions, and supervision-tree-based task decomposition, drawing on the architecture of a production AI agent marketplace.</p>
-<div class="keywords"><strong>Keywords:</strong> AI planning, natural transformation, order book, profunctor, escrow monad, market microstructure, task decomposition, reputation systems, Elixir/OTP, agent marketplace</div>
-</div>
-
-<!-- Section 1: Introduction -->
-<h2 id="sec-intro">1. Introduction</h2>
-
-<p>Every operating system has a process that runs first and orchestrates everything else. In Unix, this is <code>init</code> (PID 1). In modern Linux, <code>systemd</code> manages service dependencies, socket activation, and lifecycle transitions. In Kubernetes, the scheduler assigns pods to nodes based on resource requests, affinity rules, and priority classes. These systems solve the same fundamental problem: given a set of work items and a set of executors, determine <em>who does what, when, and how</em>.</p>
-
-<p>An AI operating system faces this problem at a higher level of abstraction. The &ldquo;processes&rdquo; are not deterministic programs but stochastic agents with heterogeneous capabilities, varying reliability, and economic incentives. The &ldquo;scheduler&rdquo; must not only assign tasks but must negotiate prices, hold funds in escrow, verify quality, and update reputations. In short, the planner engine of an AI OS is simultaneously:</p>
-
+<p>This paper presents a complete design and implementation of such a planner engine in Elixir/OTP, emphasizing the use of functional programming patterns—algebraic data types, pattern matching, GenServer state machines, Mnesia transactions, supervision trees, and pipeline composition—to achieve an architecture that is both formally clean and production-ready.</p>
+<h4 data-number="1.0.0.1" id="why-elixirotp."><span class="header-section-number">1.0.0.1</span> Why Elixir/OTP.</h4>
+<p>The BEAM virtual machine provides three properties that are uniquely suited to marketplace orchestration. First, <em>lightweight processes</em> allow each component (order book, escrow, reputation, market) to run as an independent GenServer with isolated state, communicating through message passing. Second, <em>supervision trees</em> with the let-it-crash philosophy mean that a failure in the reputation engine does not bring down the escrow system—the supervisor simply restarts the failed child. Third, <em>Mnesia</em> provides distributed, transactional storage that runs in the same BEAM node, eliminating the network hop to an external database for latency-critical financial operations.</p>
+<h4 data-number="1.0.0.2" id="categorical-context."><span class="header-section-number">1.0.0.2</span> Categorical context.</h4>
+<p>The structures in this paper have natural interpretations in category theory: the order book is a profunctor, escrow operations form a monad, market clearing is a colimit, and task decomposition is a functor. We note these connections where they illuminate the design, but the primary language of this paper is that of functional programming and system design. Readers interested in the full categorical treatment are referred to the companion formalization [Long 2026].</p>
+<h4 data-number="1.0.0.3" id="contributions."><span class="header-section-number">1.0.0.3</span> Contributions.</h4>
 <ol>
-<li>A <strong>task decomposer</strong> that breaks complex jobs into dependency graphs of subtasks;</li>
-<li>A <strong>marketplace</strong> where agents bid on work and clients select providers;</li>
-<li>A <strong>financial system</strong> managing credits, escrow, and revenue distribution;</li>
-<li>A <strong>reputation engine</strong> that scores quality and prevents gaming.</li>
+<li><p>An order book design implementing demand/supply matching with a cost functional that composes reputation, confidence, and price signals (<a href="#sec:order-book">4</a>).</p></li>
+<li><p>An escrow system with Mnesia-backed atomic hold/settle/refund operations and provable conservation invariants (<a href="#sec:escrow">5</a>).</p></li>
+<li><p>A DAG-based task decomposer with topological sorting that identifies parallel execution levels and computes critical path length (<a href="#sec:decomposition">6</a>).</p></li>
+<li><p>A market clearing module implementing the full contract lifecycle with three pricing models and 70/15/15 revenue distribution (<a href="#sec:market">7</a>).</p></li>
+<li><p>A 6-dimensional reputation engine with exponential decay weighting and three anti-gaming detectors (<a href="#sec:reputation">8</a>).</p></li>
+<li><p>A complete Elixir/OTP implementation with GenServer state machines, supervision trees, Mnesia transactions, and algebraic data types (<a href="#sec:architecture">3</a> and throughout).</p></li>
 </ol>
-
-<p>This paper provides a unified categorical framework for all four aspects. The central insight is that planning is a <em>natural transformation</em> between two functors: one that maps jobs to their requirements, and another that maps agents to their capabilities. The naturality condition ensures that planning decisions are consistent&mdash;changing the decomposition of a job and then matching is the same as matching and then decomposing the matched components.</p>
-
-<p>The marketplace aspect is captured by an <em>order book</em> modeled as a profunctor. Just as in financial markets, buy orders (task requests) and sell orders (agent proposals) accumulate until a matching occurs. The escrow mechanism, which holds client credits until work is verified, satisfies the monad laws, providing algebraic guarantees of financial consistency. Market clearing&mdash;the moment when a proposal is accepted and a contract is formed&mdash;is characterized as a colimit in the transaction category.</p>
-
-<p>We ground every abstraction in a concrete system: the AgentHero marketplace, where jobs follow the lifecycle <code>draft</code> &rarr; <code>open</code> &rarr; <code>in_progress</code> &rarr; <code>review</code>/<code>completed</code>/<code>cancelled</code>/<code>disputed</code>, operators submit proposals with execution plans and confidence scores, and atomic credit operations via Supabase RPC prevent race conditions. We provide a complete Elixir/OTP implementation demonstrating that the categorical structure maps directly to production-quality OTP patterns.</p>
-
-<h4>Contributions</h4>
-<ol>
-<li>A formal market category \(\mathcal{M}\) with participants as objects and transactions as morphisms, with the order book as a profunctor (Section 3).</li>
-<li>The planner as a natural transformation \(\eta: F \Rightarrow G\) between task and capability functors, with a proof that naturality implies planning consistency (Section 4).</li>
-<li>Functorial job decomposition into DAGs with topological execution ordering (Section 5).</li>
-<li>The escrow monad with proofs of the monad laws guaranteeing financial consistency (Section 6).</li>
-<li>A 6-dimensional reputation system with convergence guarantees (Section 7).</li>
-<li>A complete Elixir/OTP implementation with GenServer order books, Mnesia escrow, and supervision trees (Section 8).</li>
-</ol>
-
-<h4>Series context</h4>
-<p>This is Part IV of a five-part series on &ldquo;The AI Operating System.&rdquo; Part I introduced the agent OS kernel and type-theoretic foundations. Part II formalized the memory layer as a sheaf over temporal topologies. Part III modeled the tool interface via profunctors and Kan extensions. This paper addresses the planner engine. Part V presents the synthesis and operational semantics.</p>
-
-<!-- Section 2: Background -->
-<h2 id="sec-background">2. Background</h2>
-
-<h3>2.1 Process Orchestration in Classical Operating Systems</h3>
-
-<p>The evolution of process orchestration follows a clear trajectory of increasing abstraction:</p>
-
-<h4>Unix init</h4>
-<p>The original <code>init</code> process reads <code>/etc/inittab</code> and spawns services in a fixed order determined by runlevels. Dependencies are implicit in the ordering of startup scripts. This approach is inherently sequential and fragile&mdash;a slow service blocks all subsequent ones.</p>
-
-<h4>systemd</h4>
-<p>Poettering and Sievers' <code>systemd</code> introduced a declarative dependency graph. Each unit file specifies <code>Requires</code>, <code>After</code>, <code>Wants</code>, and <code>Conflicts</code> relationships. The dependency graph is topologically sorted, and independent services start in parallel. Socket activation allows services to start on-demand.</p>
-
-<h4>Kubernetes</h4>
-<p>The Kubernetes scheduler operates at the cluster level. It maintains a queue of unscheduled pods and iterates through a pipeline of <em>predicates</em> (hard constraints: resource availability, node affinity, taints/tolerations) and <em>priorities</em> (soft preferences: load balancing, data locality). Critically, Kubernetes separates the <em>desired state</em> (declared in manifests) from the <em>actual state</em> (observed by controllers), with reconciliation loops driving convergence.</p>
-
-<h4>From orchestration to markets</h4>
-<p>Each of these systems assumes a benevolent, centralized scheduler that allocates resources optimally. In an AI agent ecosystem, this assumption breaks down. Agents are autonomous, self-interested entities. They may misrepresent capabilities, deliver substandard work, or collude. The planner must therefore incorporate market mechanisms&mdash;pricing, bidding, escrow, reputation&mdash;that align individual incentives with system-wide efficiency.</p>
-
-<h3>2.2 Market Microstructure</h3>
-
-<p>Market microstructure theory studies how trading mechanisms affect price formation, liquidity, and information aggregation.</p>
-
-<h4>Order books</h4>
-<p>A limit order book (LOB) maintains buy orders (bids) and sell orders (asks), each specifying a price and quantity. Orders are matched when a bid price meets or exceeds an ask price. The <em>spread</em> between the best bid and best ask reflects liquidity and information asymmetry.</p>
-
-<h4>Matching engines</h4>
-<p>Matching follows priority rules: price-time priority (best price first, then earliest arrival) is standard. Pro-rata matching allocates proportionally at the same price level. In our setting, &ldquo;price&rdquo; is the credit cost and &ldquo;quantity&rdquo; is a unit of agent work.</p>
-
-<h4>Mechanism design</h4>
-<p>The revelation principle states that any mechanism can be replicated by a direct revelation mechanism where truthful reporting is incentive-compatible. The Vickrey-Clarke-Groves (VCG) mechanism achieves efficiency and truthfulness for combinatorial auctions. We draw on these results to design anti-gaming mechanisms for agent reputation.</p>
-
-<h3>2.3 Category Theory Preliminaries</h3>
-
-<div class="theorem-box definition">
-<div class="label">Definition 2.1 (Profunctor)</div>
-<p>A <em>profunctor</em> \(P: \mathbf{C}^{\mathrm{op}} \times \mathbf{D} \to \mathbf{Set}\) is a functor from the product of the opposite of \(\mathbf{C}\) with \(\mathbf{D}\) to the category of sets. It generalizes the notion of a relation between categories. For objects \(c \in \mathbf{C}\) and \(d \in \mathbf{D}\), \(P(c, d)\) is the set of &ldquo;heteromorphisms&rdquo; from \(c\) to \(d\).</p>
-</div>
-
-<div class="theorem-box definition">
-<div class="label">Definition 2.2 (Monad)</div>
-<p>A <em>monad</em> on a category \(\mathbf{C}\) is a triple \((T, \mu, \eta)\) where \(T: \mathbf{C} \to \mathbf{C}\) is an endofunctor, \(\eta: \mathrm{id}_{\mathbf{C}} \Rightarrow T\) is the unit, and \(\mu: T^2 \Rightarrow T\) is the multiplication, satisfying:</p>
-$$\mu \circ T\mu = \mu \circ \mu T \quad \text{(associativity)}$$
-$$\mu \circ T\eta = \mu \circ \eta T = \mathrm{id}_T \quad \text{(unit laws)}$$
-</div>
-
-<div class="theorem-box definition">
-<div class="label">Definition 2.3 (Colimit)</div>
-<p>Given a diagram \(D: \mathbf{J} \to \mathbf{C}\), a <em>colimit</em> of \(D\) is an object \(\mathrm{colim}\, D\) in \(\mathbf{C}\) together with a cocone \(\{\iota_j: D(j) \to \mathrm{colim}\, D\}_{j \in \mathbf{J}}\) that is universal: for any other cocone \(\{\phi_j: D(j) \to X\}_{j \in \mathbf{J}}\), there exists a unique morphism \(u: \mathrm{colim}\, D \to X\) with \(u \circ \iota_j = \phi_j\) for all \(j\).</p>
-</div>
-
-<!-- Section 3: Market Model -->
-<h2 id="sec-market-model">3. Market Model &mdash; Formal Framework</h2>
-
-<p>We now construct the categorical framework for the agent marketplace. The fundamental insight is that a marketplace is a category whose objects are economic participants and whose morphisms are transactions between them.</p>
-
-<h3>3.1 The Market Category</h3>
-
-<div class="theorem-box definition">
-<div class="label">Definition 3.1 (Market Category)</div>
-<p>The <em>market category</em> \(\mathcal{M}\) is defined as follows:</p>
+<h4 data-number="1.0.0.4" id="series-context."><span class="header-section-number">1.0.0.4</span> Series context.</h4>
+<p>This is Part IV of a five-part series on “The AI Operating System.” Part I [Long 2026a] introduced the agent OS kernel and type-theoretic foundations. Part II [Long 2026b] formalized the memory layer. Part III [Long 2026c] modeled the tool interface. This paper addresses the planner engine. Part V will present the runtime and operational semantics.</p>
+<h1 data-number="2" id="sec:background"><span class="header-section-number">2</span> Background and Motivation</h1>
+<h2 data-number="2.1" id="from-process-scheduling-to-agent-markets"><span class="header-section-number">2.1</span> From Process Scheduling to Agent Markets</h2>
+<p>The evolution of process orchestration follows a trajectory of increasing abstraction.</p>
+<h4 data-number="2.1.0.1" id="unix-init."><span class="header-section-number">2.1.0.1</span> Unix init.</h4>
+<p>The original <code>init</code> reads <code>/etc/inittab</code> and spawns services in a fixed order. Dependencies are implicit in the ordering of startup scripts—inherently sequential and fragile.</p>
+<h4 data-number="2.1.0.2" id="systemd."><span class="header-section-number">2.1.0.2</span> systemd.</h4>
+<p>Poettering’s <code>systemd</code> [Poettering 2010] introduced a declarative dependency graph. Each unit file specifies <code>Requires</code>, <code>After</code>, <code>Wants</code>, and <code>Conflicts</code> relationships. The dependency graph is topologically sorted, and independent services start in parallel.</p>
+<h4 data-number="2.1.0.3" id="kubernetes."><span class="header-section-number">2.1.0.3</span> Kubernetes.</h4>
+<p>The Kubernetes scheduler [Burns et al. 2016] operates at the cluster level, maintaining a queue of unscheduled pods and iterating through <em>predicates</em> (hard constraints) and <em>priorities</em> (soft preferences). Critically, Kubernetes separates desired state from actual state, with reconciliation loops driving convergence.</p>
+<h4 data-number="2.1.0.4" id="agent-markets."><span class="header-section-number">2.1.0.4</span> Agent markets.</h4>
+<p>Each of these systems assumes a benevolent, centralized scheduler. In an AI agent ecosystem, this assumption breaks down. Agents are autonomous, self-interested entities that may misrepresent capabilities, deliver substandard work, or collude. The planner must incorporate market mechanisms—pricing, bidding, escrow, reputation—that align individual incentives with system-wide efficiency.</p>
+<h2 data-number="2.2" id="market-microstructure-concepts"><span class="header-section-number">2.2</span> Market Microstructure Concepts</h2>
+<p>Our design draws on market microstructure theory [O’Hara 1995; Harris 2003]:</p>
 <ul>
-<li><strong>Objects:</strong> Economic participants, partitioned into <em>clients</em> \(\mathcal{B}\) (buyers), <em>operators</em> \(\mathcal{S}\) (sellers/agents), and the <em>platform</em> \(\pi\). Thus \(\mathrm{Ob}(\mathcal{M}) = \mathcal{B} \sqcup \mathcal{S} \sqcup \{\pi\}\).</li>
-<li><strong>Morphisms:</strong> A morphism \(f: a \to b\) is a <em>transaction</em> transferring credits from participant \(a\) to participant \(b\). Each morphism carries an amount \(\mathrm{amt}(f) \in \mathbb{R}_{\geq 0}\), a timestamp \(\mathrm{time}(f) \in \mathbb{R}_{\geq 0}\), and a transaction type \(\mathrm{type}(f) \in \{\texttt{escrow\_hold}, \texttt{escrow\_release}, \texttt{payment}, \texttt{refund}, \texttt{fee}\}\).</li>
-<li><strong>Composition:</strong> Sequential transactions compose: if \(f: a \to b\) and \(g: b \to c\), then \(g \circ f: a \to c\) with \(\mathrm{amt}(g \circ f) = \mathrm{amt}(g)\).</li>
-<li><strong>Identity:</strong> The identity \(\mathrm{id}_a: a \to a\) is the zero-transfer transaction.</li>
+<li><p><strong>Order books.</strong> A limit order book maintains buy orders (bids) and sell orders (asks), each specifying a price and quantity. Orders are matched when a bid price meets or exceeds an ask price.</p></li>
+<li><p><strong>Price-time priority.</strong> Orders at the same price level are matched in arrival order.</p></li>
+<li><p><strong>Market clearing.</strong> A market clears when supply meets demand at an agreed price. In our setting, “price” is the credit cost and “quantity” is a unit of agent work.</p></li>
+<li><p><strong>Escrow and settlement.</strong> Financial exchanges use clearinghouses to eliminate counterparty risk. Our escrow system serves the same role, holding credits until work is verified.</p></li>
 </ul>
-</div>
-
-<div class="theorem-box remark">
-<div class="label">Remark</div>
-<p>The market category is enriched over \((\mathbb{R}_{\geq 0}, +, 0)\): the hom-sets carry a monoidal structure given by addition of transaction amounts. This enrichment captures the financial flow structure.</p>
-</div>
-
-<h3>3.2 The Order Book as a Profunctor</h3>
-
-<div class="theorem-box definition">
-<div class="label">Definition 3.2 (Agent and Task Categories)</div>
-<p>Define the <em>agent category</em> \(\mathcal{A}\) and the <em>task category</em> \(\mathcal{T}\) as follows:</p>
+<h2 data-number="2.3" id="the-production-system-agenthero"><span class="header-section-number">2.3</span> The Production System: AgentHero</h2>
+<p>We ground every design decision in a concrete production system: the AgentHero marketplace, where:</p>
 <ul>
-<li>\(\mathcal{A}\): Objects are agents (operators). A morphism \(\alpha \to \alpha'\) exists when agent \(\alpha'\) can simulate or subsume the capabilities of \(\alpha\) (capability ordering).</li>
-<li>\(\mathcal{T}\): Objects are tasks (jobs or subtasks). A morphism \(\tau \to \tau'\) exists when task \(\tau\) is a prerequisite of \(\tau'\) (dependency ordering).</li>
+<li><p>Clients post jobs with budgets, required capabilities, and deadlines.</p></li>
+<li><p>Operators (AI agents) submit proposals with execution plans, credit estimates, durations, and confidence scores.</p></li>
+<li><p>Jobs follow the lifecycle: <code>draft</code> <span class="math inline">\to</span> <code>open</code> <span class="math inline">\to</span> <code>in_progress</code> <span class="math inline">\to</span> <code>review</code> <span class="math inline">\to</span> <code>completed</code> / <code>cancelled</code> / <code>disputed</code>.</p></li>
+<li><p>Credit operations are atomic (via Supabase RPC in production, Mnesia in this reference implementation).</p></li>
+<li><p>Revenue is split 70% to the operator, 15% to the platform, and 15% to an LLM inference reserve.</p></li>
 </ul>
-</div>
-
-<div class="theorem-box definition">
-<div class="label">Definition 3.3 (Order Book Profunctor)</div>
-<p>The <em>order book</em> is a profunctor</p>
-$$P: \mathcal{A}^{\mathrm{op}} \times \mathcal{T} \to \mathbf{Set}$$
-<p>where \(P(\alpha, \tau)\) is the set of <em>proposals</em> (sell orders) from agent \(\alpha\) for task \(\tau\). Each proposal \(p \in P(\alpha, \tau)\) consists of:</p>
-$$p = (\texttt{execution\_plan}, \texttt{estimated\_credits}, \texttt{estimated\_duration}, \texttt{confidence\_score})$$
-<p>The profunctor action is:</p>
-<ul>
-<li><strong>Contravariant in \(\mathcal{A}\):</strong> If \(\alpha' \to \alpha\) (i.e., \(\alpha\) subsumes \(\alpha'\)), then any proposal from \(\alpha'\) can be lifted to a proposal from \(\alpha\): \(P(\alpha', \tau) \to P(\alpha, \tau)\).</li>
-<li><strong>Covariant in \(\mathcal{T}\):</strong> If \(\tau \to \tau'\) (i.e., \(\tau\) is a prerequisite of \(\tau'\)), then completing \(\tau\) enables proposals for \(\tau'\): there is an induced map \(P(\alpha, \tau) \to P(\alpha, \tau')\).</li>
-</ul>
-</div>
-
-<div class="theorem-box definition">
-<div class="label">Definition 3.4 (Demand Profunctor)</div>
-<p>The <em>demand profunctor</em> is</p>
-$$Q: \mathcal{B}^{\mathrm{op}} \times \mathcal{T} \to \mathbf{Set}$$
-<p>where \(Q(b, \tau)\) is the set of job postings by client \(b\) for task \(\tau\), each specifying a budget ceiling, required capabilities, and deadline.</p>
-</div>
-
-<h3>3.3 Market Clearing as a Colimit</h3>
-
-<div class="theorem-box definition">
-<div class="label">Definition 3.5 (Transaction Diagram)</div>
-<p>Given a task \(\tau\) with demand \(q \in Q(b, \tau)\) and proposals \(\{p_i \in P(\alpha_i, \tau)\}_{i \in I}\), the <em>transaction diagram</em> is the functor \(D: \mathbf{J} \to \mathcal{M}\) where \(\mathbf{J}\) is the index category with objects \(\{b, \alpha_1, \ldots, \alpha_n, \pi\}\) and morphisms representing potential transactions, and \(D\) maps each object to the corresponding participant in \(\mathcal{M}\).</p>
-</div>
-
-<div class="theorem-box">
-<div class="label">Theorem 3.1 (Market Clearing as Colimit)</div>
-<p>Let \(D: \mathbf{J} \to \mathcal{M}\) be a transaction diagram for task \(\tau\). The market clearing event&mdash;where one proposal \(p_k\) is accepted and all others \(\{p_i\}_{i \neq k}\) are rejected&mdash;is the colimit \(\mathrm{colim}\, D\) in \(\mathcal{M}\). The universal cocone consists of:</p>
-<ol>
-<li>The escrow morphism \(e: b \to \pi\) with \(\mathrm{amt}(e) = \texttt{estimated\_credits}(p_k)\);</li>
-<li>The contract formation \(c: \pi \to \alpha_k\) (pending work completion);</li>
-<li>Rejection morphisms \(r_i: \alpha_i \to \alpha_i\) (identity, no transaction) for \(i \neq k\).</li>
-</ol>
-</div>
-
-<div class="proof">
-<span class="proof-label">Proof.</span> We verify the universal property. Let \(\{e, c, r_i\}\) be the proposed cocone. For any other cocone \(\{\phi_j\}_{j \in \mathbf{J}}\) over the same diagram, the unique mediating morphism \(u: \mathrm{colim}\, D \to X\) is determined by the contract terms: the escrow amount uniquely determines the payment flow, and the accepted proposal uniquely determines the executor. The rejection morphisms are identities, so they factor trivially. The uniqueness of \(u\) follows from the budget ceiling constraint&mdash;only one allocation of the client's credits is consistent with accepting exactly one proposal. To show existence, observe that accepting proposal \(p_k\) induces \(\texttt{holdEscrow}(b, \texttt{estimated\_credits}(p_k), \texttt{contract\_id})\), which atomically decrements the client's balance and creates an escrow record. This atomic operation, implemented via Supabase RPC, ensures that the colimit exists and is unique (no double-spending).
-</div>
-
-<div class="theorem-box corollary">
-<div class="label">Corollary 3.2</div>
-<p>In the colimit construction, accepting proposal \(p_k\) necessarily rejects all other proposals \(\{p_i\}_{i \neq k}\). This is the universal property at work: the cocone maps are uniquely determined.</p>
-</div>
-
-<p>This matches the AgentHero implementation exactly: when a client accepts one proposal, all others are auto-rejected, and a contract is created with escrowed credits.</p>
-
-<h3>3.4 The Escrow Monad</h3>
-
-<div class="theorem-box definition">
-<div class="label">Definition 3.6 (Credit Category)</div>
-<p>The <em>credit category</em> \(\mathcal{C}\) has:</p>
-<ul>
-<li><strong>Objects:</strong> credit balances \((b, n)\) where \(b\) is a participant and \(n \in \mathbb{R}_{\geq 0}\) is the balance;</li>
-<li><strong>Morphisms:</strong> balance transitions \((b, n) \to (b, m)\) representing credit/debit operations.</li>
-</ul>
-</div>
-
-<div class="theorem-box definition">
-<div class="label">Definition 3.7 (Escrow Monad)</div>
-<p>The <em>escrow monad</em> \(E: \mathcal{C} \to \mathcal{C}\) is the endofunctor defined by:</p>
-$$E(b, n) = (b, n - h, h) \quad \text{where } h \text{ is the held amount}$$
-$$\eta_{(b,n)}: (b, n) \to E(b, n) = (b, n, 0) \quad \text{(unit: no hold)}$$
-$$\mu_{(b,n,h)}: E(E(b, n)) \to E(b, n) \quad \text{(join: flatten nested holds)}$$
-<p>The monadic operations correspond to:</p>
-<ul>
-<li><strong>Unit (\(\eta\)):</strong> Initialize escrow with zero hold. <code>return</code> in Haskell.</li>
-<li><strong>Bind (\(\gg\!\!=\)):</strong> Sequence escrow operations. Holding credits for contract \(c_1\) and then for \(c_2\) composes into a single escrow state.</li>
-<li><strong>Join (\(\mu\)):</strong> Flatten \(E(E(b, n))\) to \(E(b, n)\)&mdash;settle an escrow-within-escrow (e.g., subcontracting).</li>
-</ul>
-</div>
-
-<!-- Section 4: Planning as Natural Transformation -->
-<h2 id="sec-planning-nat">4. Planning as Natural Transformation</h2>
-
-<p>We now formalize the planner as the central natural transformation connecting what needs to be done with who can do it.</p>
-
-<h3>4.1 The Task Functor</h3>
-
-<div class="theorem-box definition">
-<div class="label">Definition 4.1 (Requirement Category)</div>
-<p>The <em>requirement category</em> \(\mathcal{R}\) has:</p>
-<ul>
-<li><strong>Objects:</strong> requirement specifications \(r = (\texttt{capabilities}, \texttt{constraints}, \texttt{budget}, \texttt{deadline})\);</li>
-<li><strong>Morphisms:</strong> requirement refinements \(r \to r'\) where \(r'\) is a stricter specification.</li>
-</ul>
-</div>
-
-<div class="theorem-box definition">
-<div class="label">Definition 4.2 (Task Functor)</div>
-<p>The <em>task functor</em> \(F: \mathcal{T} \to \mathcal{R}\) maps each task to its requirement specification:</p>
-$$F(\tau) = (\texttt{required\_capabilities}(\tau), \texttt{constraints}(\tau), \texttt{budget}(\tau), \texttt{deadline}(\tau))$$
-<p>For a morphism \(\tau \to \tau'\) (dependency), \(F\) maps it to the induced requirement refinement.</p>
-</div>
-
-<h3>4.2 The Capability Functor</h3>
-
-<div class="theorem-box definition">
-<div class="label">Definition 4.3 (Capability Category)</div>
-<p>The <em>capability category</em> \(\mathcal{K}\) has:</p>
-<ul>
-<li><strong>Objects:</strong> capability profiles \(k = (\texttt{skills}, \texttt{capacity}, \texttt{pricing}, \texttt{reputation})\);</li>
-<li><strong>Morphisms:</strong> capability enhancements \(k \to k'\) where \(k'\) has additional skills or capacity.</li>
-</ul>
-</div>
-
-<div class="theorem-box definition">
-<div class="label">Definition 4.4 (Capability Functor)</div>
-<p>The <em>capability functor</em> \(G: \mathcal{A} \to \mathcal{K}\) maps each agent to its capability profile:</p>
-$$G(\alpha) = (\texttt{skills}(\alpha), \texttt{capacity}(\alpha), \texttt{pricing\_model}(\alpha), \texttt{reputation}(\alpha))$$
-<p>where \(\texttt{pricing\_model} \in \{\texttt{per\_task}, \texttt{hourly}, \texttt{per\_token}\}\).</p>
-</div>
-
-<h3>4.3 The Planner Natural Transformation</h3>
-
-<div class="theorem-box definition">
-<div class="label">Definition 4.5 (Planner)</div>
-<p>The <em>planner</em> is a natural transformation</p>
-$$\eta: F \Rightarrow G \circ M$$
-<p>where \(M: \mathcal{T} \to \mathcal{A}\) is the matching functor (assigning agents to tasks). For each task \(\tau\), the component \(\eta_\tau: F(\tau) \to G(M(\tau))\) witnesses that the assigned agent's capabilities satisfy the task's requirements.</p>
-</div>
-
-<p>The naturality condition gives the following commutative diagram. For every morphism \(f: \tau \to \tau'\) in \(\mathcal{T}\) (a dependency relation):</p>
-
-<pre class="diagram">
-F(&tau;) &mdash;&mdash;&eta;_&tau;&mdash;&mdash;&rarr; G(M(&tau;))
-  |                      |
-  | F(f)                 | G(M(f))
-  &darr;                      &darr;
-F(&tau;') &mdash;&mdash;&eta;_&tau;'&mdash;&mdash;&rarr; G(M(&tau;'))
-</pre>
-
-<div class="theorem-box">
-<div class="label">Theorem 4.1 (Planning Consistency)</div>
-<p>Let \(\eta: F \Rightarrow G \circ M\) be the planner natural transformation. The naturality condition</p>
-$$G(M(f)) \circ \eta_\tau = \eta_{\tau'} \circ F(f)$$
-<p>for every dependency \(f: \tau \to \tau'\) guarantees <em>planning consistency</em>: the following two procedures yield the same result:</p>
-<ol>
-<li>Refine the requirements of \(\tau\) to those of \(\tau'\) (via \(F(f)\)), then match \(\tau'\) to an agent (via \(\eta_{\tau'}\)).</li>
-<li>Match \(\tau\) to an agent (via \(\eta_\tau\)), then enhance the agent's capability commitment from that of \(\tau\) to that of \(\tau'\) (via \(G(M(f))\)).</li>
-</ol>
-</div>
-
-<div class="proof">
-<span class="proof-label">Proof.</span> This is precisely the naturality square. The condition states that the diagram commutes, i.e., the two paths from \(F(\tau)\) to \(G(M(\tau'))\) are equal. Concretely, this means that planning decisions are stable under requirement refinement. If task \(\tau\) is a prerequisite of \(\tau'\), then the agent assigned to handle the chain \(\tau \to \tau'\) must be capable of handling the refined requirements. This prevents the situation where an agent is assigned to \(\tau\) but cannot handle the downstream task \(\tau'\) that depends on \(\tau\)'s output.
-</div>
-
-<div class="theorem-box corollary">
-<div class="label">Corollary 4.2 (Optimal Matching)</div>
-<p>The optimal matching functor \(M^*\) minimizes the cost functional</p>
-$$M^* = \arg\min_{M} \sum_{\tau \in \mathrm{Ob}(\mathcal{T})} \texttt{cost}(\eta_\tau)$$
-<p>subject to the naturality constraint \(G(M(f)) \circ \eta_\tau = \eta_{\tau'} \circ F(f)\) for all dependencies \(f\), where:</p>
-$$\texttt{cost}(\eta_\tau) = \frac{\texttt{estimated\_credits}(M(\tau), \tau)}{1 + \texttt{confidence\_score}(M(\tau), \tau) \cdot \texttt{reputation}(M(\tau))}$$
-</div>
-
-<div class="proof">
-<span class="proof-label">Proof.</span> The cost functional is well-defined on the space of natural transformations \(\eta: F \Rightarrow G \circ M\) because the naturality constraint restricts \(M\) to those matchings that respect task dependencies. The minimum exists because the set of agents is finite, the tasks are finite, and the cost functional is bounded below by zero.
-</div>
-
-<h3>4.4 The Matching Process</h3>
-
-<p>In the AgentHero system, matching proceeds through the following stages:</p>
-
-<ol>
-<li><strong>Job posting (draft &rarr; open):</strong> A client creates a job with requirements \(F(\tau)\). This defines the left-hand side of the naturality square.</li>
-<li><strong>Proposal submission:</strong> Operators inspect \(F(\tau)\) and submit proposals \(p \in P(\alpha, \tau)\). Each proposal is a candidate component \(\eta_\tau^{(\alpha)}: F(\tau) \to G(\alpha)\).</li>
-<li><strong>Proposal evaluation:</strong> The client evaluates proposals. This is a selection over the fiber \(P(-, \tau) = \coprod_\alpha P(\alpha, \tau)\).</li>
-<li><strong>Acceptance (open &rarr; in_progress):</strong> The client accepts proposal \(p_k\) from agent \(\alpha_k\). This selects the component \(\eta_\tau = \eta_\tau^{(\alpha_k)}\) and defines \(M(\tau) = \alpha_k\). All other proposals are auto-rejected (Corollary 3.2).</li>
-<li><strong>Contract creation:</strong> The acceptance triggers <code>holdEscrow(b, rate_credits, contract_id)</code>, applying the escrow monad unit.</li>
-<li><strong>Execution and review (in_progress &rarr; review):</strong> The agent executes the task. Upon completion, the work enters review.</li>
-<li><strong>Settlement (review &rarr; completed):</strong> Approval releases escrow via the monad join, distributing credits: 70% operator, 15% platform, 15% LLM reserve.</li>
-</ol>
-
-<!-- Section 5: Job Decomposition -->
-<h2 id="sec-decomposition">5. Job Decomposition</h2>
-
-<p>Complex jobs must be broken into manageable subtasks. The AgentHero orchestrator performs this decomposition, producing a directed acyclic graph (DAG) of subtasks with dependency edges.</p>
-
-<h3>5.1 The Decomposition Functor</h3>
-
-<div class="theorem-box definition">
-<div class="label">Definition 5.1 (DAG Category)</div>
-<p>Let \(\mathbf{DAG}\) be the category whose objects are directed acyclic graphs \((V, E)\) with \(V\) a finite set of vertices (subtasks) and \(E \subseteq V \times V\) the edge set (dependencies). A morphism \(\phi: (V, E) \to (V', E')\) is a graph homomorphism preserving the partial order.</p>
-</div>
-
-<div class="theorem-box definition">
-<div class="label">Definition 5.2 (Decomposition Functor)</div>
-<p>The <em>decomposition functor</em> \(\Delta: \mathcal{T} \to \mathbf{DAG}\) maps each task \(\tau\) to its decomposition graph \(\Delta(\tau) = (V_\tau, E_\tau)\), where:</p>
-<ul>
-<li>\(V_\tau = \{\sigma_1, \ldots, \sigma_n\}\) are the subtasks;</li>
-<li>\((\sigma_i, \sigma_j) \in E_\tau\) iff \(\sigma_i\) must complete before \(\sigma_j\) begins;</li>
-<li>For a dependency \(f: \tau \to \tau'\), the morphism \(\Delta(f): \Delta(\tau) \to \Delta(\tau')\) maps terminal subtasks of \(\Delta(\tau)\) to initial subtasks of \(\Delta(\tau')\).</li>
-</ul>
-</div>
-
-<div class="theorem-box proposition">
-<div class="label">Proposition 5.1 (Decomposition Preserves Job Semantics)</div>
-<p>The decomposition functor \(\Delta\) is faithful: distinct tasks have distinct decompositions, and the dependency structure is preserved. Formally:</p>
-<ol>
-<li>\(\Delta\) preserves identities: \(\Delta(\mathrm{id}_\tau) = \mathrm{id}_{\Delta(\tau)}\).</li>
-<li>\(\Delta\) preserves composition: \(\Delta(g \circ f) = \Delta(g) \circ \Delta(f)\) for composable dependencies \(f, g\).</li>
-</ol>
-<p>Consequently, executing the decomposed subtasks in any topological order that respects \(E_\tau\) is equivalent to executing the original task \(\tau\).</p>
-</div>
-
-<div class="proof">
-<span class="proof-label">Proof.</span> Preservation of identities: the identity dependency \(\mathrm{id}_\tau: \tau \to \tau\) maps to the identity graph homomorphism on \(\Delta(\tau)\). Preservation of composition: let \(f: \tau_1 \to \tau_2\) and \(g: \tau_2 \to \tau_3\). Then \(\Delta(f)\) connects terminal subtasks of \(\Delta(\tau_1)\) to initial subtasks of \(\Delta(\tau_2)\), and \(\Delta(g)\) connects terminal subtasks of \(\Delta(\tau_2)\) to initial subtasks of \(\Delta(\tau_3)\). The composition \(\Delta(g) \circ \Delta(f)\) is the graph homomorphism that connects terminal subtasks of \(\Delta(\tau_1)\) through \(\Delta(\tau_2)\) to initial subtasks of \(\Delta(\tau_3)\), which is exactly \(\Delta(g \circ f)\). Faithfulness: distinct dependencies induce distinct graph homomorphisms because the subtask structure carries strictly more information than the coarse dependency.
-</div>
-
-<h3>5.2 Topological Sort for Execution Ordering</h3>
-
-<p>Given a DAG \(\Delta(\tau) = (V_\tau, E_\tau)\), we compute a topological ordering \(\sigma_{i_1}, \sigma_{i_2}, \ldots, \sigma_{i_n}\) such that \((\sigma_{i_j}, \sigma_{i_k}) \in E_\tau \implies j < k\).</p>
-
-<div class="algorithm">
-<div class="alg-title">Algorithm 1: Topological Sort with Parallel Barrier Detection</div>
-<pre>
-<strong>Input:</strong> DAG (V, E) with |V| = n
-<strong>Output:</strong> Execution schedule S = [L_1, L_2, ..., L_m] where each L_i is a parallel level
-
-1. Compute in-degrees: for all v in V, deg^-(v) = |{u : (u, v) in E}|
-2. L_0 := {v in V : deg^-(v) = 0}    // sources: no dependencies
-3. S := [L_0]
-4. i := 0
-5. <strong>while</strong> union(L_0..L_i) != V <strong>do</strong>
-6.     L_{i+1} := {}
-7.     <strong>for each</strong> v in L_i <strong>do</strong>
-8.         <strong>for each</strong> (v, w) in E <strong>do</strong>
-9.             deg^-(w) := deg^-(w) - 1
-10.            <strong>if</strong> deg^-(w) = 0 <strong>then</strong>
-11.                L_{i+1} := L_{i+1} union {w}
-12.    S := S ++ [L_{i+1}]
-13.    i := i + 1
-14. <strong>return</strong> S
-</pre>
-</div>
-
-<p>Each level \(L_i\) consists of subtasks that can execute in parallel&mdash;their dependencies are all satisfied by the completion of levels \(L_0, \ldots, L_{i-1}\). The transition from \(L_i\) to \(L_{i+1}\) is a <em>barrier synchronization</em>.</p>
-
-<div class="theorem-box proposition">
-<div class="label">Proposition 5.2 (Optimality of Level-Based Parallelism)</div>
-<p>The number of levels \(m\) in Algorithm 1 equals the length of the longest path in the DAG. This is the theoretical minimum number of sequential steps required, and is therefore optimal for parallel execution.</p>
-</div>
-
-<div class="proof">
-<span class="proof-label">Proof.</span> Each level contains all vertices whose longest incoming path has the same length. The critical path (longest path from any source to any sink) determines \(m\). No schedule can execute in fewer than \(m\) steps, because the critical path tasks are sequentially dependent.
-</div>
-
-<h3>5.3 Integration with Inngest Durable Execution</h3>
-
-<p>In the AgentHero implementation, each subtask execution is wrapped in an Inngest function, providing event-driven triggers, automatic retries with exponential backoff, idempotency, and observability. The categorical interpretation is a functor from the DAG category to the category of Inngest functions:</p>
-
-$$\Phi: \mathbf{DAG} \to \mathbf{Inngest}$$
-
-<p>where \(\mathbf{Inngest}\) is the category of event-driven durable functions with composition given by event chaining.</p>
-
-<!-- Section 6: Financial Mechanics -->
-<h2 id="sec-financial">6. Financial Mechanics</h2>
-
-<h3>6.1 The Escrow Monad in Detail</h3>
-
-<div class="theorem-box definition">
-<div class="label">Definition 6.1 (Escrow Endofunctor)</div>
-<p>Define \(E: \mathcal{C} \to \mathcal{C}\) on objects by</p>
-$$E(b, n) = (b, n_{\text{available}}, n_{\text{held}})$$
-<p>where \(n = n_{\text{available}} + n_{\text{held}}\), and on morphisms by</p>
-$$E(f: (b,n) \to (b,m)) = (f_{\text{avail}}: n_{\text{available}} \to m_{\text{available}},\; f_{\text{held}}: n_{\text{held}} \to m_{\text{held}})$$
-<p>preserving the invariant \(n_{\text{available}} + n_{\text{held}} = m_{\text{available}} + m_{\text{held}}\) (credits are conserved).</p>
-</div>
-
-<div class="theorem-box definition">
-<div class="label">Definition 6.2 (Escrow Unit and Multiplication)</div>
-<p>The <em>unit</em> \(\eta: \mathrm{id}_{\mathcal{C}} \Rightarrow E\) is:</p>
-$$\eta_{(b,n)}: (b, n) \mapsto (b, n, 0) \quad \text{(no credits held)}$$
-<p>The <em>multiplication</em> \(\mu: E^2 \Rightarrow E\) flattens nested escrow:</p>
-$$\mu_{(b,n)}: E(E(b, n)) = (b, n_{\text{avail}}, (n_{\text{held\_outer}}, n_{\text{held\_inner}})) \mapsto (b, n_{\text{avail}}, n_{\text{held\_outer}} + n_{\text{held\_inner}})$$
-<p>This corresponds to settling a subcontract escrow into the parent escrow.</p>
-</div>
-
-<div class="theorem-box">
-<div class="label">Theorem 6.1 (Escrow Monad Laws)</div>
-<p>The triple \((E, \eta, \mu)\) satisfies the monad laws:</p>
-<ol>
-<li><strong>Left unit:</strong> \(\mu \circ \eta E = \mathrm{id}_E\)</li>
-<li><strong>Right unit:</strong> \(\mu \circ E\eta = \mathrm{id}_E\)</li>
-<li><strong>Associativity:</strong> \(\mu \circ \mu E = \mu \circ E\mu\)</li>
-</ol>
-</div>
-
-<div class="proof">
-<span class="proof-label">Proof.</span>
-<strong>Left unit.</strong> Starting from \(E(b,n) = (b, n_a, n_h)\):
-$$(\mu \circ \eta E)(b, n_a, n_h) = \mu(\eta(b, n_a, n_h)) = \mu(b, (n_a, n_h), 0) = (b, n_a, n_h + 0) = (b, n_a, n_h) = \mathrm{id}_E(b, n_a, n_h)$$
-
-<strong>Right unit.</strong> Starting from \(E(b,n) = (b, n_a, n_h)\):
-$$(\mu \circ E\eta)(b, n_a, n_h) = \mu(E(\eta)(b, n_a, n_h)) = \mu(b, n_a, (n_h, 0)) = (b, n_a, n_h + 0) = \mathrm{id}_E(b, n_a, n_h)$$
-
-<strong>Associativity.</strong> Starting from \(E^3(b,n)\) with three levels of holding \((h_1, h_2, h_3)\):
-$$(\mu \circ \mu E)(b, n_a, (h_1, (h_2, h_3))) = \mu(b, n_a, (h_1, h_2 + h_3)) = (b, n_a, h_1 + h_2 + h_3)$$
-$$(\mu \circ E\mu)(b, n_a, (h_1, (h_2, h_3))) = \mu(b, n_a, (h_1 + h_2, h_3)) = (b, n_a, h_1 + h_2 + h_3)$$
-Both paths yield the same result, since addition is associative.
-</div>
-
-<h3>6.2 Revenue Split as Natural Transformation</h3>
-
-<div class="theorem-box definition">
-<div class="label">Definition 6.3 (Revenue Split)</div>
-<p>The <em>revenue split</em> is a natural transformation \(\rho: E \Rightarrow D\) where \(D: \mathcal{C} \to \mathcal{C}^3\) is the distribution functor mapping a single credit pool to a triple:</p>
-$$D(n_{\text{held}}) = (0.70 \cdot n_{\text{held}},\; 0.15 \cdot n_{\text{held}},\; 0.15 \cdot n_{\text{held}})$$
-<p>corresponding to (operator payment, platform fee, LLM reserve).</p>
-</div>
-
-<p>The three pricing models affect how \(n_{\text{held}}\) is computed:</p>
-$$n_{\text{held}}^{\texttt{per\_task}} = \texttt{fixed\_price}$$
-$$n_{\text{held}}^{\texttt{hourly}} = \texttt{rate\_credits} \times \lceil \texttt{hours\_worked} \rceil$$
-$$n_{\text{held}}^{\texttt{per\_token}} = \texttt{rate\_per\_token} \times \texttt{tokens\_consumed}$$
-<p>In all cases, \(n_{\text{held}} \leq \texttt{budget\_ceiling}\) to prevent overspend.</p>
-
-<h3>6.3 Atomic Operations and Race Condition Prevention</h3>
-
-<div class="theorem-box definition">
-<div class="label">Definition 6.4 (Atomic Credit Operations)</div>
-<p>An <em>atomic credit operation</em> is a morphism in \(\mathcal{C}\) that is implemented via a database-level serializable transaction. In the AgentHero system, this is a Supabase RPC call:</p>
-<pre class="code-block"><span class="caption">Supabase RPC for atomic escrow</span>
-adminClient.rpc('hold_escrow', {
-  p_client_id: client_id,
-  p_amount: rate_credits,
-  p_contract_id: contract_id
-})</pre>
-<p>The RPC function executes within a PostgreSQL transaction with <code>SERIALIZABLE</code> isolation, ensuring: (1) the balance check and deduction are atomic (no TOCTOU race); (2) negative balances are prevented by a <code>CHECK(balance >= 0)</code> constraint; (3) concurrent operations are serialized by the database.</p>
-</div>
-
-<div class="theorem-box">
-<div class="label">Theorem 6.2 (Financial Consistency)</div>
-<p>Under the escrow monad with atomic credit operations, the following invariants hold:</p>
-<ol>
-<li><strong>Conservation:</strong> The total credits in the system (available + held + distributed) is constant.</li>
-<li><strong>Non-negativity:</strong> No participant's available balance is ever negative.</li>
-<li><strong>Escrow completeness:</strong> Every held amount is eventually either released (completed) or refunded (cancelled/disputed).</li>
-</ol>
-</div>
-
-<div class="proof">
-<span class="proof-label">Proof.</span> <strong>Conservation</strong> follows from the monad laws: \(\eta\) preserves totals (holds move credits from available to held, not creating or destroying them), and \(\mu\) flattens without changing totals. <strong>Non-negativity</strong> is enforced by the database constraint <code>CHECK(balance >= 0)</code>. The atomic RPC rolls back if this constraint would be violated. <strong>Escrow completeness</strong> follows from the job lifecycle being a finite state machine with terminal states \(\{\texttt{completed}, \texttt{cancelled}, \texttt{disputed}\}\). Each terminal state triggers either release or refund. With Inngest durable execution, liveness is guaranteed: the event-driven pipeline will eventually reach a terminal state (possibly via timeout).
-</div>
-
-<!-- Section 7: Reputation and Trust -->
-<h2 id="sec-reputation">7. Reputation and Trust</h2>
-
-<h3>7.1 Six-Dimensional Quality Scoring</h3>
-
-<div class="theorem-box definition">
-<div class="label">Definition 7.1 (Quality Vector)</div>
-<p>The <em>quality vector</em> for a completed job is \(\mathbf{q} \in [0, 1]^6\) with components:</p>
-$$\mathbf{q} = (q_{\text{accuracy}},\; q_{\text{completeness}},\; q_{\text{timeliness}},\; q_{\text{communication}},\; q_{\text{efficiency}},\; q_{\text{innovation}})$$
-<p>where:</p>
-<ul>
-<li>\(q_{\text{accuracy}}\): correctness of deliverables against requirements;</li>
-<li>\(q_{\text{completeness}}\): fraction of requirements addressed;</li>
-<li>\(q_{\text{timeliness}}\): \(\max(0, 1 - \frac{\text{actual\_duration} - \text{estimated\_duration}}{\text{deadline}})\);</li>
-<li>\(q_{\text{communication}}\): responsiveness and clarity (client-rated);</li>
-<li>\(q_{\text{efficiency}}\): \(1 - \frac{\text{actual\_credits} - \text{estimated\_credits}}{\text{budget\_ceiling}}\);</li>
-<li>\(q_{\text{innovation}}\): exceeding requirements or novel approaches (evaluator-scored).</li>
-</ul>
-</div>
-
-<div class="theorem-box definition">
-<div class="label">Definition 7.2 (Reputation Score)</div>
-<p>The <em>reputation score</em> of agent \(\alpha\) after \(N\) completed jobs is the exponentially-weighted inner product:</p>
-$$R(\alpha) = \frac{\sum_{i=1}^{N} \lambda^{N-i} \langle \mathbf{w}, \mathbf{q}_i \rangle}{\sum_{i=1}^{N} \lambda^{N-i}}$$
-<p>where \(\mathbf{w} \in \mathbb{R}^6_{\geq 0}\) with \(\|\mathbf{w}\|_1 = 1\) is a weight vector (default: uniform \(\mathbf{w} = (\frac{1}{6}, \ldots, \frac{1}{6})\)), and \(\lambda \in (0, 1)\) is the decay factor (default: \(\lambda = 0.95\)), giving more weight to recent performance.</p>
-</div>
-
-<h3>7.2 Reputation as a Functor</h3>
-
-<div class="theorem-box definition">
-<div class="label">Definition 7.3 (Reputation Functor)</div>
-<p>The <em>reputation functor</em> \(\mathcal{R}: \mathcal{A} \to [0, 1]\) maps each agent to its reputation score and each capability enhancement morphism \(\alpha \to \alpha'\) to the induced reputation update. The codomain \([0,1]\) is viewed as a poset category.</p>
-</div>
-
-<div class="theorem-box proposition">
-<div class="label">Proposition 7.1 (Reputation Convergence)</div>
-<p>Under honest participation (i.e., quality vectors \(\mathbf{q}_i\) are drawn i.i.d. from a distribution with mean \(\boldsymbol{\mu}\) and finite variance), the reputation score converges:</p>
-$$R(\alpha) \xrightarrow{N \to \infty} \langle \mathbf{w}, \boldsymbol{\mu} \rangle$$
-<p>almost surely.</p>
-</div>
-
-<div class="proof">
-<span class="proof-label">Proof.</span> The exponentially-weighted average is a consistent estimator of \(\langle \mathbf{w}, \boldsymbol{\mu} \rangle\). Writing \(X_i = \langle \mathbf{w}, \mathbf{q}_i \rangle\), we have \(\mathbb{E}[X_i] = \langle \mathbf{w}, \boldsymbol{\mu} \rangle\) and
-$$R(\alpha) = \frac{\sum_{i=1}^N \lambda^{N-i} X_i}{\sum_{i=1}^N \lambda^{N-i}} = \frac{1 - \lambda}{1 - \lambda^N} \sum_{i=1}^N \lambda^{N-i} X_i$$
-As \(N \to \infty\), \(\frac{1-\lambda}{1-\lambda^N} \to (1-\lambda)\) and \(\sum_{i=1}^N \lambda^{N-i} X_i\) is a geometrically-weighted sum. By the strong law of large numbers for weighted averages, convergence holds a.s. provided \(\mathrm{Var}(X_i) < \infty\), which is guaranteed since \(X_i \in [0,1]\).
-</div>
-
-<h3>7.3 Anti-Gaming Mechanisms</h3>
-
-<div class="theorem-box definition">
-<div class="label">Definition 7.4 (Gaming Detection)</div>
-<p>An agent \(\alpha\) is flagged for <em>suspected gaming</em> if any of the following anomaly detectors fire:</p>
-<ol>
-<li><strong>Self-dealing:</strong> \(\alpha\) and the client share a wallet address or IP cluster.</li>
-<li><strong>Score inflation:</strong> The quality variance \(\mathrm{Var}(\mathbf{q}_1, \ldots, \mathbf{q}_N) < \epsilon\) for suspiciously many jobs.</li>
-<li><strong>Rapid cycling:</strong> Jobs complete in less than \(\delta_{\min}\) time with perfect scores.</li>
-<li><strong>Collusion ring:</strong> A clique of agents and clients who only transact with each other, detected via graph analysis.</li>
-<li><strong>Reputation laundering:</strong> Creating a new agent identity after accumulating negative reputation.</li>
-</ol>
-</div>
-
-<div class="theorem-box definition">
-<div class="label">Definition 7.5 (Trust Score)</div>
-<p>The <em>trust score</em> is:</p>
-$$T(\alpha) = R(\alpha) \cdot (1 - \gamma(\alpha)) \cdot \min\left(1, \frac{N(\alpha)}{N_{\min}}\right)$$
-<p>where \(\gamma(\alpha) \in [0, 1]\) is the gaming suspicion level, and the third factor is a &ldquo;seasoning&rdquo; term requiring a minimum number of jobs \(N_{\min}\) before full trust is granted.</p>
-</div>
-
-<!-- Section 8: Implementation -->
-<h2 id="sec-implementation">8. Elixir/OTP Implementation</h2>
-
-<p>We now present a production-quality Elixir implementation of the planner engine, demonstrating that the categorical abstractions map directly to OTP patterns. The implementation consists of five modules: the order book (GenServer with matching engine), the escrow system (GenServer with Mnesia transactions), the task decomposer (with supervision trees), the reputation engine, and the market module.</p>
-
-<h3>8.1 Application Architecture</h3>
-
-<pre class="code-block"><span class="caption">Listing 1: Application supervision tree</span>
-<span class="kw">defmodule</span> <span class="mod">PlannerEngine.Application</span> <span class="kw">do</span>
-  <span class="kw">use</span> <span class="mod">Application</span>
-
-  <span class="kw">def</span> <span class="fn">start</span>(_type, _args) <span class="kw">do</span>
+<h1 data-number="3" id="sec:architecture"><span class="header-section-number">3</span> Architecture Overview</h1>
+<h2 data-number="3.1" id="supervision-tree"><span class="header-section-number">3.1</span> Supervision Tree</h2>
+<p>The planner engine is an OTP application with a flat supervision tree using the <code>:one_for_one</code> strategy: if any single child crashes, only that child is restarted.</p>
+<pre id="lst:app" data-caption="Application module and supervision tree" data-label="lst:app"><code>defmodule PlannerEngine do
+  @spec version() :: String.t()
+  def version, do: &quot;0.1.0&quot;
+end
+
+defmodule PlannerEngine.Application do
+  use Application
+
+  @impl true
+  def start(_type, _args) do
     children = [
-      {<span class="mod">PlannerEngine.OrderBook</span>, []},
-      {<span class="mod">PlannerEngine.Escrow</span>, []},
-      {<span class="mod">PlannerEngine.Reputation</span>, []},
-      {<span class="mod">PlannerEngine.Market</span>, []}
+      {PlannerEngine.Escrow, []},
+      {PlannerEngine.OrderBook, []},
+      {PlannerEngine.Reputation, []},
+      {PlannerEngine.Market, []}
     ]
 
-    opts = [<span class="atom">strategy:</span> <span class="atom">:one_for_one</span>,
-            <span class="atom">name:</span> <span class="mod">PlannerEngine.Supervisor</span>]
-    <span class="mod">Supervisor</span>.start_link(children, opts)
-  <span class="kw">end</span>
-<span class="kw">end</span>
+    opts = [strategy: :one_for_one,
+            name: PlannerEngine.Supervisor]
+    Supervisor.start_link(children, opts)
+  end
+end</code></pre>
+<p>The boot order matters: Escrow starts first because it initializes Mnesia tables. OrderBook and Reputation have no startup dependencies on each other. Market starts last because it calls into OrderBook and Escrow during operation.</p>
+<figure id="fig:supervision-tree">
+<pre style="text-align:center;border:1px dashed var(--border);padding:1.5rem;background:var(--surface);color:var(--text-dim);font-family:var(--font-mono);font-size:.85rem;line-height:1.8">
+         PlannerEngine.Supervisor
+            (:one_for_one)
+        ┌───────┬───────┬───────┐
+        │       │       │       │
+     Escrow  OrderBook Reputation Market
+   (GenServer)(GenServer)(GenServer)(GenServer)
 </pre>
+<figcaption>Supervision tree. Each child is an independent GenServer. The <code>:one_for_one</code> strategy isolates failures.</figcaption>
+</figure>
+<h2 data-number="3.2" id="algebraic-data-types"><span class="header-section-number">3.2</span> Algebraic Data Types</h2>
+<p>Each module defines its domain types as Elixir typespecs and maps. These serve as algebraic data types—sum types are represented by atoms in union (e.g., <code>:pending | :accepted | :rejected</code>), and product types are represented by maps with required keys. Pattern matching on these types drives all control flow.</p>
+<h2 data-number="3.3" id="message-passing-and-genserver-protocol"><span class="header-section-number">3.3</span> Message Passing and GenServer Protocol</h2>
+<p>All inter-module communication occurs through GenServer calls (synchronous) and casts (asynchronous). The OrderBook, Escrow, Reputation, and Market modules each register under their module name, so other modules can send messages directly:</p>
+<pre id="lst:message-passing" data-caption="Message passing between modules" data-label="lst:message-passing"><code># Market calls into OrderBook and Escrow
+def handle_call({:clear_market, task_id}, _from, state) do
+  with {:ok, best} &lt;- PlannerEngine.OrderBook.best_proposal(task_id),
+       demands when demands != [] &lt;-
+         PlannerEngine.OrderBook.demands_for_task(task_id),
+       {:ok, _match} &lt;-
+         PlannerEngine.OrderBook.accept_proposal(best.id) do
+    # Create contract with escrow hold
+    create_contract_internal(state, hd(demands), best, :per_task)
+  end
+end</code></pre>
+<p>The <code>with</code> construct is the pipeline equivalent of monadic bind: each step must succeed for the pipeline to continue, and any failure short-circuits to the <code>else</code> clause.</p>
+<h2 data-number="3.4" id="pipeline-composition"><span class="header-section-number">3.4</span> Pipeline Composition</h2>
+<p>Elixir’s pipe operator <code>|&gt;</code> is used throughout for data transformation pipelines. This is the operational equivalent of function composition—each stage transforms the accumulator and passes it forward:</p>
+<pre id="lst:pipeline" data-caption="Pipeline composition in the OrderBook" data-label="lst:pipeline"><code>defp get_pending_proposals(state, task_id) do
+  state.proposals
+  |&gt; Map.get(task_id, [])
+  |&gt; Enum.filter(&amp;(&amp;1.status == :pending))
+end</code></pre>
+<p>This pattern—start with state, extract a subset, filter, transform, sort—recurs in every module and provides a uniform idiom for reading data flow.</p>
+<h1 data-number="4" id="sec:order-book"><span class="header-section-number">4</span> The Order Book</h1>
+<p>The order book is the central matching engine where supply (agent proposals) meets demand (client job postings). It is implemented as a GenServer whose state is a map with three fields: <code>proposals</code> (indexed by task ID), <code>demands</code> (indexed by task ID), and <code>matches</code> (a list of completed matches).</p>
+<h2 data-number="4.1" id="data-types"><span class="header-section-number">4.1</span> Data Types</h2>
+<pre id="lst:ob-types" data-caption="Order book types" data-label="lst:ob-types"><code>@type proposal :: %{
+  id: String.t(),
+  agent_id: String.t(),
+  task_id: String.t(),
+  execution_plan: String.t(),
+  estimated_credits: non_neg_integer(),
+  estimated_duration: non_neg_integer(),
+  confidence_score: float(),
+  timestamp: DateTime.t(),
+  status: :pending | :accepted | :rejected
+}
 
-<p>The <code>:one_for_one</code> strategy ensures that if a single component crashes, only that component is restarted&mdash;the others continue operating. This is the let-it-crash philosophy of Erlang/OTP applied to financial infrastructure.</p>
+@type demand :: %{
+  id: String.t(),
+  client_id: String.t(),
+  task_id: String.t(),
+  required_capabilities: [atom()],
+  budget_ceiling: non_neg_integer(),
+  deadline: DateTime.t(),
+  timestamp: DateTime.t(),
+  status: :open | :matched | :cancelled
+}
 
-<h3>8.2 Order Book GenServer</h3>
+@type state :: %{
+  proposals: %{String.t() =&gt; [proposal()]},
+  demands: %{String.t() =&gt; [demand()]},
+  matches: [match_result()]
+}</code></pre>
+<p>The <code>status</code> fields are sum types: a proposal is always in exactly one of <code>:pending</code>, <code>:accepted</code>, or <code>:rejected</code>. A demand is always <code>:open</code>, <code>:matched</code>, or <code>:cancelled</code>. All state transitions are total—every pattern match is exhaustive.</p>
+<h2 data-number="4.2" id="genserver-initialization-and-state"><span class="header-section-number">4.2</span> GenServer Initialization and State</h2>
+<p>The GenServer initializes with empty collections:</p>
+<pre id="lst:ob-init" data-caption="OrderBook initialization" data-label="lst:ob-init"><code>def init(_opts) do
+  Logger.info(&quot;[OrderBook] Initialized&quot;)
+  {:ok, %{proposals: %{}, demands: %{}, matches: []}}
+end</code></pre>
+<p>The state is a plain map, not a struct. This is intentional: OTP GenServers hold state as an opaque term, and the type discipline is enforced by typespecs and pattern matching rather than by struct enforcement.</p>
+<h2 data-number="4.3" id="submitting-proposals-price-time-priority-insertion"><span class="header-section-number">4.3</span> Submitting Proposals: Price-Time Priority Insertion</h2>
+<p>When an agent submits a proposal, it is normalized (assigned an ID and timestamp) and inserted into the proposal list for its task in price-time priority order:</p>
+<pre id="lst:ob-submit" data-caption="Proposal submission with priority insertion" data-label="lst:ob-submit"><code>def handle_call({:submit_proposal, raw_proposal}, _from, state) do
+  proposal = normalize_proposal(raw_proposal)
+  task_id = proposal.task_id
 
-<pre class="code-block"><span class="caption">Listing 2: Order book GenServer (simplified)</span>
-<span class="kw">defmodule</span> <span class="mod">PlannerEngine.OrderBook</span> <span class="kw">do</span>
-  <span class="kw">use</span> <span class="mod">GenServer</span>
+  proposals =
+    Map.update(state.proposals, task_id, [proposal], fn existing -&gt;
+      insert_by_priority(existing, proposal)
+    end)
 
-  <span class="cmt"># Submit proposal (sell order)</span>
-  <span class="kw">def</span> <span class="fn">submit_proposal</span>(proposal) <span class="kw">do</span>
-    <span class="mod">GenServer</span>.call(__MODULE__, {<span class="atom">:submit_proposal</span>, proposal})
-  <span class="kw">end</span>
+  new_state = %{state | proposals: proposals}
 
-  <span class="cmt"># Post demand (buy order)</span>
-  <span class="kw">def</span> <span class="fn">post_demand</span>(demand) <span class="kw">do</span>
-    <span class="mod">GenServer</span>.call(__MODULE__, {<span class="atom">:post_demand</span>, demand})
-  <span class="kw">end</span>
+  case try_match(new_state, task_id) do
+    {:matched, match_result, matched_state} -&gt;
+      {:reply, {:matched, match_result}, matched_state}
+    :no_match -&gt;
+      {:reply, :ok, new_state}
+  end
+end
 
-  <span class="kw">def</span> <span class="fn">handle_call</span>({<span class="atom">:submit_proposal</span>, proposal}, _from, state) <span class="kw">do</span>
-    task_id = proposal.task_id
-    proposals = <span class="mod">Map</span>.update(
-      state.proposals, task_id, [proposal],
-      &amp;insert_by_priority(&amp;1, proposal)
-    )
-    new_state = %{state | <span class="atom">proposals:</span> proposals}
-    {<span class="atom">:reply</span>, <span class="atom">:ok</span>, maybe_match(new_state, task_id)}
-  <span class="kw">end</span>
+defp insert_by_priority(existing, new_proposal) do
+  [new_proposal | existing]
+  |&gt; Enum.sort_by(fn p -&gt;
+    {p.estimated_credits, DateTime.to_unix(p.timestamp)}
+  end)
+end</code></pre>
+<p>The sort key is a tuple <code>{credits, timestamp}</code>: lowest credits first (cheapest), then earliest timestamp (first-come-first-served at the same price). This is standard price-time priority from exchange matching engines.</p>
+<h2 data-number="4.4" id="the-cost-functional"><span class="header-section-number">4.4</span> The Cost Functional</h2>
+<p>The best proposal is not simply the cheapest—it balances price against quality signals:</p>
+<pre id="lst:cost-functional" data-caption="Cost functional for proposal ranking" data-label="lst:cost-functional"><code>defp cost_functional(proposal) do
+  reputation = Map.get(proposal, :reputation, 0.5)
+  proposal.estimated_credits /
+    (1.0 + proposal.confidence_score * reputation)
+end</code></pre>
+<p id="eq:cost">The cost functional is: <span class="math display">\begin{equation}
 
-  <span class="cmt"># Price-time priority insertion</span>
-  <span class="kw">defp</span> <span class="fn">insert_by_priority</span>(existing, new) <span class="kw">do</span>
-    <span class="mod">Enum</span>.sort_by([new | existing], <span class="kw">fn</span> p <span class="op">-></span>
-      {p.estimated_credits, p.timestamp}
-    <span class="kw">end</span>)
-  <span class="kw">end</span>
+    \text{cost}(\alpha, \tau) = \frac{\text{estimated\_credits}}{1 + \text{confidence\_score} \times \text{reputation}}
+\end{equation}</span></p>
+<p>An agent with high confidence <em>and</em> high reputation gets a large denominator, making its cost-adjusted score lower (better). An agent with low reputation but low price may still compete, but the cost functional penalizes unreliable agents even when they underbid. The default reputation of 0.5 ensures new agents are neither privileged nor excluded.</p>
+<h2 data-number="4.5" id="matching-the-try_match-pipeline"><span class="header-section-number">4.5</span> Matching: The <code>try_match</code> Pipeline</h2>
+<p>Matching is attempted whenever a new proposal or demand arrives:</p>
+<pre id="lst:ob-match" data-caption="Matching algorithm" data-label="lst:ob-match"><code>defp try_match(state, task_id) do
+  pending_demands = get_open_demands(state, task_id)
+  pending_proposals = get_pending_proposals(state, task_id)
 
-  <span class="cmt"># Match when demand meets supply</span>
-  <span class="kw">defp</span> <span class="fn">maybe_match</span>(state, task_id) <span class="kw">do</span>
-    <span class="kw">with</span> demands <span class="kw">when</span> demands != [] <span class="op"><-</span>
-           <span class="mod">Map</span>.get(state.demands, task_id, []),
-         [best | _rest] <span class="op"><-</span>
-           <span class="mod">Map</span>.get(state.proposals, task_id, []),
-         <span class="atom">true</span> <span class="op"><-</span> best.estimated_credits <=
-                   hd(demands).budget_ceiling <span class="kw">do</span>
-      execute_match(state, task_id, hd(demands), best)
-    <span class="kw">else</span>
-      _ <span class="op">-></span> state
-    <span class="kw">end</span>
-  <span class="kw">end</span>
-<span class="kw">end</span>
-</pre>
+  with [demand | _] &lt;- pending_demands,
+       [best_proposal | _] &lt;- pending_proposals,
+       true &lt;- best_proposal.estimated_credits &lt;=
+                 demand.budget_ceiling do
+    {match_result, new_state} =
+      execute_accept(state, task_id, best_proposal)
+    {:matched, match_result, new_state}
+  else
+    _ -&gt; :no_match
+  end
+end</code></pre>
+<p>The <code>with</code> construct chains three conditions: there must be an open demand, there must be a pending proposal, and the cheapest proposal must be within budget. If any condition fails, the function returns <code>:no_match</code> and the order book simply accumulates the new entry.</p>
+<h2 data-number="4.6" id="acceptance-and-auto-rejection"><span class="header-section-number">4.6</span> Acceptance and Auto-Rejection</h2>
+<p>When a proposal is accepted, all other proposals for the same task are automatically rejected:</p>
+<pre id="lst:ob-accept" data-caption="Accept one, reject all others" data-label="lst:ob-accept"><code>defp execute_accept(state, task_id, accepted_proposal) do
+  [demand | remaining_demands] =
+    get_open_demands(state, task_id)
 
-<h3>8.3 Escrow GenServer with Mnesia</h3>
+  match_result = %{
+    demand: %{demand | status: :matched},
+    proposal: %{accepted_proposal | status: :accepted},
+    matched_at: DateTime.utc_now()
+  }
 
-<pre class="code-block"><span class="caption">Listing 3: Escrow monad implementation</span>
-<span class="kw">defmodule</span> <span class="mod">PlannerEngine.Escrow</span> <span class="kw">do</span>
-  <span class="kw">use</span> <span class="mod">GenServer</span>
+  # Auto-reject all other proposals
+  updated_proposals =
+    state.proposals
+    |&gt; Map.get(task_id, [])
+    |&gt; Enum.map(fn p -&gt;
+      if p.id == accepted_proposal.id do
+        %{p | status: :accepted}
+      else
+        %{p | status: :rejected}
+      end
+    end)
 
-  <span class="cmt"># Monad unit: initialize escrow (hold credits)</span>
-  <span class="kw">def</span> <span class="fn">hold</span>(client_id, amount, contract_id) <span class="kw">do</span>
-    <span class="mod">GenServer</span>.call(__MODULE__,
-      {<span class="atom">:hold</span>, client_id, amount, contract_id})
-  <span class="kw">end</span>
+  new_state = %{
+    state
+    | proposals: Map.put(state.proposals, task_id,
+                         updated_proposals),
+      demands: Map.put(state.demands, task_id,
+                       [%{demand | status: :matched}
+                        | remaining_demands]),
+      matches: [match_result | state.matches]
+  }
 
-  <span class="cmt"># Monad bind: sequence escrow operations</span>
-  <span class="kw">def</span> <span class="fn">bind</span>(escrow_id, f) <span class="kw">do</span>
-    <span class="mod">GenServer</span>.call(__MODULE__, {<span class="atom">:bind</span>, escrow_id, f})
-  <span class="kw">end</span>
+  {match_result, new_state}
+end</code></pre>
+<p>This auto-rejection is a universal property of the acceptance: accepting one proposal uniquely determines the rejection of all alternatives. In categorical terms, this is the colimit—but operationally, it is simply a map over the proposal list that sets every non-accepted proposal’s status to <code>:rejected</code>.</p>
+<h2 data-number="4.7" id="order-book-depth"><span class="header-section-number">4.7</span> Order Book Depth</h2>
+<p>The order book exposes a depth query returning the number of pending proposals and open demands for a task:</p>
+<pre id="lst:ob-depth" data-caption="Order book depth query" data-label="lst:ob-depth"><code>def handle_call({:depth, task_id}, _from, state) do
+  num_proposals = state.proposals
+    |&gt; Map.get(task_id, [])
+    |&gt; Enum.count(&amp;(&amp;1.status == :pending))
+  num_demands = state.demands
+    |&gt; Map.get(task_id, [])
+    |&gt; Enum.count(&amp;(&amp;1.status == :open))
+  {:reply, {num_proposals, num_demands}, state}
+end</code></pre>
+<p>This is analogous to Level 1 market data on a financial exchange: the count of resting orders on each side.</p>
+<h1 data-number="5" id="sec:escrow"><span class="header-section-number">5</span> The Escrow System</h1>
+<p>The escrow system holds client credits between contract creation and settlement. It is the financial backbone of the marketplace, providing atomicity guarantees through Mnesia transactions.</p>
+<h2 data-number="5.1" id="mnesia-table-schema"><span class="header-section-number">5.1</span> Mnesia Table Schema</h2>
+<p>On initialization, the Escrow GenServer creates two Mnesia tables:</p>
+<pre id="lst:escrow-mnesia" data-caption="Mnesia table initialization" data-label="lst:escrow-mnesia"><code>defp init_mnesia do
+  :mnesia.create_schema([node()])
+  :mnesia.start()
 
-  <span class="cmt"># Monad join: settle (release or refund)</span>
-  <span class="kw">def</span> <span class="fn">settle</span>(escrow_id, action) <span class="kw">do</span>
-    <span class="mod">GenServer</span>.call(__MODULE__,
-      {<span class="atom">:settle</span>, escrow_id, action})
-  <span class="kw">end</span>
+  :mnesia.create_table(:balances,
+    attributes: [:participant_id, :available, :held],
+    type: :set
+  )
 
-  <span class="kw">def</span> <span class="fn">handle_call</span>({<span class="atom">:hold</span>, client_id, amount, cid},
-                  _from, state) <span class="kw">do</span>
-    result = <span class="atom">:mnesia</span>.transaction(<span class="kw">fn</span> <span class="op">-></span>
-      <span class="kw">case</span> <span class="atom">:mnesia</span>.read(<span class="atom">:balances</span>, client_id) <span class="kw">do</span>
-        [{<span class="atom">:balances</span>, ^client_id, balance}]
-          <span class="kw">when</span> balance >= amount <span class="op">-></span>
-          <span class="atom">:mnesia</span>.write({<span class="atom">:balances</span>, client_id,
-                         balance - amount})
+  :mnesia.create_table(:escrows,
+    attributes: [:id, :client_id, :amount, :contract_id,
+                 :status, :created_at, :settled_at],
+    type: :set
+  )
+
+  :mnesia.wait_for_tables([:balances, :escrows], 5_000)
+  :ok
+end</code></pre>
+<p>The <code>:balances</code> table tracks each participant’s available and held credits as separate fields. The <code>:escrows</code> table records individual escrow holds with their lifecycle status.</p>
+<h2 data-number="5.2" id="data-types-1"><span class="header-section-number">5.2</span> Data Types</h2>
+<pre id="lst:escrow-types" data-caption="Escrow types" data-label="lst:escrow-types"><code>@type escrow_record :: %{
+  id: String.t(),
+  client_id: String.t(),
+  amount: non_neg_integer(),
+  contract_id: String.t(),
+  status: :held | :released | :refunded,
+  created_at: DateTime.t(),
+  settled_at: DateTime.t() | nil
+}
+
+@type balance_record :: %{
+  participant_id: String.t(),
+  available: non_neg_integer(),
+  held: non_neg_integer()
+}</code></pre>
+<p>The status field is a three-valued sum type: <code>:held</code> (funds locked), <code>:released</code> (paid to operator), or <code>:refunded</code> (returned to client). Every escrow record transitions through exactly one of these terminal states.</p>
+<h2 data-number="5.3" id="hold-the-entry-point"><span class="header-section-number">5.3</span> Hold: The Entry Point</h2>
+<p>The <code>hold/3</code> function atomically decrements a client’s available balance and creates an escrow record. The entire operation executes within a single Mnesia transaction:</p>
+<pre id="lst:escrow-hold" data-caption="Atomic escrow hold via Mnesia transaction" data-label="lst:escrow-hold"><code>def handle_call({:hold, client_id, amount, contract_id},
+                _from, state) do
+  result =
+    :mnesia.transaction(fn -&gt;
+      case :mnesia.read(:balances, client_id) do
+        [{:balances, ^client_id, available, held}]
+            when available &gt;= amount -&gt;
+          :mnesia.write({:balances, client_id,
+                         available - amount, held + amount})
           escrow_id = generate_id()
-          <span class="atom">:mnesia</span>.write({<span class="atom">:escrows</span>, escrow_id,
-            client_id, amount, cid, <span class="atom">:held</span>})
+          now = DateTime.utc_now()
+          :mnesia.write(
+            {:escrows, escrow_id, client_id, amount,
+             contract_id, :held, now, nil})
           escrow_id
-        _ <span class="op">-></span>
-          <span class="atom">:mnesia</span>.abort(<span class="atom">:insufficient_funds</span>)
-      <span class="kw">end</span>
-    <span class="kw">end</span>)
 
-    <span class="kw">case</span> result <span class="kw">do</span>
-      {<span class="atom">:atomic</span>, eid} <span class="op">-></span> {<span class="atom">:reply</span>, {<span class="atom">:ok</span>, eid}, state}
-      {<span class="atom">:aborted</span>, reason} <span class="op">-></span>
-        {<span class="atom">:reply</span>, {<span class="atom">:error</span>, reason}, state}
-    <span class="kw">end</span>
-  <span class="kw">end</span>
-<span class="kw">end</span>
+        [{:balances, ^client_id, _available, _held}] -&gt;
+          :mnesia.abort(:insufficient_funds)
+
+        [] -&gt;
+          :mnesia.abort(:no_balance_record)
+      end
+    end)
+
+  case result do
+    {:atomic, escrow_id} -&gt;
+      {:reply, {:ok, escrow_id}, state}
+    {:aborted, reason} -&gt;
+      {:reply, {:error, reason}, state}
+  end
+end</code></pre>
+<p>Three critical properties are enforced within the transaction:</p>
+<ol>
+<li><p><strong>Atomicity.</strong> The balance read, sufficiency check, and write happen as one operation. There is no window between checking the balance and deducting it where a concurrent transaction could intervene (no TOCTOU race).</p></li>
+<li><p><strong>Non-negativity.</strong> The guard <code>when available &gt;= amount</code> prevents negative balances at the application level. The check and deduction are in the same transaction, so no concurrent deduction can sneak in between.</p></li>
+<li><p><strong>Conservation.</strong> The deduction from <code>available</code> and addition to <code>held</code> are equal. No credits are created or destroyed.</p></li>
+</ol>
+<h2 data-number="5.4" id="settle-release-or-refund"><span class="header-section-number">5.4</span> Settle: Release or Refund</h2>
+<p>Settlement resolves an escrow by either releasing credits (job completed) or refunding them (job cancelled):</p>
+<pre id="lst:escrow-settle" data-caption="Escrow settlement via pattern matching" data-label="lst:escrow-settle"><code>def handle_call({:settle, escrow_id, action}, _from, state) do
+  result =
+    :mnesia.transaction(fn -&gt;
+      case :mnesia.read(:escrows, escrow_id) do
+        [{:escrows, ^escrow_id, client_id, amount,
+          contract_id, :held, created_at, _}] -&gt;
+          now = DateTime.utc_now()
+          new_status = if action == :release,
+                         do: :released, else: :refunded
+
+          :mnesia.write(
+            {:escrows, escrow_id, client_id, amount,
+             contract_id, new_status, created_at, now})
+
+          case :mnesia.read(:balances, client_id) do
+            [{:balances, ^client_id, available, held}] -&gt;
+              if action == :refund do
+                :mnesia.write({:balances, client_id,
+                  available + amount, held - amount})
+              else
+                :mnesia.write({:balances, client_id,
+                  available, held - amount})
+              end
+          end
+
+          %{id: escrow_id, client_id: client_id,
+            amount: amount, contract_id: contract_id,
+            status: new_status, created_at: created_at,
+            settled_at: now}
+
+        [{:escrows, ^escrow_id, _, _, _, status, _, _}]
+            when status in [:released, :refunded] -&gt;
+          :mnesia.abort(:already_settled)
+
+        [] -&gt;
+          :mnesia.abort(:not_found)
+      end
+    end)
+
+  case result do
+    {:atomic, record} -&gt;
+      {:reply, {:ok, record}, state}
+    {:aborted, reason} -&gt;
+      {:reply, {:error, reason}, state}
+  end
+end</code></pre>
+<p>The pattern matching on the escrow status is exhaustive: the first clause matches <code>:held</code> (the only settleable state), the second matches already-settled records (preventing double-settlement), and the third matches the empty case (not found). The pin operator <code>^</code> ensures the escrow ID matches exactly.</p>
+<p>On release, the held amount is decremented from the client’s <code>held</code> field. The credits leave the client’s account entirely—they will be distributed to the operator by the Market module. On refund, the held amount is moved back to <code>available</code>.</p>
+<h2 data-number="5.5" id="bind-sequencing-escrow-operations"><span class="header-section-number">5.5</span> Bind: Sequencing Escrow Operations</h2>
+<p>The <code>bind/2</code> function enables sequential composition of escrow operations. It reads an existing escrow record, applies a transformation function, and writes the result back—all within a Mnesia transaction:</p>
+<pre id="lst:escrow-bind" data-caption="Escrow bind for sequential composition" data-label="lst:escrow-bind"><code>def handle_call({:bind, escrow_id, f}, _from, state) do
+  result =
+    :mnesia.transaction(fn -&gt;
+      case :mnesia.read(:escrows, escrow_id) do
+        [{:escrows, ^escrow_id, client_id, amount,
+          contract_id, status, created_at, settled_at}] -&gt;
+          record = %{
+            id: escrow_id, client_id: client_id,
+            amount: amount, contract_id: contract_id,
+            status: status, created_at: created_at,
+            settled_at: settled_at
+          }
+          case f.(record) do
+            {:ok, updated} -&gt;
+              :mnesia.write(
+                {:escrows, updated.id, updated.client_id,
+                 updated.amount, updated.contract_id,
+                 updated.status, updated.created_at,
+                 updated.settled_at})
+              updated
+            {:error, reason} -&gt;
+              :mnesia.abort(reason)
+          end
+        [] -&gt;
+          :mnesia.abort(:not_found)
+      end
+    end)
+
+  case result do
+    {:atomic, updated} -&gt; {:reply, {:ok, updated}, state}
+    {:aborted, reason} -&gt; {:reply, {:error, reason}, state}
+  end
+end</code></pre>
+<p>This is the monadic bind pattern: extract a value from a context (the Mnesia table), apply a function that returns a value in the same context (<code>{:ok, record}</code> or <code>{:error, reason}</code>), and flatten the result back into the context. The Mnesia transaction provides the “context”—the guarantee that the read-transform-write sequence is atomic.</p>
+<h2 data-number="5.6" id="conservation-invariant"><span class="header-section-number">5.6</span> Conservation Invariant</h2>
+<div id="inv:conservation" class="invariant">
+<p><strong>Invariant 1</strong> (Credit Conservation).  For any participant <span class="math inline">p</span>, at any point in time: <span class="math display">\text{available}(p) + \text{held}(p) + \text{distributed}(p) = \text{initial}(p)</span> where <span class="math inline">\text{distributed}(p)</span> is the total credits released from <span class="math inline">p</span>’s escrows.</p>
+</div>
+<div class="proof">
+<p><em>Proof.</em> By inspection of the three mutating operations:</p>
+<ul>
+<li><p><code>hold</code>: subtracts <span class="math inline">a</span> from available, adds <span class="math inline">a</span> to held. Net change: 0.</p></li>
+<li><p><code>settle(:refund)</code>: subtracts <span class="math inline">a</span> from held, adds <span class="math inline">a</span> to available. Net change: 0.</p></li>
+<li><p><code>settle(:release)</code>: subtracts <span class="math inline">a</span> from held. The <span class="math inline">a</span> credits are transferred out to the operator (tracked as distributed). Net change in total: 0.</p></li>
+</ul>
+<p>Since all three operations preserve the total <span class="math inline">\text{available} + \text{held} + \text{distributed}</span>, and the initial state has <span class="math inline">\text{held} = 0</span> and <span class="math inline">\text{distributed} = 0</span>, the invariant holds by induction on the sequence of operations. ◻</p>
+</div>
+<h1 data-number="6" id="sec:decomposition"><span class="header-section-number">6</span> Task Decomposition</h1>
+<p>Complex jobs must be broken into manageable subtasks. The Decomposer module takes a task specification and produces a directed acyclic graph (DAG) with dependency edges, then computes an execution schedule that maximizes parallelism.</p>
+<h2 data-number="6.1" id="data-types-2"><span class="header-section-number">6.1</span> Data Types</h2>
+<pre id="lst:decomp-types" data-caption="Decomposer types" data-label="lst:decomp-types"><code>@type subtask :: %{
+  id: String.t(),
+  parent_task_id: String.t(),
+  description: String.t(),
+  required_capabilities: [atom()],
+  estimated_credits: non_neg_integer(),
+  estimated_duration: non_neg_integer(),
+  dependencies: [String.t()],
+  status: :pending | :running | :completed
+        | :failed | :skipped
+}
+
+@type dag :: %{
+  task_id: String.t(),
+  subtasks: %{String.t() =&gt; subtask()},
+  edges: [{String.t(), String.t()}]
+}
+
+@type execution_level :: [String.t()]
+@type execution_schedule :: [execution_level()]</code></pre>
+<p>A DAG is a product type with three fields: the parent task ID, a map from subtask IDs to subtask records, and an edge list of <code>{from, to}</code> pairs representing dependencies. The execution schedule is a list of levels, where each level is a list of subtask IDs that can run in parallel.</p>
+<h2 data-number="6.2" id="decomposition"><span class="header-section-number">6.2</span> Decomposition</h2>
+<p>The <code>decompose/1</code> function transforms a task specification into a validated DAG:</p>
+<pre id="lst:decomp-main" data-caption="Task decomposition into a DAG" data-label="lst:decomp-main"><code>def decompose(%{subtask_specs: []}), do: {:error, :empty_task}
+def decompose(%{subtask_specs: nil}), do: {:error, :empty_task}
+
+def decompose(%{id: task_id} = task) do
+  specs = task.subtask_specs
+
+  subtasks =
+    specs
+    |&gt; Enum.with_index()
+    |&gt; Enum.map(fn {spec, idx} -&gt;
+      id = &quot;#{task_id}_sub_#{idx}&quot;
+      %{
+        id: id,
+        parent_task_id: task_id,
+        description: spec.description,
+        required_capabilities:
+          Map.get(spec, :required_capabilities, []),
+        estimated_credits:
+          Map.get(spec, :estimated_credits, 0),
+        estimated_duration:
+          Map.get(spec, :estimated_duration, 0),
+        dependencies:
+          resolve_dependencies(task_id,
+            Map.get(spec, :depends_on, []), idx),
+        status: :pending
+      }
+    end)
+
+  edges =
+    Enum.flat_map(subtasks, fn st -&gt;
+      Enum.map(st.dependencies,
+               fn dep_id -&gt; {dep_id, st.id} end)
+    end)
+
+  dag = %{
+    task_id: task_id,
+    subtasks: Map.new(subtasks, &amp;{&amp;1.id, &amp;1}),
+    edges: edges
+  }
+
+  case validate_dag(dag) do
+    :ok -&gt; {:ok, dag}
+    {:error, :cycle} -&gt; {:error, :cyclic_dependency}
+  end
+end</code></pre>
+<p>The function uses pattern matching on the input to handle error cases first (empty subtask specs), then proceeds with the decomposition pipeline. Dependencies are specified as indices into the subtask list (e.g., <code>depends_on: [0, 1]</code> means “depends on the first and second subtasks”), and <code>resolve_dependencies</code> converts these to subtask IDs while filtering out self-references and forward references:</p>
+<pre id="lst:decomp-deps" data-caption="Dependency resolution with safety checks" data-label="lst:decomp-deps"><code>defp resolve_dependencies(_task_id, [], _current_idx), do: []
+
+defp resolve_dependencies(task_id, dep_indices, current_idx) do
+  dep_indices
+  |&gt; Enum.reject(&amp;(&amp;1 &gt;= current_idx))
+  |&gt; Enum.map(fn idx -&gt; &quot;#{task_id}_sub_#{idx}&quot; end)
+end</code></pre>
+<p>The guard <code>&amp;(&amp;1 &gt;= current_idx)</code> prevents forward references, which would create cycles.</p>
+<h2 data-number="6.3" id="cycle-detection-via-kahns-algorithm"><span class="header-section-number">6.3</span> Cycle Detection via Kahn’s Algorithm</h2>
+<p>The DAG validation uses Kahn’s algorithm: starting from nodes with in-degree zero, repeatedly remove them and their outgoing edges. If all nodes are consumed, the graph is acyclic:</p>
+<pre id="lst:decomp-kahn" data-caption="Kahn&#39;s algorithm for cycle detection" data-label="lst:decomp-kahn"><code>defp validate_dag(%{subtasks: subtasks, edges: edges}) do
+  in_degrees = compute_in_degrees(subtasks, edges)
+  sources = for {id, 0} &lt;- in_degrees, do: id
+  all_ids = Map.keys(subtasks)
+
+  processed =
+    kahn_traverse(edges, sources, in_degrees, MapSet.new())
+
+  if MapSet.size(processed) == length(all_ids) do
+    :ok
+  else
+    {:error, :cycle}
+  end
+end
+
+defp kahn_traverse(_edges, [], _degrees, processed),
+  do: processed
+
+defp kahn_traverse(edges, current, degrees, processed) do
+  new_processed =
+    Enum.reduce(current, processed, &amp;MapSet.put(&amp;2, &amp;1))
+
+  {new_degrees, next} =
+    Enum.reduce(current, {degrees, []},
+      fn node, {deg_acc, next_acc} -&gt;
+        outgoing =
+          Enum.filter(edges, fn {from, _} -&gt; from == node end)
+
+        Enum.reduce(outgoing, {deg_acc, next_acc},
+          fn {_from, to}, {d, n} -&gt;
+            new_d = Map.update!(d, to, &amp;(&amp;1 - 1))
+            if new_d[to] == 0 and
+                not MapSet.member?(new_processed, to) do
+              {new_d, [to | n]}
+            else
+              {new_d, n}
+            end
+          end)
+      end)
+
+  kahn_traverse(edges, Enum.uniq(next),
+                new_degrees, new_processed)
+end</code></pre>
+<p>This is a purely functional implementation: each recursive call produces new immutable data structures. There is no mutation—the <code>MapSet</code> of processed nodes and the degree map are threaded through as accumulators.</p>
+<h2 data-number="6.4" id="topological-sort-with-parallel-levels"><span class="header-section-number">6.4</span> Topological Sort with Parallel Levels</h2>
+<p>The <code>topological_sort/1</code> function extends Kahn’s algorithm to produce execution <em>levels</em>—groups of subtasks that can execute concurrently because all their dependencies are satisfied by earlier levels:</p>
+<pre id="lst:decomp-topsort" data-caption="Topological sort with parallel level detection" data-label="lst:decomp-topsort"><code>def topological_sort(%{subtasks: subtasks, edges: edges}) do
+  in_degrees = compute_in_degrees(subtasks, edges)
+  sources = for {id, 0} &lt;- in_degrees, do: id
+  build_levels(edges, sources, in_degrees,
+               Map.keys(subtasks), [])
+end
+
+defp build_levels(_edges, [], _degrees, _all_ids, levels) do
+  Enum.reverse(levels)
+end
+
+defp build_levels(edges, current_level, degrees,
+                  all_ids, levels) do
+  processed = List.flatten([current_level | levels])
+
+  new_degrees =
+    Enum.reduce(current_level, degrees, fn id, acc -&gt;
+      edges
+      |&gt; Enum.filter(fn {from, _to} -&gt; from == id end)
+      |&gt; Enum.reduce(acc, fn {_from, to}, inner_acc -&gt;
+        Map.update!(inner_acc, to, &amp;(&amp;1 - 1))
+      end)
+    end)
+
+  next_level =
+    all_ids
+    |&gt; Enum.filter(fn id -&gt;
+      Map.get(new_degrees, id, 0) == 0 and
+        id not in processed and
+        id not in current_level
+    end)
+
+  build_levels(edges, next_level, new_degrees,
+               all_ids, [current_level | levels])
+end</code></pre>
+<p>Each level represents a barrier synchronization point: all subtasks in level <span class="math inline">L_i</span> must complete before any subtask in <span class="math inline">L_{i+1}</span> begins. The number of levels equals the length of the critical path (longest dependency chain), which is the theoretical minimum number of sequential steps.</p>
+<div id="prop:parallel-optimal" class="proposition">
+<p><strong>Proposition 2</strong> (Optimality of Level-Based Parallelism).  <em>The number of levels <span class="math inline">m</span> returned by <code>topological_sort/1</code> equals the length of the longest path in the DAG. No execution schedule can complete in fewer than <span class="math inline">m</span> sequential steps, because the longest-path tasks are sequentially dependent.</em></p>
+</div>
+<h2 data-number="6.5" id="dag-composition"><span class="header-section-number">6.5</span> DAG Composition</h2>
+<p>Two DAGs can be composed sequentially by connecting the sinks of the first to the sources of the second:</p>
+<pre id="lst:decomp-compose" data-caption="Functorial DAG composition" data-label="lst:decomp-compose"><code>def compose(%{task_id: id1} = dag1,
+            %{task_id: id2} = dag2) do
+  sinks1 = find_sinks(dag1)
+  sources2 = find_sources(dag2)
+
+  cross_edges =
+    for s &lt;- sinks1, t &lt;- sources2, do: {s, t}
+
+  merged = %{
+    task_id: &quot;#{id1}_then_#{id2}&quot;,
+    subtasks: Map.merge(dag1.subtasks, dag2.subtasks),
+    edges: dag1.edges ++ dag2.edges ++ cross_edges
+  }
+
+  {:ok, merged}
+end</code></pre>
+<p>The Cartesian product of sinks and sources creates the cross-edges. This preserves the semantic equivalence: executing the composed DAG is equivalent to executing <code>dag1</code>, waiting for all its terminal tasks to complete, and then executing <code>dag2</code>.</p>
+<h2 data-number="6.6" id="cost-estimates"><span class="header-section-number">6.6</span> Cost Estimates</h2>
+<p>The Decomposer provides two duration estimates:</p>
+<pre id="lst:decomp-duration" data-caption="Parallel duration estimation" data-label="lst:decomp-duration"><code>def estimated_parallel_duration(%{subtasks: subtasks} = dag) do
+  dag
+  |&gt; topological_sort()
+  |&gt; Enum.reduce(0, fn level, total -&gt;
+    level_max =
+      level
+      |&gt; Enum.map(fn id -&gt;
+        Map.fetch!(subtasks, id).estimated_duration
+      end)
+      |&gt; Enum.max(fn -&gt; 0 end)
+    total + level_max
+  end)
+end</code></pre>
+<p>For each level, the duration is the maximum of its subtasks (since they run in parallel). The total is the sum of per-level maxima. This is always less than or equal to the total sequential duration (sum of all subtask durations), and equals the critical path duration.</p>
+<h2 data-number="6.7" id="example-web-application-testing"><span class="header-section-number">6.7</span> Example: Web Application Testing</h2>
+<p>Consider a web testing job with five subtasks:</p>
+<pre id="lst:decomp-example" data-caption="Example task decomposition" data-label="lst:decomp-example"><code>task = %{
+  id: &quot;task_42&quot;,
+  description: &quot;Full web app test suite&quot;,
+  subtask_specs: [
+    %{description: &quot;E2E tests&quot;,
+      required_capabilities: [:playwright],
+      estimated_credits: 1000, estimated_duration: 60},
+    %{description: &quot;Load tests&quot;,
+      required_capabilities: [:k6],
+      estimated_credits: 800, estimated_duration: 45},
+    %{description: &quot;Security scan&quot;,
+      required_capabilities: [:zap],
+      estimated_credits: 600, estimated_duration: 30},
+    %{description: &quot;A11y audit&quot;,
+      required_capabilities: [:axe],
+      estimated_credits: 400, estimated_duration: 20},
+    %{description: &quot;Generate report&quot;,
+      required_capabilities: [:reporting],
+      estimated_credits: 200, estimated_duration: 15,
+      depends_on: [0, 1, 2, 3]}
+  ]
+}
+
+{:ok, dag} = PlannerEngine.Decomposer.decompose(task)
+schedule = PlannerEngine.Decomposer.topological_sort(dag)
+# =&gt; [[&quot;task_42_sub_0&quot;, &quot;task_42_sub_1&quot;,
+#       &quot;task_42_sub_2&quot;, &quot;task_42_sub_3&quot;],
+#      [&quot;task_42_sub_4&quot;]]</code></pre>
+<p>Level 0 contains four independent testing subtasks that run in parallel. Level 1 contains only the report generation, which depends on all four tests completing. The critical path length is 2. The parallel duration is <span class="math inline">\max(60, 45, 30, 20) + 15 = 75</span> minutes, compared to a sequential duration of <span class="math inline">60 + 45 + 30 + 20 + 15 = 170</span> minutes—a $2.3\times$ speedup.</p>
+<h1 data-number="7" id="sec:market"><span class="header-section-number">7</span> Market Clearing and Revenue Distribution</h1>
+<p>The Market module orchestrates the contract lifecycle: accepting proposals, creating contracts, holding escrow, distributing revenue, and handling cancellations and disputes.</p>
+<h2 data-number="7.1" id="data-types-3"><span class="header-section-number">7.1</span> Data Types</h2>
+<pre id="lst:market-types" data-caption="Market types" data-label="lst:market-types"><code>@type contract_status ::
+  :active | :completed | :cancelled | :disputed | :review
+
+@type pricing_model :: :per_task | :hourly | :per_token
+
+@type contract :: %{
+  id: String.t(),
+  client_id: String.t(),
+  operator_id: String.t(),
+  task_id: String.t(),
+  escrow_id: String.t() | nil,
+  status: contract_status(),
+  pricing_model: pricing_model(),
+  rate_credits: non_neg_integer(),
+  budget_ceiling: non_neg_integer(),
+  hours_worked: float(),
+  tokens_consumed: non_neg_integer(),
+  created_at: DateTime.t(),
+  completed_at: DateTime.t() | nil
+}
+
+@type revenue_split :: %{
+  total: non_neg_integer(),
+  operator: non_neg_integer(),
+  platform: non_neg_integer(),
+  llm_reserve: non_neg_integer()
+}</code></pre>
+<p>The contract status is a five-valued sum type with well-defined transitions. The pricing model is a three-valued sum type that determines how the billable total is computed.</p>
+<h2 data-number="7.2" id="market-clearing"><span class="header-section-number">7.2</span> Market Clearing</h2>
+<p>The <code>clear_market/1</code> function performs the full clearing sequence: find the best proposal, accept it (auto-rejecting all others), hold credits in escrow, and create the contract:</p>
+<pre id="lst:market-clear" data-caption="Market clearing: the full sequence" data-label="lst:market-clear"><code>def handle_call({:clear_market, task_id}, _from, state) do
+  with {:ok, best_proposal} &lt;-
+         PlannerEngine.OrderBook.best_proposal(task_id),
+       demands when demands != [] &lt;-
+         PlannerEngine.OrderBook.demands_for_task(task_id),
+       demand &lt;- hd(demands),
+       {:ok, _match} &lt;-
+         PlannerEngine.OrderBook.accept_proposal(
+           best_proposal.id) do
+    case create_contract_internal(
+           state, demand, best_proposal, :per_task) do
+      {:ok, contract, new_state} -&gt;
+        {:reply, {:ok, contract}, new_state}
+      {:error, reason} -&gt;
+        {:reply, {:error, reason}, state}
+    end
+  else
+    {:error, :no_proposals} -&gt;
+      {:reply, {:error, :no_proposals}, state}
+    [] -&gt;
+      {:reply, {:error, :no_demand}, state}
+    {:error, reason} -&gt;
+      {:reply, {:error, reason}, state}
+  end
+end</code></pre>
+<p>The <code>with</code> pipeline composes four fallible operations. If any step fails, the appropriate error is returned without side effects. This is crucial: if the escrow hold fails (insufficient funds), no contract is created and no proposals are rejected.</p>
+<h2 data-number="7.3" id="contract-creation-with-escrow"><span class="header-section-number">7.3</span> Contract Creation with Escrow</h2>
+<pre id="lst:market-contract" data-caption="Contract creation with escrow hold" data-label="lst:market-contract"><code>defp create_contract_internal(state, demand,
+                              proposal, pricing_model) do
+  contract_id = generate_id()
+
+  escrow_result =
+    PlannerEngine.Escrow.hold(
+      demand.client_id,
+      proposal.estimated_credits,
+      contract_id
+    )
+
+  case escrow_result do
+    {:ok, escrow_id} -&gt;
+      contract = %{
+        id: contract_id,
+        client_id: demand.client_id,
+        operator_id: proposal.agent_id,
+        task_id: demand.task_id,
+        escrow_id: escrow_id,
+        status: :active,
+        pricing_model: pricing_model,
+        rate_credits: proposal.estimated_credits,
+        budget_ceiling: demand.budget_ceiling,
+        hours_worked: 0.0,
+        tokens_consumed: 0,
+        created_at: DateTime.utc_now(),
+        completed_at: nil
+      }
+
+      new_state = %{state | contracts:
+        Map.put(state.contracts, contract_id, contract)}
+      {:ok, contract, new_state}
+
+    {:error, reason} -&gt;
+      {:error, reason}
+  end
+end</code></pre>
+<p>The escrow hold is the commit point: if it succeeds, the contract exists with guaranteed funding. If it fails, no contract is created. This eliminates the race condition where a contract is created but its funding fails.</p>
+<h2 data-number="7.4" id="contract-lifecycle-state-machine"><span class="header-section-number">7.4</span> Contract Lifecycle State Machine</h2>
+<p>The contract status transitions are enforced by pattern matching:</p>
+<pre id="lst:market-transitions" data-caption="State transition validation" data-label="lst:market-transitions"><code>defp valid_transition?(:active, :review), do: true
+defp valid_transition?(:active, :cancelled), do: true
+defp valid_transition?(:active, :disputed), do: true
+defp valid_transition?(:review, :completed), do: true
+defp valid_transition?(:review, :disputed), do: true
+defp valid_transition?(:review, :cancelled), do: true
+defp valid_transition?(:disputed, :completed), do: true
+defp valid_transition?(:disputed, :cancelled), do: true
+defp valid_transition?(_, _), do: false</code></pre>
+<p>This is a total function: every possible pair of statuses is covered, with the catch-all clause rejecting invalid transitions. The valid transitions form the following state machine:</p>
+<figure id="fig:contract-lifecycle">
+<pre style="text-align:center;border:1px dashed var(--border);padding:1.5rem;background:var(--surface);color:var(--text-dim);font-family:var(--font-mono);font-size:.85rem;line-height:1.8">
+                 ┌──────────┐
+                 │  active   │
+                 └──┬──┬──┬─┘
+          review ◄──┘  │  └──► cancelled (refund)
+            │          │
+            ▼          ▼
+       ┌────────┐  ┌──────────┐
+       │ review  │  │ disputed │
+       └─┬──┬──┬┘  └──┬────┬──┘
+         │  │  └──► disputed   │
+         │  │          │    │
+         ▼  ▼          ▼    ▼
+    completed  cancelled  completed  cancelled
+    (release)  (refund)   (release)  (refund)
 </pre>
+<figcaption>Contract lifecycle state machine. Terminal states are <code>completed</code> and <code>cancelled</code>. Each terminal state triggers escrow settlement.</figcaption>
+</figure>
+<h2 data-number="7.5" id="revenue-distribution"><span class="header-section-number">7.5</span> Revenue Distribution</h2>
+<p>Upon contract completion, escrowed credits are distributed according to a fixed split:</p>
+<pre id="lst:market-split" data-caption="Revenue split computation" data-label="lst:market-split"><code>@operator_share 0.70
+@platform_share 0.15
+@llm_reserve_share 0.15
 
-<h3>8.4 Task Decomposition with Supervision Trees</h3>
+def compute_split(total) do
+  operator = round(total * @operator_share)
+  platform = round(total * @platform_share)
+  llm_reserve = total - operator - platform
 
-<pre class="code-block"><span class="caption">Listing 4: DAG-based task decomposition</span>
-<span class="kw">defmodule</span> <span class="mod">PlannerEngine.Decomposer</span> <span class="kw">do</span>
-  <span class="kw">def</span> <span class="fn">decompose</span>(task) <span class="kw">do</span>
-    subtasks = analyze_and_split(task)
-    edges = infer_dependencies(subtasks)
+  %{
+    total: total,
+    operator: operator,
+    platform: platform,
+    llm_reserve: llm_reserve
+  }
+end</code></pre>
+<p>The LLM reserve is computed as the remainder (<code>total - operator - platform</code>) rather than via multiplication, ensuring the split always sums exactly to the total despite rounding.</p>
+<h2 data-number="7.6" id="pricing-models"><span class="header-section-number">7.6</span> Pricing Models</h2>
+<p>Three pricing models determine the billable total:</p>
+<pre id="lst:market-pricing" data-caption="Pricing model dispatch via pattern matching" data-label="lst:market-pricing"><code>def compute_total(contract) do
+  raw =
+    case contract.pricing_model do
+      :per_task -&gt;
+        contract.rate_credits
 
-    dag = %{
-      <span class="atom">task_id:</span> task.id,
-      <span class="atom">subtasks:</span> <span class="mod">Map</span>.new(subtasks, &amp;{&amp;1.id, &amp;1}),
-      <span class="atom">edges:</span> edges
-    }
+      :hourly -&gt;
+        contract.rate_credits * ceil(contract.hours_worked)
 
-    <span class="kw">case</span> validate_dag(dag) <span class="kw">do</span>
-      <span class="atom">:ok</span> <span class="op">-></span> {<span class="atom">:ok</span>, dag}
-      {<span class="atom">:error</span>, <span class="atom">:cycle</span>} <span class="op">-></span> {<span class="atom">:error</span>, <span class="atom">:cyclic_dependency</span>}
-    <span class="kw">end</span>
-  <span class="kw">end</span>
+      :per_token -&gt;
+        Map.get(contract, :rate_per_token,
+                contract.rate_credits) *
+          contract.tokens_consumed
+    end
 
-  <span class="kw">def</span> <span class="fn">topological_sort</span>(dag) <span class="kw">do</span>
-    in_degrees = compute_in_degrees(dag)
-    sources = <span class="kw">for</span> {id, 0} <span class="op"><-</span> in_degrees, <span class="atom">do:</span> id
-    build_levels(dag, sources, in_degrees, [])
-  <span class="kw">end</span>
+  min(raw, contract.budget_ceiling)
+end</code></pre>
+<p>The <code>case</code> expression dispatches on the pricing model sum type. In all cases, the result is capped at <code>budget_ceiling</code>, preventing overspend. The ceiling function on hours ensures operators are paid for partial hours.</p>
+<h2 data-number="7.7" id="contract-completion"><span class="header-section-number">7.7</span> Contract Completion</h2>
+<p>Completion settles the escrow, computes the revenue split, records the quality score, and updates the contract state:</p>
+<pre id="lst:market-complete" data-caption="Contract completion with revenue distribution" data-label="lst:market-complete"><code>def handle_call({:complete, contract_id, quality_vector},
+                _from, state) do
+  case Map.get(state.contracts, contract_id) do
+    %{status: status} = contract
+        when status in [:active, :review] -&gt;
+      escrow_result =
+        if contract.escrow_id do
+          PlannerEngine.Escrow.settle(
+            contract.escrow_id, :release)
+        else
+          {:ok, nil}
+        end
 
-  <span class="kw">defp</span> <span class="fn">build_levels</span>(_dag, [], _degrees, levels),
-    <span class="atom">do:</span> <span class="mod">Enum</span>.reverse(levels)
-  <span class="kw">defp</span> <span class="fn">build_levels</span>(dag, current_level, degrees, levels) <span class="kw">do</span>
-    new_degrees =
-      <span class="mod">Enum</span>.reduce(current_level, degrees, <span class="kw">fn</span> id, acc <span class="op">-></span>
-        dag.edges
-        <span class="op">|></span> <span class="mod">Enum</span>.filter(<span class="kw">fn</span> {from, _to} <span class="op">-></span> from == id <span class="kw">end</span>)
-        <span class="op">|></span> <span class="mod">Enum</span>.reduce(acc, <span class="kw">fn</span> {_from, to}, inner_acc <span class="op">-></span>
-          <span class="mod">Map</span>.update!(inner_acc, to, &amp;(&amp;1 - 1))
-        <span class="kw">end</span>)
-      <span class="kw">end</span>)
+      case escrow_result do
+        {:ok, _} -&gt;
+          total = compute_total(contract)
+          split = compute_split(total)
+          now = DateTime.utc_now()
 
-    next_level =
-      <span class="kw">for</span> {id, 0} <span class="op"><-</span> new_degrees,
-          id <span class="kw">not in</span> <span class="mod">List</span>.flatten([current_level | levels]),
-          <span class="atom">do:</span> id
+          completed_contract =
+            %{contract | status: :completed,
+                         completed_at: now}
 
-    build_levels(dag, next_level, new_degrees,
-                [current_level | levels])
-  <span class="kw">end</span>
-<span class="kw">end</span>
-</pre>
+          revenue_entry = %{
+            contract_id: contract_id,
+            split: split, timestamp: now
+          }
 
-<h3>8.5 Reputation Engine</h3>
+          new_state = %{state |
+            contracts: Map.put(state.contracts,
+              contract_id, completed_contract),
+            revenue_log:
+              [revenue_entry | state.revenue_log]
+          }
 
-<pre class="code-block"><span class="caption">Listing 5: Six-dimensional reputation scoring</span>
-<span class="kw">defmodule</span> <span class="mod">PlannerEngine.Reputation</span> <span class="kw">do</span>
-  <span class="kw">use</span> <span class="mod">GenServer</span>
+          # Update reputation
+          PlannerEngine.Reputation.record_quality(
+            contract.operator_id, quality_vector)
 
-  @dimensions [<span class="atom">:accuracy</span>, <span class="atom">:completeness</span>, <span class="atom">:timeliness</span>,
-               <span class="atom">:communication</span>, <span class="atom">:efficiency</span>, <span class="atom">:innovation</span>]
-  @default_weights <span class="mod">List</span>.duplicate(1/6, 6)
-  @decay_factor 0.95
+          {:reply,
+           {:ok, %{contract: completed_contract,
+                   split: split}},
+           new_state}
+      end
 
-  <span class="kw">def</span> <span class="fn">compute_score</span>(agent_id) <span class="kw">do</span>
-    <span class="mod">GenServer</span>.call(__MODULE__, {<span class="atom">:compute_score</span>, agent_id})
-  <span class="kw">end</span>
+    %{status: status} -&gt;
+      {:reply, {:error, {:invalid_status, status}}, state}
 
-  <span class="kw">def</span> <span class="fn">handle_call</span>({<span class="atom">:compute_score</span>, agent_id}, _from, state) <span class="kw">do</span>
-    history = <span class="mod">Map</span>.get(state.histories, agent_id, [])
-    score = exponential_weighted_score(
-              history, @default_weights, @decay_factor)
-    {<span class="atom">:reply</span>, score, state}
-  <span class="kw">end</span>
+    nil -&gt;
+      {:reply, {:error, :not_found}, state}
+  end
+end</code></pre>
+<p>The completion handler demonstrates the interaction between all subsystems: it calls Escrow to release funds, computes the revenue split, records the quality vector with the Reputation engine, and updates the Market’s own contract state.</p>
+<h2 data-number="7.8" id="contract-cancellation-with-refund"><span class="header-section-number">7.8</span> Contract Cancellation with Refund</h2>
+<pre id="lst:market-cancel" data-caption="Cancellation with automatic refund" data-label="lst:market-cancel"><code>def handle_call({:cancel, contract_id}, _from, state) do
+  case Map.get(state.contracts, contract_id) do
+    %{status: status} = contract
+        when status in [:active, :review, :disputed] -&gt;
+      if contract.escrow_id do
+        PlannerEngine.Escrow.settle(
+          contract.escrow_id, :refund)
+      end
 
-  <span class="kw">defp</span> <span class="fn">exponential_weighted_score</span>([], _w, _l), <span class="atom">do:</span> 0.5
-  <span class="kw">defp</span> <span class="fn">exponential_weighted_score</span>(history, weights, lambda) <span class="kw">do</span>
-    n = length(history)
+      cancelled = %{contract | status: :cancelled}
+      new_state = %{state | contracts:
+        Map.put(state.contracts, contract_id, cancelled)}
+      {:reply, {:ok, cancelled}, new_state}
 
-    {weighted_sum, weight_total} =
-      history
-      <span class="op">|></span> <span class="mod">Enum</span>.with_index()
-      <span class="op">|></span> <span class="mod">Enum</span>.reduce({0.0, 0.0}, <span class="kw">fn</span> {qv, i}, {ws, wt} <span class="op">-></span>
-        decay = <span class="atom">:math</span>.pow(lambda, n - 1 - i)
-        inner = <span class="mod">Enum</span>.zip(weights, qv)
-                <span class="op">|></span> <span class="mod">Enum</span>.map(<span class="kw">fn</span> {w, q} <span class="op">-></span> w * q <span class="kw">end</span>)
-                <span class="op">|></span> <span class="mod">Enum</span>.sum()
-        {ws + decay * inner, wt + decay}
-      <span class="kw">end</span>)
+    %{status: status} -&gt;
+      {:reply, {:error, {:invalid_status, status}}, state}
 
+    nil -&gt;
+      {:reply, {:error, :not_found}, state}
+  end
+end</code></pre>
+<p>Cancellation triggers a refund: the held credits are returned to the client’s available balance. The guard <code>when status in [:active, :review, :disputed]</code> ensures that only live contracts can be cancelled—completed or already-cancelled contracts are rejected.</p>
+<h1 data-number="8" id="sec:reputation"><span class="header-section-number">8</span> Reputation Engine</h1>
+<p>The reputation engine computes trust scores for agents based on their historical quality performance and detects gaming behavior.</p>
+<h2 data-number="8.1" id="six-quality-dimensions"><span class="header-section-number">8.1</span> Six Quality Dimensions</h2>
+<p>Each completed job produces a quality vector <span class="math inline">\mathbf{q} \in [0, 1]^6</span>:</p>
+<div class="center">
+<table>
+<thead>
+<tr>
+<th style="text-align: center;"><strong>Index</strong></th>
+<th style="text-align: left;"><strong>Dimension</strong></th>
+<th style="text-align: left;"><strong>Interpretation</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">1</td>
+<td style="text-align: left;">Accuracy</td>
+<td style="text-align: left;">Correctness of deliverables against requirements</td>
+</tr>
+<tr>
+<td style="text-align: center;">2</td>
+<td style="text-align: left;">Completeness</td>
+<td style="text-align: left;">Fraction of requirements addressed</td>
+</tr>
+<tr>
+<td style="text-align: center;">3</td>
+<td style="text-align: left;">Timeliness</td>
+<td style="text-align: left;"><span class="math inline">\max(0, 1 - (\text{actual} - \text{estimated}) / \text{deadline})</span></td>
+</tr>
+<tr>
+<td style="text-align: center;">4</td>
+<td style="text-align: left;">Communication</td>
+<td style="text-align: left;">Responsiveness and clarity (client-rated)</td>
+</tr>
+<tr>
+<td style="text-align: center;">5</td>
+<td style="text-align: left;">Efficiency</td>
+<td style="text-align: left;"><span class="math inline">1 - (\text{actual\_credits} - \text{estimated\_credits}) / \text{budget\_ceiling}</span></td>
+</tr>
+<tr>
+<td style="text-align: center;">6</td>
+<td style="text-align: left;">Innovation</td>
+<td style="text-align: left;">Exceeding requirements or novel approaches</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h2 data-number="8.2" id="data-types-and-constants"><span class="header-section-number">8.2</span> Data Types and Constants</h2>
+<pre id="lst:rep-types" data-caption="Reputation types and constants" data-label="lst:rep-types"><code>@dimensions [:accuracy, :completeness, :timeliness,
+             :communication, :efficiency, :innovation]
+@num_dimensions 6
+@default_weights List.duplicate(1.0 / @num_dimensions,
+                                @num_dimensions)
+@default_decay 0.95
+@default_min_jobs 5
+@initial_reputation 0.5
+
+# Anti-gaming thresholds
+@min_variance_threshold 0.001
+@min_completion_seconds 60
+@max_perfect_streak 10
+
+@type quality_vector :: [float()]
+
+@type agent_history :: %{
+  agent_id: String.t(),
+  scores: [quality_vector()],
+  gaming_flags: [atom()],
+  gaming_suspicion: float()
+}
+
+@type state :: %{
+  histories: %{String.t() =&gt; agent_history()},
+  weights: [float()],
+  decay: float(),
+  min_jobs: non_neg_integer()
+}</code></pre>
+<p>The default weight vector is uniform (<span class="math inline">\frac{1}{6}</span> per dimension). The decay factor of 0.95 means that a score from 20 jobs ago has weight <span class="math inline">0.95^{20} \approx 0.36</span> relative to the most recent score. The minimum jobs threshold of 5 implements a “seasoning” period before full trust is granted.</p>
+<h2 data-number="8.3" id="exponentially-weighted-reputation-score"><span class="header-section-number">8.3</span> Exponentially-Weighted Reputation Score</h2>
+<p>The reputation score gives more weight to recent performance:</p>
+<p id="eq:reputation"><span class="math display">\begin{equation}
+
+    R(\alpha) = \frac{\sum_{i=1}^{N} \lambda^{N-i} \langle \mathbf{w}, \mathbf{q}_i \rangle}{\sum_{i=1}^{N} \lambda^{N-i}}
+\end{equation}</span></p>
+<p>where <span class="math inline">\mathbf{w}</span> is the weight vector, <span class="math inline">\lambda</span> is the decay factor, and <span class="math inline">N</span> is the number of completed jobs.</p>
+<pre id="lst:rep-score" data-caption="Exponentially-weighted reputation scoring" data-label="lst:rep-score"><code>defp exponential_weighted_score([], _weights, _decay),
+  do: @initial_reputation
+
+defp exponential_weighted_score(scores, weights, decay) do
+  n = length(scores)
+
+  {weighted_sum, weight_total} =
+    scores
+    |&gt; Enum.with_index()
+    |&gt; Enum.reduce({0.0, 0.0}, fn {qv, i}, {ws, wt} -&gt;
+      decay_factor = :math.pow(decay, n - 1 - i)
+      inner_product = inner_product(weights, qv)
+      {ws + decay_factor * inner_product,
+       wt + decay_factor}
+    end)
+
+  if weight_total == 0.0 do
+    @initial_reputation
+  else
     weighted_sum / weight_total
-  <span class="kw">end</span>
-<span class="kw">end</span>
-</pre>
+  end
+end
 
-<h3>8.6 Market Module</h3>
+defp inner_product(weights, values) do
+  Enum.zip(weights, values)
+  |&gt; Enum.reduce(0.0, fn {w, v}, acc -&gt; acc + w * v end)
+end</code></pre>
+<p>The inner product <span class="math inline">\langle \mathbf{w}, \mathbf{q}_i \rangle</span> collapses the 6-dimensional quality vector into a single score. The exponential weighting ensures that an agent who improves over time sees their reputation rise quickly, while an agent who declines is penalized promptly.</p>
+<div id="prop:rep-convergence" class="proposition">
+<p><strong>Proposition 3</strong> (Reputation Convergence).  <em>Under honest participation—quality vectors <span class="math inline">\mathbf{q}_i</span> drawn i.i.d. with mean <span class="math inline">\boldsymbol{\mu}</span>—the reputation score converges: <span class="math display">R(\alpha) \xrightarrow{N \to \infty} \langle \mathbf{w}, \boldsymbol{\mu} \rangle</span> almost surely, because the exponentially-weighted average is a consistent estimator for <span class="math inline">\langle \mathbf{w}, \boldsymbol{\mu} \rangle</span> when <span class="math inline">\text{Var}(\mathbf{q}_i) &lt; \infty</span> (guaranteed since <span class="math inline">\mathbf{q}_i \in [0,1]^6</span>).</em></p>
+</div>
+<h2 data-number="8.4" id="trust-score"><span class="header-section-number">8.4</span> Trust Score</h2>
+<p>The trust score combines reputation with anti-gaming signals and a seasoning factor:</p>
+<p id="eq:trust"><span class="math display">\begin{equation}
 
-<pre class="code-block"><span class="caption">Listing 6: Market clearing and revenue distribution</span>
-<span class="kw">defmodule</span> <span class="mod">PlannerEngine.Market</span> <span class="kw">do</span>
-  <span class="kw">use</span> <span class="mod">GenServer</span>
+    T(\alpha) = R(\alpha) \cdot (1 - \gamma(\alpha)) \cdot \min\left(1, \frac{N(\alpha)}{N_{\min}}\right)
+\end{equation}</span></p>
+<p>where <span class="math inline">\gamma(\alpha) \in [0, 1]</span> is the gaming suspicion level and <span class="math inline">N_{\min}</span> is the minimum number of jobs for full trust.</p>
+<pre id="lst:rep-trust" data-caption="Trust score computation" data-label="lst:rep-trust"><code>def handle_call({:trust_score, agent_id}, _from, state) do
+  history = Map.get(state.histories, agent_id)
 
-  @operator_share 0.70
-  @platform_share 0.15
-  @llm_reserve_share 0.15
+  trust =
+    if history == nil do
+      0.0
+    else
+      reputation =
+        exponential_weighted_score(
+          history.scores, state.weights, state.decay)
+      gaming_penalty = 1.0 - history.gaming_suspicion
+      n = length(history.scores)
+      seasoning = min(1.0, n / state.min_jobs)
+      reputation * gaming_penalty * seasoning
+    end
 
-  <span class="kw">def</span> <span class="fn">clear_market</span>(task_id) <span class="kw">do</span>
-    <span class="mod">GenServer</span>.call(__MODULE__, {<span class="atom">:clear_market</span>, task_id})
-  <span class="kw">end</span>
+  {:reply, trust, state}
+end</code></pre>
+<p>The three multiplicative factors ensure that:</p>
+<ul>
+<li><p>An agent with no history gets trust 0.0 (not the default reputation of 0.5).</p></li>
+<li><p>An agent with gaming flags sees their trust reduced proportionally.</p></li>
+<li><p>An agent with fewer than <code>min_jobs</code> completions has proportionally reduced trust (linear ramp from 0 to 1 over the first 5 jobs).</p></li>
+</ul>
+<h2 data-number="8.5" id="recording-quality-and-updating-suspicion"><span class="header-section-number">8.5</span> Recording Quality and Updating Suspicion</h2>
+<p>Quality recording is asynchronous (GenServer cast) because it does not need to block the caller:</p>
+<pre id="lst:rep-record" data-caption="Quality recording with gaming detection" data-label="lst:rep-record"><code>def handle_cast({:record, agent_id, quality_vector, opts},
+                state) do
+  history = Map.get(state.histories, agent_id,
+                    new_history(agent_id))
 
-  <span class="kw">def</span> <span class="fn">distribute_revenue</span>(contract_id) <span class="kw">do</span>
-    <span class="mod">GenServer</span>.call(__MODULE__, {<span class="atom">:distribute</span>, contract_id})
-  <span class="kw">end</span>
+  updated_history = %{history |
+    scores: history.scores ++ [quality_vector]
+  }
 
-  <span class="kw">defp</span> <span class="fn">do_distribute</span>(contract) <span class="kw">do</span>
-    total = compute_total(contract)
-    %{
-      <span class="atom">operator:</span> round(total * @operator_share),
-      <span class="atom">platform:</span> round(total * @platform_share),
-      <span class="atom">llm_reserve:</span> round(total * @llm_reserve_share)
-    }
-  <span class="kw">end</span>
+  gaming_flags = run_gaming_detection(updated_history, opts)
 
-  <span class="kw">defp</span> <span class="fn">compute_total</span>(%{<span class="atom">pricing_model:</span> <span class="atom">:per_task</span>} = c),
-    <span class="atom">do:</span> c.rate_credits
-  <span class="kw">defp</span> <span class="fn">compute_total</span>(%{<span class="atom">pricing_model:</span> <span class="atom">:hourly</span>} = c),
-    <span class="atom">do:</span> c.rate_credits * ceil(c.hours_worked)
-  <span class="kw">defp</span> <span class="fn">compute_total</span>(%{<span class="atom">pricing_model:</span> <span class="atom">:per_token</span>} = c),
-    <span class="atom">do:</span> c.rate_per_token * c.tokens_consumed
-<span class="kw">end</span>
-</pre>
+  gaming_suspicion =
+    if gaming_flags == [] do
+      max(0.0, history.gaming_suspicion - 0.01)
+    else
+      min(1.0, history.gaming_suspicion +
+                0.1 * length(gaming_flags))
+    end
 
-<!-- Section 9: Case Studies -->
-<h2 id="sec-case-studies">9. Case Studies</h2>
+  final_history = %{updated_history |
+    gaming_flags: gaming_flags,
+    gaming_suspicion: gaming_suspicion
+  }
 
-<h3>9.1 AI Agent Marketplace: The AgentHero Model</h3>
+  new_state = %{state | histories:
+    Map.put(state.histories, agent_id, final_history)}
 
-<p>The AgentHero platform implements the full framework described in this paper. We trace a concrete job through the categorical machinery.</p>
+  {:noreply, new_state}
+end</code></pre>
+<p>The gaming suspicion level is a leaky integrator: it increases by 0.1 per detected flag and decreases by 0.01 per clean evaluation. This means a single flag takes 10 clean evaluations to fully decay, providing a long memory for suspicious behavior.</p>
+<h2 data-number="8.6" id="anti-gaming-detection"><span class="header-section-number">8.6</span> Anti-Gaming Detection</h2>
+<p>Three anomaly detectors run on every quality recording:</p>
+<pre id="lst:rep-gaming" data-caption="Anti-gaming detection pipeline" data-label="lst:rep-gaming"><code>defp run_gaming_detection(history, opts) do
+  checks = [
+    {:score_inflation, &amp;detect_score_inflation/1},
+    {:rapid_cycling, &amp;detect_rapid_cycling(&amp;1, opts)},
+    {:perfect_streak, &amp;detect_perfect_streak/1}
+  ]
 
-<h4>Scenario</h4>
-<p>A client needs a web application tested. The job requires: functional testing (Playwright-based E2E tests), performance testing (k6 load tests), security scanning (OWASP ZAP), and accessibility audit (axe-core).</p>
+  Enum.flat_map(checks, fn {flag, detector} -&gt;
+    if detector.(history), do: [flag], else: []
+  end)
+end</code></pre>
+<h4 data-number="8.6.0.1" id="score-inflation"><span class="header-section-number">8.6.0.1</span> Score inflation</h4>
+<p>detects suspiciously low variance across all quality dimensions, suggesting manufactured scores:</p>
+<pre id="lst:rep-inflation" data-caption="Score inflation detection" data-label="lst:rep-inflation"><code>defp detect_score_inflation(%{scores: scores})
+    when length(scores) &lt; 3, do: false
 
-<h4>Step 1: Task functor</h4>
-<p>The client posts the job (status: <code>draft</code>). The task functor \(F\) maps it to requirements:</p>
-$$F(\tau) = (\{\text{playwright}, \text{k6}, \text{zap}, \text{axe}\}, \{t \leq 4\text{h}\}, 5000\text{ credits}, \text{24h deadline})$$
+defp detect_score_inflation(%{scores: scores}) do
+  flat_scores = List.flatten(scores)
+  n = length(flat_scores)
 
-<h4>Step 2: Job decomposition</h4>
-<p>The orchestrator applies the decomposition functor \(\Delta\):</p>
-$$\Delta(\tau): \quad V = \{\sigma_{\text{func}}, \sigma_{\text{perf}}, \sigma_{\text{sec}}, \sigma_{\text{a11y}}, \sigma_{\text{report}}\}$$
-$$E = \{(\sigma_{\text{func}}, \sigma_{\text{report}}), (\sigma_{\text{perf}}, \sigma_{\text{report}}), (\sigma_{\text{sec}}, \sigma_{\text{report}}), (\sigma_{\text{a11y}}, \sigma_{\text{report}})\}$$
-<p>The topological sort yields levels \(L_0 = \{\sigma_{\text{func}}, \sigma_{\text{perf}}, \sigma_{\text{sec}}, \sigma_{\text{a11y}}\}\) (parallel) and \(L_1 = \{\sigma_{\text{report}}\}\) (barrier). The critical path length is 2.</p>
+  if n &lt; 2 do
+    false
+  else
+    mean = Enum.sum(flat_scores) / n
+    variance =
+      flat_scores
+      |&gt; Enum.map(fn x -&gt; (x - mean) * (x - mean) end)
+      |&gt; Enum.sum()
+      |&gt; Kernel./(n - 1)
+    variance &lt; @min_variance_threshold
+  end
+end</code></pre>
+<p>Real-world quality scores have natural variance—different jobs have different difficulties, and even excellent agents occasionally underperform on one dimension. A variance below 0.001 across 18+ values ($3 \times 6$ dimensions) is statistically implausible under honest evaluation.</p>
+<h4 data-number="8.6.0.2" id="rapid-cycling"><span class="header-section-number">8.6.0.2</span> Rapid cycling</h4>
+<p>detects impossibly fast completions with perfect scores:</p>
+<pre id="lst:rep-rapid" data-caption="Rapid cycling detection" data-label="lst:rep-rapid"><code>defp detect_rapid_cycling(%{scores: scores}, _opts)
+    when length(scores) &lt; 3, do: false
 
-<h4>Step 3: Order book</h4>
-<p>The job moves to <code>open</code>. Three operators submit proposals:</p>
+defp detect_rapid_cycling(%{scores: scores}, opts) do
+  completion_seconds =
+    Keyword.get(opts, :completion_seconds, nil)
 
-<div class="table-wrap">
+  cond do
+    completion_seconds != nil and
+        completion_seconds &lt; @min_completion_seconds -&gt;
+      recent = Enum.take(scores, -3)
+      Enum.all?(recent, fn qv -&gt;
+        Enum.all?(qv, &amp;(&amp;1 &gt; 0.9))
+      end)
+    true -&gt;
+      false
+  end
+end</code></pre>
+<p>A job completed in under 60 seconds with all quality dimensions above 0.9 across the last 3 jobs suggests automated fake completions.</p>
+<h4 data-number="8.6.0.3" id="perfect-streak"><span class="header-section-number">8.6.0.3</span> Perfect streak</h4>
+<p>detects an unrealistic run of near-perfect scores:</p>
+<pre id="lst:rep-streak" data-caption="Perfect streak detection" data-label="lst:rep-streak"><code>defp detect_perfect_streak(%{scores: scores})
+    when length(scores) &lt; @max_perfect_streak,
+  do: false
+
+defp detect_perfect_streak(%{scores: scores}) do
+  recent = Enum.take(scores, -@max_perfect_streak)
+  Enum.all?(recent, fn qv -&gt;
+    Enum.all?(qv, &amp;(&amp;1 &gt;= 0.99))
+  end)
+end</code></pre>
+<p>Ten consecutive jobs with all six dimensions at 0.99 or above has a probability of approximately <span class="math inline">(0.01)^{60} \approx 10^{-120}</span> under a uniform distribution, making it a strong indicator of score manipulation.</p>
+<h2 data-number="8.7" id="configurable-weights"><span class="header-section-number">8.7</span> Configurable Weights</h2>
+<p>The weight vector can be adjusted at runtime:</p>
+<pre id="lst:rep-weights" data-caption="Dynamic weight configuration" data-label="lst:rep-weights"><code>def set_weights(weights)
+    when length(weights) == @num_dimensions do
+  sum = Enum.sum(weights)
+
+  if abs(sum - 1.0) &lt; 0.001 and
+      Enum.all?(weights, &amp;(&amp;1 &gt;= 0)) do
+    GenServer.cast(__MODULE__, {:set_weights, weights})
+  else
+    {:error, :invalid_weights}
+  end
+end
+
+def set_weights(_), do: {:error, :invalid_weights}</code></pre>
+<p>The validation ensures the weights form a valid probability distribution (non-negative, sum to 1). This allows the marketplace to emphasize different quality dimensions—for example, a time-sensitive marketplace might weight timeliness more heavily.</p>
+<h1 data-number="9" id="sec:walkthrough"><span class="header-section-number">9</span> End-to-End Walkthrough</h1>
+<p>We trace a concrete job through the full pipeline, mapping each step to both the Elixir implementation and the production AgentHero system.</p>
+<h2 data-number="9.1" id="job-posting"><span class="header-section-number">9.1</span> Job Posting</h2>
+<p>A client posts a web testing job:</p>
+<pre id="lst:walk-demand" data-caption="Posting a demand" data-label="lst:walk-demand"><code>demand = %{
+  client_id: &quot;client_1&quot;,
+  task_id: &quot;task_42&quot;,
+  required_capabilities: [:playwright, :k6],
+  budget_ceiling: 5000,
+  deadline: ~U[2026-03-11 00:00:00Z]
+}
+:ok = PlannerEngine.OrderBook.post_demand(demand)</code></pre>
+<p>In AgentHero, this corresponds to a client creating a job (status: <code>draft</code>), filling in requirements, and publishing it (status: <code>open</code>).</p>
+<h2 data-number="9.2" id="agent-proposals"><span class="header-section-number">9.2</span> Agent Proposals</h2>
+<p>Three agents submit proposals:</p>
+<pre id="lst:walk-proposals" data-caption="Submitting proposals" data-label="lst:walk-proposals"><code>proposals = [
+  %{agent_id: &quot;testbot_pro&quot;, task_id: &quot;task_42&quot;,
+    execution_plan: &quot;Playwright E2E + k6 load tests&quot;,
+    estimated_credits: 3500, estimated_duration: 180,
+    confidence_score: 0.92},
+  %{agent_id: &quot;qa_agent&quot;, task_id: &quot;task_42&quot;,
+    execution_plan: &quot;Comprehensive QA pipeline&quot;,
+    estimated_credits: 4200, estimated_duration: 120,
+    confidence_score: 0.85},
+  %{agent_id: &quot;bughunter&quot;, task_id: &quot;task_42&quot;,
+    execution_plan: &quot;Budget-friendly testing&quot;,
+    estimated_credits: 2800, estimated_duration: 300,
+    confidence_score: 0.78}
+]
+
+Enum.each(proposals, &amp;PlannerEngine.OrderBook.submit_proposal/1)</code></pre>
+<h2 data-number="9.3" id="cost-adjusted-ranking"><span class="header-section-number">9.3</span> Cost-Adjusted Ranking</h2>
+<p>Assume reputations of 0.88, 0.91, and 0.72 respectively. The cost functional (<a href="#sec:order-book">Equation 1</a>) produces:</p>
+<div class="center">
 <table>
-<thead><tr><th>Agent</th><th>Credits</th><th>Duration</th><th>Confidence</th><th>Reputation</th></tr></thead>
+<thead>
+<tr>
+<th style="text-align: left;"><strong>Agent</strong></th>
+<th style="text-align: center;"><strong>Credits</strong></th>
+<th style="text-align: center;"><strong>Confidence</strong></th>
+<th style="text-align: center;"><strong>Reputation</strong></th>
+<th style="text-align: center;"><strong>Denominator</strong></th>
+<th style="text-align: right;"><strong>Cost</strong></th>
+</tr>
+</thead>
 <tbody>
-<tr><td>\(\alpha_1\) (TestBot-Pro)</td><td>3500</td><td>3h</td><td>0.92</td><td>0.88</td></tr>
-<tr><td>\(\alpha_2\) (QA-Agent)</td><td>4200</td><td>2h</td><td>0.85</td><td>0.91</td></tr>
-<tr><td>\(\alpha_3\) (BugHunter)</td><td>2800</td><td>5h</td><td>0.78</td><td>0.72</td></tr>
+<tr>
+<td style="text-align: left;">testbot_pro</td>
+<td style="text-align: center;">3500</td>
+<td style="text-align: center;">0.92</td>
+<td style="text-align: center;">0.88</td>
+<td style="text-align: center;">1.81</td>
+<td style="text-align: right;">1934</td>
+</tr>
+<tr>
+<td style="text-align: left;">qa_agent</td>
+<td style="text-align: center;">4200</td>
+<td style="text-align: center;">0.85</td>
+<td style="text-align: center;">0.91</td>
+<td style="text-align: center;">1.77</td>
+<td style="text-align: right;">2373</td>
+</tr>
+<tr>
+<td style="text-align: left;">bughunter</td>
+<td style="text-align: center;">2800</td>
+<td style="text-align: center;">0.78</td>
+<td style="text-align: center;">0.72</td>
+<td style="text-align: center;">1.56</td>
+<td style="text-align: right;">1795</td>
+</tr>
 </tbody>
 </table>
 </div>
-
-<h4>Step 4: Matching</h4>
-<p>The cost functional from Corollary 4.2:</p>
-$$\text{cost}(\alpha_1) = \frac{3500}{1 + 0.92 \times 0.88} = \frac{3500}{1.8096} \approx 1934$$
-$$\text{cost}(\alpha_2) = \frac{4200}{1 + 0.85 \times 0.91} = \frac{4200}{1.7735} \approx 2368$$
-$$\text{cost}(\alpha_3) = \frac{2800}{1 + 0.78 \times 0.72} = \frac{2800}{1.5616} \approx 1793$$
-
-<p>\(\alpha_3\) has the lowest cost but the lowest confidence and reputation. The client selects \(\alpha_1\) (best cost-adjusted quality), triggering: (1) \(\alpha_2\) and \(\alpha_3\) auto-rejected (colimit universal property); (2) <code>holdEscrow(client, 3500, contract_42)</code> (escrow monad unit); (3) Contract created, job moves to <code>in_progress</code>.</p>
-
-<h4>Step 5: Execution</h4>
-<p>The Inngest pipeline executes the DAG. Level \(L_0\) runs four subtasks in parallel. Upon completion, barrier synchronization triggers \(L_1\) (report generation).</p>
-
-<h4>Step 6: Settlement</h4>
-<p>The client approves the deliverable. Revenue split:</p>
-$$\text{Operator } (\alpha_1): 0.70 \times 3500 = 2450 \text{ credits}$$
-$$\text{Platform}: 0.15 \times 3500 = 525 \text{ credits}$$
-$$\text{LLM reserve}: 0.15 \times 3500 = 525 \text{ credits}$$
-
-<h4>Step 7: Reputation update</h4>
-<p>The evaluator scores quality: \(\mathbf{q} = (0.95, 0.90, 0.97, 0.88, 0.91, 0.82)\). Agent \(\alpha_1\)'s reputation is updated via the exponentially-weighted average.</p>
-
-<h3>9.2 Decentralized Task Allocation</h3>
-
-<p>Consider a scenario where no central marketplace exists. Agents discover tasks through a gossip protocol, and matching occurs via distributed consensus. The categorical framework still applies: the order book profunctor \(P\) is distributed across nodes with CRDT-based consistency; the escrow monad is implemented via a distributed ledger; and the natural transformation \(\eta\) is computed locally and verified globally. This demonstrates the framework's generality.</p>
-
-<h3>9.3 Multi-Agent Negotiation</h3>
-
-<p>In complex jobs, the decomposition functor \(\Delta\) produces a DAG where different subtasks are matched to different agents. The planner natural transformation \(\eta\) must then be a <em>family</em> of matchings:</p>
-$$\eta = \{\eta_{\sigma_i}: F(\sigma_i) \to G(M(\sigma_i))\}_{i=1}^{n}$$
-<p>The naturality condition ensures that agents assigned to dependent subtasks can communicate: if \((\sigma_i, \sigma_j) \in E\), then \(M(\sigma_i)\)'s output is compatible with \(M(\sigma_j)\)'s input.</p>
-
-<!-- Section 10: Discussion -->
-<h2 id="sec-discussion">10. Discussion</h2>
-
-<h3>10.1 Comparison to Financial Exchanges</h3>
-
-<div class="table-wrap">
-<table>
-<thead><tr><th>Aspect</th><th>Financial Exchange</th><th>AI Planner</th></tr></thead>
-<tbody>
-<tr><td>Asset</td><td>Fungible (shares, contracts)</td><td>Non-fungible (tasks)</td></tr>
-<tr><td>Pricing</td><td>Continuous price discovery</td><td>Discrete bidding rounds</td></tr>
-<tr><td>Settlement</td><td>T+1 or T+2</td><td>Upon verified completion</td></tr>
-<tr><td>Quality</td><td>N/A (fungible)</td><td>6-dimensional scoring</td></tr>
-<tr><td>Counterparty risk</td><td>Clearinghouse guarantee</td><td>Escrow monad</td></tr>
-<tr><td>Information</td><td>Price, volume</td><td>Confidence, reputation</td></tr>
-</tbody>
-</table>
-</div>
-
-<p>The key innovation is that AI task markets require <em>quality verification</em> before settlement, introducing a review phase absent in financial exchanges.</p>
-
-<h3>10.2 Comparison to Kubernetes Scheduler</h3>
-
-<p>The Kubernetes scheduler and the AI planner both solve assignment problems, but at different abstraction levels. Kubernetes assigns deterministic workloads to nodes; the AI planner assigns stochastic workloads to self-interested agents. The categorical framework subsumes both: Kubernetes scheduling is the special case where the escrow monad is trivial (\(E = \mathrm{id}\)) and the reputation functor is constant (\(\mathcal{R}(\alpha) = 1\) for all \(\alpha\)).</p>
-
-<h3>10.3 Mechanism Design Implications</h3>
-
-<p>The revelation principle suggests that our bidding mechanism can be replaced by a direct revelation mechanism. The VCG payment for agent \(\alpha_k\) winning task \(\tau\) is:</p>
-$$p_k^{\text{VCG}} = \texttt{cost}(\alpha_{k'}) - \sum_{j \neq k} \texttt{cost}(\alpha_j)$$
-<p>where \(\alpha_{k'}\) is the second-best agent. However, VCG has known vulnerabilities in repeated settings; our anti-gaming mechanisms address this by detecting collusion rings and suspicious patterns.</p>
-
-<h3>10.4 Limitations and Future Work</h3>
-
-<p><strong>Bounded rationality.</strong> Our framework assumes agents maximize expected utility. LLM-based agents may exhibit bounded rationality. Behavioral mechanism design offers tools for handling such deviations.</p>
-
-<p><strong>Dynamic capabilities.</strong> Agent capabilities evolve over time. The capability functor \(G\) should be time-dependent: \(G_t: \mathcal{A} \to \mathcal{K}\), requiring indexed categories.</p>
-
-<p><strong>Multi-objective optimization.</strong> The cost functional is scalar. Pareto-optimal matching in a multi-criteria setting requires enriched profunctors over partially ordered monoids.</p>
-
-<p><strong>Privacy.</strong> Agents may not wish to reveal their true capabilities. Secure multi-party computation or zero-knowledge proofs could enable private matching while preserving the colimit structure.</p>
-
-<!-- Section 11: Conclusion -->
-<h2 id="sec-conclusion">11. Conclusion</h2>
-
-<p>We have presented a comprehensive categorical framework for the planner engine of an AI operating system, unifying task orchestration, marketplace dynamics, financial mechanics, and reputation management under a single mathematical roof.</p>
-
-<p>The key constructions are:</p>
+<p>BugHunter has the lowest cost-adjusted score (1795), but also the lowest confidence and reputation. TestBot-Pro offers the best balance of quality and price.</p>
+<h2 data-number="9.4" id="market-clearing-1"><span class="header-section-number">9.4</span> Market Clearing</h2>
+<pre id="lst:walk-clear" data-caption="Clearing the market" data-label="lst:walk-clear"><code>{:ok, contract} = PlannerEngine.Market.clear_market(&quot;task_42&quot;)</code></pre>
+<p>This triggers the following sequence:</p>
 <ol>
-<li>The <strong>order book profunctor</strong> \(P: \mathcal{A}^{\mathrm{op}} \times \mathcal{T} \to \mathbf{Set}\), capturing the two-sided market structure.</li>
-<li>The <strong>planner natural transformation</strong> \(\eta: F \Rightarrow G \circ M\), formalizing matching with provable consistency (naturality).</li>
-<li>The <strong>escrow monad</strong> \((E, \eta, \mu)\) on the credit category, with verified monad laws guaranteeing financial consistency.</li>
-<li><strong>Market clearing as a colimit</strong>, characterizing acceptance and auto-rejection via the universal property.</li>
-<li><strong>Functorial job decomposition</strong> into DAGs with topologically-sorted parallel execution.</li>
-<li><strong>Convergent reputation scoring</strong> via exponentially-weighted 6-dimensional quality vectors with anti-gaming constraints.</li>
+<li><p>OrderBook selects the best proposal (lowest cost functional).</p></li>
+<li><p>OrderBook accepts it, auto-rejecting the other two.</p></li>
+<li><p>Escrow holds 3500 credits from the client’s balance.</p></li>
+<li><p>Market creates a contract (status: <code>active</code>).</p></li>
 </ol>
+<p>In AgentHero, this corresponds to the client clicking “Accept Proposal,” which triggers the Supabase RPC <code>hold_escrow</code> and creates a contract record.</p>
+<h2 data-number="9.5" id="task-decomposition-and-execution"><span class="header-section-number">9.5</span> Task Decomposition and Execution</h2>
+<p>The task is decomposed into subtasks, scheduled into parallel levels, and executed:</p>
+<pre id="lst:walk-decompose" data-caption="Decomposition and execution scheduling" data-label="lst:walk-decompose"><code>task = %{
+  id: &quot;task_42&quot;,
+  description: &quot;Web app testing&quot;,
+  subtask_specs: [
+    %{description: &quot;E2E tests&quot;,
+      required_capabilities: [:playwright],
+      estimated_credits: 1000, estimated_duration: 60},
+    %{description: &quot;Load tests&quot;,
+      required_capabilities: [:k6],
+      estimated_credits: 800, estimated_duration: 45},
+    %{description: &quot;Final report&quot;,
+      required_capabilities: [:reporting],
+      estimated_credits: 200, estimated_duration: 15,
+      depends_on: [0, 1]}
+  ]
+}
 
-<p>The Elixir/OTP implementation demonstrates that these abstractions are not merely theoretical: GenServer order books, Mnesia-backed escrow transactions, and supervision-tree decomposition provide production-ready realizations. The planner engine occupies the highest level of the AI OS abstraction hierarchy. Part V completes the series by presenting the synthesis that unifies all four subsystems into a coherent 2-categorical framework.</p>
+{:ok, dag} = PlannerEngine.Decomposer.decompose(task)
+schedule = PlannerEngine.Decomposer.topological_sort(dag)
+# Level 0: [&quot;task_42_sub_0&quot;, &quot;task_42_sub_1&quot;]  (parallel)
+# Level 1: [&quot;task_42_sub_2&quot;]                    (after barrier)</code></pre>
+<p>In AgentHero, each level maps to an Inngest step group. Subtasks within a level execute as parallel Inngest functions. The completion event of the last subtask in a level triggers the next level.</p>
+<h2 data-number="9.6" id="completion-and-revenue-distribution"><span class="header-section-number">9.6</span> Completion and Revenue Distribution</h2>
+<p>The operator submits deliverables, the client approves, and revenue is distributed:</p>
+<pre id="lst:walk-complete" data-caption="Contract completion" data-label="lst:walk-complete"><code># Operator submits for review
+{:ok, _} = PlannerEngine.Market.submit_for_review(
+  contract.id)
 
-<!-- References -->
-<h2 id="references">References</h2>
+# Client approves with quality scores
+quality = [0.95, 0.90, 0.97, 0.88, 0.91, 0.82]
+{:ok, result} = PlannerEngine.Market.complete_contract(
+  contract.id, quality)
 
+result.split
+# =&gt; %{total: 3500, operator: 2450,
+#       platform: 525, llm_reserve: 525}</code></pre>
+<p>The revenue split: <span class="math display">\begin{align}
+    \text{Operator (testbot\_pro)} &amp;: 0.70 \times 3500 = 2450 \text{ credits} \nonumber \\
+    \text{Platform} &amp;: 0.15 \times 3500 = 525 \text{ credits} \nonumber \\
+    \text{LLM reserve} &amp;: 3500 - 2450 - 525 = 525 \text{ credits} \nonumber
+\end{align}</span></p>
+<p>The quality vector is recorded by the Reputation engine, updating testbot_pro’s exponentially-weighted score.</p>
+<h1 data-number="10" id="sec:properties"><span class="header-section-number">10</span> Design Properties and Guarantees</h1>
+<h2 data-number="10.1" id="financial-invariants"><span class="header-section-number">10.1</span> Financial Invariants</h2>
+<div id="thm:financial" class="theorem">
+<p><strong>Theorem 4</strong> (Financial Consistency).  <em>The escrow system, combined with the market clearing protocol, maintains three invariants:</em></p>
+<ol>
+<li><p><em><strong>Conservation:</strong> Total credits (available + held + distributed) are constant.</em></p></li>
+<li><p><em><strong>Non-negativity:</strong> No participant’s available balance is ever negative.</em></p></li>
+<li><p><em><strong>Escrow completeness:</strong> Every held amount is eventually either released or refunded.</em></p></li>
+</ol>
+</div>
+<div class="proof">
+<p><em>Proof.</em> Conservation follows from <a href="#inv:conservation">1</a>: every mutating operation preserves the total.</p>
+<p>Non-negativity is enforced by the Mnesia transaction guard <code>when available &gt;= amount</code>. Because the check and deduction are atomic, no concurrent transaction can create a negative balance.</p>
+<p>Escrow completeness follows from the contract lifecycle being a finite state machine with terminal states <code>completed</code> and <code>cancelled</code> (<a href="#fig:contract-lifecycle">2</a>). Every terminal state triggers <code>settle/2</code> with either <code>:release</code> or <code>:refund</code>. With Inngest durable execution providing liveness guarantees, every contract eventually reaches a terminal state. ◻</p>
+</div>
+<h2 data-number="10.2" id="matching-properties"><span class="header-section-number">10.2</span> Matching Properties</h2>
+<div id="prop:auto-reject" class="proposition">
+<p><strong>Proposition 5</strong> (Auto-Rejection).  <em>Accepting proposal <span class="math inline">p_k</span> for task <span class="math inline">\tau</span> necessarily rejects all other proposals <span class="math inline">\{p_i\}_{i \neq k}</span> for <span class="math inline">\tau</span>. This is a consequence of the single-assignment design: each task has exactly one active contract.</em></p>
+</div>
+<div id="prop:budget-safety" class="proposition">
+<p><strong>Proposition 6</strong> (Budget Safety).  <em>The billable total of any contract is bounded by the demand’s budget ceiling: <span class="math display">\texttt{compute\_total}(c) \le c.\texttt{budget\_ceiling}</span> This is enforced by the <code>min(raw, contract.budget_ceiling)</code> cap in <code>compute_total/1</code>.</em></p>
+</div>
+<h2 data-number="10.3" id="decomposition-properties"><span class="header-section-number">10.3</span> Decomposition Properties</h2>
+<div id="prop:acyclic" class="proposition">
+<p><strong>Proposition 7</strong> (Acyclicity Guarantee).  <em>Every DAG produced by <code>decompose/1</code> is acyclic, verified by Kahn’s algorithm. If the input specification contains a cycle, the function returns <code>{:error, :cyclic_dependency}</code> rather than producing an invalid DAG.</em></p>
+</div>
+<div id="prop:compose-semantics" class="proposition">
+<p><strong>Proposition 8</strong> (Composition Preserves Semantics).  <em>For two DAGs <span class="math inline">D_1</span> and <span class="math inline">D_2</span>, the composed DAG <span class="math inline">D_1 \circ D_2</span> (from <code>compose/2</code>) has the property that its topological sort produces levels where all of <span class="math inline">D_1</span>’s levels precede the cross-edge barrier, which precedes all of <span class="math inline">D_2</span>’s levels. Executing the composed DAG is equivalent to executing <span class="math inline">D_1</span>, then <span class="math inline">D_2</span>.</em></p>
+</div>
+<h2 data-number="10.4" id="reputation-properties"><span class="header-section-number">10.4</span> Reputation Properties</h2>
+<div id="prop:bounded-trust" class="proposition">
+<p><strong>Proposition 9</strong> (Bounded Trust).  <em>For any agent <span class="math inline">\alpha</span>: <span class="math inline">0 \le T(\alpha) \le 1</span>.</em></p>
+</div>
+<div class="proof">
+<p><em>Proof.</em> Each factor in the trust formula (<a href="#trust-score">Equation 3</a>) is in <span class="math inline">[0, 1]</span>:</p>
+<ul>
+<li><p><span class="math inline">R(\alpha) \in [0, 1]</span> because quality vectors are in <span class="math inline">[0, 1]^6</span> and the weights are non-negative with unit sum.</p></li>
+<li><p><span class="math inline">(1 - \gamma(\alpha)) \in [0, 1]</span> because <span class="math inline">\gamma \in [0, 1]</span>.</p></li>
+<li><p><span class="math inline">\min(1, N/N_{\min}) \in [0, 1]</span>.</p></li>
+</ul>
+<p>The product of three values in <span class="math inline">[0, 1]</span> is in <span class="math inline">[0, 1]</span>. ◻</p>
+</div>
+<h2 data-number="10.5" id="fault-tolerance"><span class="header-section-number">10.5</span> Fault Tolerance</h2>
+<p>The <code>:one_for_one</code> supervision strategy provides the following isolation guarantees:</p>
+<ul>
+<li><p>A crash in the Reputation engine does not affect active contracts or escrow holds. Reputation data is lost on crash (it is held in GenServer state, not Mnesia), but can be reconstructed from the Market’s revenue log.</p></li>
+<li><p>A crash in the OrderBook loses pending proposals and demands, but does not affect existing contracts. This is acceptable because proposals are ephemeral—agents can re-submit.</p></li>
+<li><p>A crash in the Escrow GenServer loses the GenServer state (which is empty—it is a pure proxy to Mnesia), but Mnesia data survives because it is stored on disc.</p></li>
+<li><p>A crash in the Market loses the in-memory contract map. In production, contracts would be persisted to Mnesia or an external database.</p></li>
+</ul>
+<h1 data-number="11" id="sec:discussion"><span class="header-section-number">11</span> Discussion</h1>
+<h2 data-number="11.1" id="comparison-to-financial-exchanges"><span class="header-section-number">11.1</span> Comparison to Financial Exchanges</h2>
+<p>The planner engine’s order book shares structural features with financial exchanges, but with key differences:</p>
+<div class="center">
+<table>
+<thead>
+<tr>
+<th style="text-align: left;"><strong>Aspect</strong></th>
+<th style="text-align: left;"><strong>Financial Exchange</strong></th>
+<th style="text-align: left;"><strong>AI Planner</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">Asset</td>
+<td style="text-align: left;">Fungible (shares)</td>
+<td style="text-align: left;">Non-fungible (tasks)</td>
+</tr>
+<tr>
+<td style="text-align: left;">Pricing</td>
+<td style="text-align: left;">Continuous discovery</td>
+<td style="text-align: left;">Discrete bidding</td>
+</tr>
+<tr>
+<td style="text-align: left;">Settlement</td>
+<td style="text-align: left;">T+1 or T+2</td>
+<td style="text-align: left;">Upon verified completion</td>
+</tr>
+<tr>
+<td style="text-align: left;">Quality</td>
+<td style="text-align: left;">N/A (fungible)</td>
+<td style="text-align: left;">6-dimensional scoring</td>
+</tr>
+<tr>
+<td style="text-align: left;">Counterparty risk</td>
+<td style="text-align: left;">Clearinghouse</td>
+<td style="text-align: left;">Escrow system</td>
+</tr>
+<tr>
+<td style="text-align: left;">Information</td>
+<td style="text-align: left;">Price, volume</td>
+<td style="text-align: left;">Confidence, reputation</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>The key distinction is that AI task markets require <em>quality verification</em> before settlement, introducing a review phase absent in financial exchanges.</p>
+<h2 data-number="11.2" id="comparison-to-kubernetes-scheduling"><span class="header-section-number">11.2</span> Comparison to Kubernetes Scheduling</h2>
+<p>The Kubernetes scheduler and the AI planner both solve assignment problems:</p>
+<ul>
+<li><p><strong>Kubernetes:</strong> Assigns deterministic workloads to nodes. The scheduler is centralized and benevolent. Matching uses hard constraints (predicates) and soft preferences (priorities).</p></li>
+<li><p><strong>AI Planner:</strong> Assigns stochastic workloads to self-interested agents. The planner must incentivize truthful capability reporting. Matching incorporates economic signals (pricing, reputation) alongside capability constraints.</p></li>
+</ul>
+<p>The AI planner subsumes the Kubernetes model: Kubernetes scheduling is the special case where the escrow system is trivial (no financial holds) and the reputation is constant (all nodes equally trusted).</p>
+<h2 data-number="11.3" id="categorical-perspective"><span class="header-section-number">11.3</span> Categorical Perspective</h2>
+<p>For readers familiar with category theory, the structures in this paper have clean categorical interpretations:</p>
+<div class="center">
+<table>
+<thead>
+<tr>
+<th style="text-align: left;"><strong>System Component</strong></th>
+<th style="text-align: left;"><strong>Categorical Structure</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">Order book</td>
+<td style="text-align: left;">Profunctor <span class="math inline">\mathcal{A}^{\text{op}} \times \mathcal{T} \to \mathbf{Set}</span></td>
+</tr>
+<tr>
+<td style="text-align: left;">Escrow (hold/bind/settle)</td>
+<td style="text-align: left;">Monad on credit category</td>
+</tr>
+<tr>
+<td style="text-align: left;">Market clearing (accept one, reject rest)</td>
+<td style="text-align: left;">Colimit in transaction category</td>
+</tr>
+<tr>
+<td style="text-align: left;">Task decomposition</td>
+<td style="text-align: left;">Functor <span class="math inline">\mathcal{T} \to \mathbf{DAG}</span></td>
+</tr>
+<tr>
+<td style="text-align: left;">DAG composition</td>
+<td style="text-align: left;">Functorial composition</td>
+</tr>
+<tr>
+<td style="text-align: left;">Planner (match tasks to agents)</td>
+<td style="text-align: left;">Natural transformation</td>
+</tr>
+<tr>
+<td style="text-align: left;">Reputation</td>
+<td style="text-align: left;">Functor <span class="math inline">\mathcal{A} \to [0,1]</span></td>
+</tr>
+<tr>
+<td style="text-align: left;">Revenue split</td>
+<td style="text-align: left;">Natural transformation</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>These correspondences are not accidental: the functional programming patterns (algebraic data types, pipeline composition, monadic bind, pattern matching) are the computational realization of categorical structures. The Elixir implementation is effectively executable category theory, with GenServer state machines replacing objects and message passing replacing morphisms.</p>
+<h2 data-number="11.4" id="mechanism-design-considerations"><span class="header-section-number">11.4</span> Mechanism Design Considerations</h2>
+<p>The cost functional (<a href="#sec:order-book">Equation 1</a>) incentivizes truthful bidding: an agent who inflates their confidence score will be selected more often but will accumulate poor quality scores, driving down their reputation and increasing their future cost functional. Conversely, an agent who deflates their price to win bids will suffer if they cannot deliver at that price point.</p>
+<p>The anti-gaming detectors (<a href="#sec:reputation">8</a>) address the main attack vectors:</p>
+<ul>
+<li><p><strong>Sybil attacks</strong> (creating fake identities) are mitigated by the seasoning factor, which requires <span class="math inline">N_{\min}</span> real completions before trust ramps up.</p></li>
+<li><p><strong>Wash trading</strong> (fake jobs between colluding parties) is detected by the score inflation and rapid cycling detectors.</p></li>
+<li><p><strong>Reputation farming</strong> (accumulating scores on easy jobs, then defecting on a high-value job) is mitigated by the exponential decay, which ensures old scores carry decreasing weight.</p></li>
+</ul>
+<h2 data-number="11.5" id="limitations-and-future-work"><span class="header-section-number">11.5</span> Limitations and Future Work</h2>
+<h4 data-number="11.5.0.1" id="persistence."><span class="header-section-number">11.5.0.1</span> Persistence.</h4>
+<p>The current implementation stores OrderBook and Market state in GenServer process memory. A production system would persist these to Mnesia or an external database. The Escrow module already demonstrates the Mnesia persistence pattern.</p>
+<h4 data-number="11.5.0.2" id="distributed-operation."><span class="header-section-number">11.5.0.2</span> Distributed operation.</h4>
+<p>The current design runs on a single BEAM node. For multi-node deployment, the order book could use a distributed Mnesia table or a CRDT-based replicated state. The escrow system already uses Mnesia, which supports multi-node replication.</p>
+<h4 data-number="11.5.0.3" id="multi-agent-collaboration."><span class="header-section-number">11.5.0.3</span> Multi-agent collaboration.</h4>
+<p>The current model assigns one agent per task. For complex jobs requiring multiple collaborating agents, the decomposition module produces subtasks that can be matched to different agents. The naturality condition from category theory ensures compatibility: if subtask <span class="math inline">\sigma_i</span> depends on <span class="math inline">\sigma_j</span>, the agent assigned to <span class="math inline">\sigma_i</span> must accept the output format of the agent assigned to <span class="math inline">\sigma_j</span>.</p>
+<h4 data-number="11.5.0.4" id="dynamic-capabilities."><span class="header-section-number">11.5.0.4</span> Dynamic capabilities.</h4>
+<p>Agent capabilities evolve over time (through fine-tuning, tool acquisition, or prompt engineering). The reputation engine captures this partially through the exponential decay, but a more sophisticated model would track capability growth explicitly.</p>
+<h4 data-number="11.5.0.5" id="privacy."><span class="header-section-number">11.5.0.5</span> Privacy.</h4>
+<p>Agents may not wish to reveal their true capabilities or cost structures. Secure multi-party computation or zero-knowledge proofs could enable private matching while preserving the correctness guarantees.</p>
+<h1 data-number="12" id="sec:conclusion"><span class="header-section-number">12</span> Conclusion</h1>
+<p>We have presented the design and implementation of a planner engine for an AI operating system, built entirely on Elixir/OTP patterns. The five subsystems—order book, escrow, decomposer, market, and reputation—collaborate through message passing to orchestrate a marketplace of self-interested AI agents.</p>
+<p>The key design decisions are:</p>
+<ol>
+<li><p><strong>Order book with composite scoring.</strong> The cost functional <span class="math inline">\text{credits} / (1 + \text{confidence} \times \text{reputation})</span> balances price against quality signals, incentivizing agents to build genuine reputations rather than simply underbidding.</p></li>
+<li><p><strong>Mnesia-backed escrow.</strong> Atomic hold/settle/refund operations within Mnesia transactions eliminate TOCTOU races and guarantee credit conservation. The three-state escrow lifecycle (<code>:held</code> <span class="math inline">\to</span> <code>:released</code> or <code>:refunded</code>) is simple, total, and exhaustively pattern-matched.</p></li>
+<li><p><strong>DAG-based decomposition with parallel levels.</strong> Topological sorting via Kahn’s algorithm identifies the maximum parallelism available in a task dependency graph. The critical path length provides a tight lower bound on execution time.</p></li>
+<li><p><strong>Contract lifecycle as state machine.</strong> Eight valid transitions between five states, enforced by pattern matching, ensure that every contract reaches a terminal state and every escrow is settled.</p></li>
+<li><p><strong>Exponentially-weighted 6-dimensional reputation.</strong> Recent performance matters more than historical averages. Anti-gaming detectors (score inflation, rapid cycling, perfect streaks) penalize manipulation, while the seasoning factor prevents fresh accounts from accumulating trust too quickly.</p></li>
+<li><p><strong>OTP supervision for fault isolation.</strong> The <code>:one_for_one</code> strategy ensures that a crash in any subsystem is contained and recovered without affecting the others.</p></li>
+</ol>
+<p>The planner engine occupies the highest level of the AI OS abstraction hierarchy. Where the kernel (Part I) provides the type-theoretic foundation, the memory layer (Part II) provides persistent state, and the tool interface (Part III) provides capability extension, the planner engine provides the <em>economic coordination</em> that turns a collection of independent agents into a functioning marketplace. Part V will complete the series by presenting the runtime that executes the plans produced by this engine.</p>
 <div class="references">
+<h2 id="references">References</h2>
 <ol>
-<li>M. Long, "The AI Operating System, Part I: Agent OS kernel and type-theoretic foundations," <em>GrokRxiv</em>, 2026.</li>
-<li>M. Long, "The AI Operating System, Part II: Memory layer as sheaf over temporal topologies," <em>GrokRxiv</em>, 2026.</li>
-<li>M. Long, "The AI Operating System, Part III: Tool interface via profunctors and Kan extensions," <em>GrokRxiv</em>, 2026.</li>
-<li>S. Mac Lane, <em>Categories for the Working Mathematician</em>, 2nd ed. Springer, 1998.</li>
-<li>E. Riehl, <em>Category Theory in Context</em>. Dover, 2017.</li>
-<li>T. Leinster, <em>Basic Category Theory</em>. Cambridge University Press, 2014.</li>
-<li>S. Awodey, <em>Category Theory</em>, 2nd ed. Oxford University Press, 2010.</li>
-<li>B. Fong and D. I. Spivak, <em>An Invitation to Applied Category Theory</em>. Cambridge University Press, 2019.</li>
-<li>L. Poettering, "systemd, a system and service manager," <em>Proceedings of the Linux Symposium</em>, 2010.</li>
-<li>B. Burns et al., "Borg, Omega, and Kubernetes," <em>ACM Queue</em>, vol. 14, no. 1, pp. 70-93, 2016.</li>
-<li>M. O'Hara, <em>Market Microstructure Theory</em>. Blackwell, 1995.</li>
-<li>L. Harris, <em>Trading and Exchanges</em>. Oxford University Press, 2003.</li>
-<li>M. D. Gould et al., "Limit order books," <em>Quantitative Finance</em>, vol. 13, no. 11, pp. 1709-1748, 2013.</li>
-<li>R. B. Myerson, "Optimal auction design," <em>Mathematics of Operations Research</em>, vol. 6, no. 1, pp. 58-73, 1981.</li>
-<li>W. Vickrey, "Counterspeculation, auctions, and competitive sealed tenders," <em>Journal of Finance</em>, vol. 16, no. 1, pp. 8-37, 1961.</li>
-<li>E. H. Clarke, "Multipart pricing of public goods," <em>Public Choice</em>, vol. 11, pp. 17-33, 1971.</li>
-<li>T. Groves, "Incentives in teams," <em>Econometrica</em>, vol. 41, no. 4, pp. 617-631, 1973.</li>
-<li>L. M. Ausubel and P. Milgrom, "The lovely but lonely Vickrey auction," in <em>Combinatorial Auctions</em>, MIT Press, 2006.</li>
-<li>N. Nisan et al., Eds., <em>Algorithmic Game Theory</em>. Cambridge University Press, 2007.</li>
-<li>M. Ghallab et al., <em>Automated Planning and Acting</em>. Cambridge University Press, 2016.</li>
-<li>S. J. Russell and P. Norvig, <em>Artificial Intelligence: A Modern Approach</em>, 4th ed. Pearson, 2021.</li>
-<li>M. Wooldridge, <em>An Introduction to MultiAgent Systems</em>, 2nd ed. Wiley, 2009.</li>
-<li>F. Cesarini and S. Thompson, <em>Erlang Programming</em>. O'Reilly, 2009.</li>
-<li>S. Juric, <em>Elixir in Action</em>, 2nd ed. Manning, 2019.</li>
-<li>J. Armstrong, <em>Programming Erlang</em>, 2nd ed. Pragmatic Bookshelf, 2013.</li>
-<li>C. Hewitt et al., "A universal modular ACTOR formalism for artificial intelligence," in <em>IJCAI</em>, 1973.</li>
-<li>B. Jamison et al., "Convergence of weighted averages of independent random variables," <em>Z. Wahrscheinlichkeitstheorie</em>, vol. 4, pp. 40-44, 1965.</li>
+<li>M. Long, “The AI Operating System, Part I: Agent OS kernel and type-theoretic foundations,” <em>GrokRxiv</em>, 2026.</li>
+<li>M. Long, “The AI Operating System, Part II: Memory layer as sheaf over temporal topologies,” <em>GrokRxiv</em>, 2026.</li>
+<li>M. Long, “The AI Operating System, Part III: Tool interface via profunctors and Kan extensions,” <em>GrokRxiv</em>, 2026.</li>
+<li>M. Long, “Categorical foundations for AI agent marketplaces: Profunctors, monads, and colimits,” <em>GrokRxiv</em>, 2026.</li>
+<li>L. Poettering, “systemd, a system and service manager,” <em>Proceedings of the Linux Symposium</em>, 2010.</li>
+<li>B. Burns, B. Grant, D. Oppenheimer, E. Brewer, and J. Wilkes, “Borg, Omega, and Kubernetes,” <em>ACM Queue</em>, vol. 14, no. 1, pp. 70–93, 2016.</li>
+<li>M. O’Hara, <em>Market Microstructure Theory</em>. Blackwell, 1995.</li>
+<li>L. Harris, <em>Trading and Exchanges: Market Microstructure for Practitioners</em>. Oxford University Press, 2003.</li>
+<li>M. D. Gould, M. A. Porter, S. Williams, M. McDonald, D. J. Fenn, and S. D. Howison, “Limit order books,” <em>Quantitative Finance</em>, vol. 13, no. 11, pp. 1709–1748, 2013.</li>
+<li>R. B. Myerson, “Optimal auction design,” <em>Mathematics of Operations Research</em>, vol. 6, no. 1, pp. 58–73, 1981.</li>
+<li>W. Vickrey, “Counterspeculation, auctions, and competitive sealed tenders,” <em>Journal of Finance</em>, vol. 16, no. 1, pp. 8–37, 1961.</li>
+<li>N. Nisan, T. Roughgarden, E. Tardos, and V. V. Vazirani, Eds., <em>Algorithmic Game Theory</em>. Cambridge University Press, 2007.</li>
+<li>L. S. Shapley and D. Gale, “College admissions and the stability of marriage,” <em>American Mathematical Monthly</em>, vol. 69, no. 1, pp. 9–15, 1962.</li>
+<li>A. E. Roth, “The economist as engineer: Game theory, experimentation, and computation as tools for design economics,” <em>Econometrica</em>, vol. 70, no. 4, pp. 1341–1378, 2002.</li>
+<li>M. Ghallab, D. Nau, and P. Traverso, <em>Automated Planning and Acting</em>. Cambridge University Press, 2016.</li>
+<li>S. J. Russell and P. Norvig, <em>Artificial Intelligence: A Modern Approach</em>, 4th ed. Pearson, 2021.</li>
+<li>M. Wooldridge, <em>An Introduction to MultiAgent Systems</em>, 2nd ed. Wiley, 2009.</li>
+<li>Y. Shoham and K. Leyton-Brown, <em>Multiagent Systems: Algorithmic, Game-Theoretic, and Logical Foundations</em>. Cambridge University Press, 2009.</li>
+<li>S. Jurić, <em>Elixir in Action</em>, 2nd ed. Manning, 2019.</li>
+<li>J. Armstrong, <em>Programming Erlang: Software for a Concurrent World</em>, 2nd ed. Pragmatic Bookshelf, 2013.</li>
+<li>C. Hewitt, P. Bishop, and R. Steiger, “A universal modular ACTOR formalism for artificial intelligence,” in <em>IJCAI</em>, 1973, pp. 235–245.</li>
+<li>G. Agha, <em>Actors: A Model of Concurrent Computation in Distributed Systems</em>. MIT Press, 1986.</li>
 </ol>
 </div>
-
-<!-- Appendix A -->
-<h2 id="app-glossary">Appendix A: Categorical Glossary</h2>
-
-<div class="table-wrap">
+<h1 data-number="13" id="app:module-ref"><span class="header-section-number">13</span> Module Reference</h1>
+<div class="center">
 <table>
-<thead><tr><th>Symbol</th><th>Type</th><th>Interpretation</th></tr></thead>
+<thead>
+<tr>
+<th style="text-align: left;"><strong>Module</strong></th>
+<th style="text-align: left;"><strong>Type</strong></th>
+<th style="text-align: left;"><strong>Key Functions</strong></th>
+</tr>
+</thead>
 <tbody>
-<tr><td>\(\mathcal{M}\)</td><td>Category</td><td>Market of participants and transactions</td></tr>
-<tr><td>\(\mathcal{A}\)</td><td>Category</td><td>Agents ordered by capability subsumption</td></tr>
-<tr><td>\(\mathcal{T}\)</td><td>Category</td><td>Tasks ordered by dependency</td></tr>
-<tr><td>\(\mathcal{C}\)</td><td>Category</td><td>Credit balances and transitions</td></tr>
-<tr><td>\(\mathcal{R}\)</td><td>Category</td><td>Requirement specifications</td></tr>
-<tr><td>\(\mathcal{K}\)</td><td>Category</td><td>Capability profiles</td></tr>
-<tr><td>\(P\)</td><td>Profunctor \(\mathcal{A}^{\mathrm{op}} \times \mathcal{T} \to \mathbf{Set}\)</td><td>Order book</td></tr>
-<tr><td>\(Q\)</td><td>Profunctor \(\mathcal{B}^{\mathrm{op}} \times \mathcal{T} \to \mathbf{Set}\)</td><td>Demand book</td></tr>
-<tr><td>\(F\)</td><td>Functor \(\mathcal{T} \to \mathcal{R}\)</td><td>Task &rarr; requirements</td></tr>
-<tr><td>\(G\)</td><td>Functor \(\mathcal{A} \to \mathcal{K}\)</td><td>Agent &rarr; capabilities</td></tr>
-<tr><td>\(M\)</td><td>Functor \(\mathcal{T} \to \mathcal{A}\)</td><td>Matching (assignment)</td></tr>
-<tr><td>\(\eta\)</td><td>Nat. trans. \(F \Rightarrow G \circ M\)</td><td>Planner</td></tr>
-<tr><td>\(E\)</td><td>Monad on \(\mathcal{C}\)</td><td>Escrow</td></tr>
-<tr><td>\(\Delta\)</td><td>Functor \(\mathcal{T} \to \mathbf{DAG}\)</td><td>Job decomposition</td></tr>
-<tr><td>\(\mathcal{R}\)</td><td>Functor \(\mathcal{A} \to [0,1]\)</td><td>Reputation</td></tr>
-<tr><td>\(\rho\)</td><td>Nat. trans. \(E \Rightarrow D\)</td><td>Revenue split</td></tr>
+<tr>
+<td style="text-align: left;"><code>PlannerEngine</code></td>
+<td style="text-align: left;">Library</td>
+<td style="text-align: left;"><code>version/0</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>PlannerEngine.Application</code></td>
+<td style="text-align: left;">OTP App</td>
+<td style="text-align: left;"><code>start/2</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>PlannerEngine.OrderBook</code></td>
+<td style="text-align: left;">GenServer</td>
+<td style="text-align: left;"><code>submit_proposal/1</code>, <code>post_demand/1</code>,</td>
+</tr>
+<tr>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"><code>best_proposal/1</code>, <code>accept_proposal/1</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>PlannerEngine.Escrow</code></td>
+<td style="text-align: left;">GenServer</td>
+<td style="text-align: left;"><code>hold/3</code>, <code>bind/2</code>, <code>settle/2</code>,</td>
+</tr>
+<tr>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"><code>balance/1</code>, <code>set_balance/2</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>PlannerEngine.Decomposer</code></td>
+<td style="text-align: left;">Library</td>
+<td style="text-align: left;"><code>decompose/1</code>, <code>topological_sort/1</code>,</td>
+</tr>
+<tr>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"><code>compose/2</code>, <code>critical_path_length/1</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>PlannerEngine.Market</code></td>
+<td style="text-align: left;">GenServer</td>
+<td style="text-align: left;"><code>clear_market/1</code>, <code>create_contract/2</code>,</td>
+</tr>
+<tr>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"><code>complete_contract/2</code>, <code>cancel_contract/1</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>PlannerEngine.Reputation</code></td>
+<td style="text-align: left;">GenServer</td>
+<td style="text-align: left;"><code>record_quality/3</code>, <code>compute_score/1</code>,</td>
+</tr>
+<tr>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"><code>trust_score/1</code>, <code>detect_gaming/1</code></td>
+</tr>
 </tbody>
 </table>
 </div>
-
-<!-- Appendix B -->
-<h2 id="app-lifecycle">Appendix B: Job Lifecycle State Machine</h2>
-
-<p>The complete job lifecycle is a finite state machine:</p>
-
-<pre class="diagram">
-draft &mdash;&mdash;publish&mdash;&mdash;&rarr; open &mdash;&mdash;accept&mdash;&mdash;&rarr; in_progress &mdash;&mdash;submit&mdash;&mdash;&rarr; review
-                        |                      |                        |       \
-                        | cancel                | cancel                 |approve  \dispute
-                        &darr;                      &darr;                        &darr;         &darr;
-                     cancelled              cancelled                completed   disputed
-                                                                                    |
-                                                                        resolve &larr;&mdash;&mdash;'
-                                                                           |
-                                                                           &darr;
-                                                                       completed
-</pre>
-
-<p>Each transition corresponds to a morphism in the market category \(\mathcal{M}\), and the terminal states \(\{\texttt{completed}, \texttt{cancelled}, \texttt{disputed}\}\) trigger escrow settlement (release or refund).</p>
-
-<!-- Appendix C -->
-<h2 id="app-full-diagram">Appendix C: Full Planning Pipeline</h2>
-
-<p>The complete planning pipeline as a commutative diagram:</p>
-
-<pre class="diagram">
-             F                  M*
-   T &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&rarr; R &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&rarr; K
-   |                                     &uarr;
-   | &Delta;                                   | E
-   &darr;               &Phi;              exec    |
-  DAG &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&rarr; Inngest &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&rarr; C
-                                         |
-                                         | &rho;
-                                         &darr;
-                                    (op, plat, llm)
-</pre>
-<div class="diagram-caption">Upper path: planning natural transformation. Lower path: execution pipeline with escrow and revenue split.</div>
-
-<!-- Series Navigation -->
-<nav class="series-nav">
-<h3>The AI Operating System &mdash; Paper Series</h3>
-<ol>
-<li><a href="agent-scheduler.html">Agent Scheduler: Complex Orchestration as Process Management</a></li>
-<li><a href="tool-interface.html">Tool Interface: Profunctors and Capability-Based Security</a></li>
-<li><a href="memory-layer.html">Memory Layer: Typed Persistent Memory as Functor</a></li>
-<li class="current"><span>Planner Engine: Order Book Dynamics and Natural Transformation</span></li>
-<li><a href="synthesis.html">Synthesis: The AI Operating System as Categorical Framework</a></li>
-</ol>
-</nav>
-
-<footer class="paper-footer">
-<p>&copy; 2026 Matthew Long &middot; The YonedaAI Collaboration &middot; YonedaAI Research Collective</p>
-<p>GrokRxiv:2026.03.planner-engine-ai-os [cs.AI]</p>
-</footer>
+<h1 data-number="14" id="app:transitions"><span class="header-section-number">14</span> Contract Lifecycle Transitions</h1>
+<div class="center">
+<table>
+<thead>
+<tr>
+<th style="text-align: left;"><strong>From</strong></th>
+<th style="text-align: left;"><strong>To</strong></th>
+<th style="text-align: left;"><strong>Trigger</strong></th>
+<th style="text-align: left;"><strong>Escrow Action</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>active</code></td>
+<td style="text-align: left;"><code>review</code></td>
+<td style="text-align: left;">Operator submits</td>
+<td style="text-align: left;">None</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>active</code></td>
+<td style="text-align: left;"><code>cancelled</code></td>
+<td style="text-align: left;">Client/operator cancels</td>
+<td style="text-align: left;">Refund</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>active</code></td>
+<td style="text-align: left;"><code>disputed</code></td>
+<td style="text-align: left;">Either party disputes</td>
+<td style="text-align: left;">Hold maintained</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>review</code></td>
+<td style="text-align: left;"><code>completed</code></td>
+<td style="text-align: left;">Client approves</td>
+<td style="text-align: left;">Release</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>review</code></td>
+<td style="text-align: left;"><code>disputed</code></td>
+<td style="text-align: left;">Client disputes</td>
+<td style="text-align: left;">Hold maintained</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>review</code></td>
+<td style="text-align: left;"><code>cancelled</code></td>
+<td style="text-align: left;">Client cancels</td>
+<td style="text-align: left;">Refund</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>disputed</code></td>
+<td style="text-align: left;"><code>completed</code></td>
+<td style="text-align: left;">Resolution: approve</td>
+<td style="text-align: left;">Release</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>disputed</code></td>
+<td style="text-align: left;"><code>cancelled</code></td>
+<td style="text-align: left;">Resolution: cancel</td>
+<td style="text-align: left;">Refund</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h1 data-number="15" id="app:production"><span class="header-section-number">15</span> Production Mapping</h1>
+<div class="center">
+<table>
+<thead>
+<tr>
+<th style="text-align: left;"><strong>Planner Engine Component</strong></th>
+<th style="text-align: left;"><strong>AgentHero Production Equivalent</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>OrderBook.post_demand/1</code></td>
+<td style="text-align: left;">Client creates and publishes a job</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>OrderBook.submit_proposal/1</code></td>
+<td style="text-align: left;">Operator submits a proposal</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Market.clear_market/1</code></td>
+<td style="text-align: left;">Client accepts a proposal</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Escrow.hold/3</code></td>
+<td style="text-align: left;"><code>adminClient.rpc(’hold_escrow’, ...)</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Escrow.settle(:release)</code></td>
+<td style="text-align: left;"><code>adminClient.rpc(’release_escrow’, ...)</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Escrow.settle(:refund)</code></td>
+<td style="text-align: left;"><code>adminClient.rpc(’refund_escrow’, ...)</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Decomposer.decompose/1</code></td>
+<td style="text-align: left;">Inngest function step decomposition</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Decomposer.topological_sort/1</code></td>
+<td style="text-align: left;">Inngest step group ordering</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Market.compute_split/1</code></td>
+<td style="text-align: left;">Credit distribution after approval</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Reputation.record_quality/3</code></td>
+<td style="text-align: left;">Agent quality evaluation after completion</td>
+</tr>
+<tr>
+<td style="text-align: left;">GenServer state</td>
+<td style="text-align: left;">Supabase Postgres tables</td>
+</tr>
+<tr>
+<td style="text-align: left;">Mnesia transactions</td>
+<td style="text-align: left;">Supabase RPC with SERIALIZABLE isolation</td>
+</tr>
+<tr>
+<td style="text-align: left;">Supervisor <code>:one_for_one</code></td>
+<td style="text-align: left;">Vercel/Fly.io process restart</td>
+</tr>
+</tbody>
+</table>
+</div>
 
 </main>
 </div>
-
 <script>
-// Highlight active TOC link on scroll
-document.addEventListener('DOMContentLoaded', function() {
-  const sections = document.querySelectorAll('h2[id]');
-  const navLinks = document.querySelectorAll('.sidebar ol li a');
+// Build sidebar TOC from h2/h3 in content
+(function(){
+  var nav=document.getElementById('toc-nav');
+  var headings=document.querySelectorAll('.main-content h2, .main-content h3');
+  if(!headings.length)return;
+  var items=[];
+  for(var i=0;i<headings.length;i++){
+    var h=headings[i];
+    if(!h.id){
+      h.id=h.textContent.trim().toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/-+$/,'');
+    }
+    items.push({tag:h.tagName,id:h.id,text:h.textContent.trim()});
+  }
+  var ul=document.createElement('ul');
+  var currentLi=null;
+  var subUl=null;
+  for(var j=0;j<items.length;j++){
+    var item=items[j];
+    var li=document.createElement('li');
+    var a=document.createElement('a');
+    a.href='#'+item.id;
+    a.textContent=item.text;
+    if(item.tag==='H2'){
+      if(subUl&&currentLi){currentLi.appendChild(subUl);subUl=null;}
+      li.appendChild(a);
+      ul.appendChild(li);
+      currentLi=li;
+    } else {
+      if(!subUl)subUl=document.createElement('ul');
+      li.appendChild(a);
+      subUl.appendChild(li);
+    }
+  }
+  if(subUl&&currentLi)currentLi.appendChild(subUl);
+  nav.appendChild(ul);
 
-  const observer = new IntersectionObserver(entries => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        navLinks.forEach(link => link.classList.remove('active'));
-        const active = document.querySelector('.sidebar ol li a[href="#' + entry.target.id + '"]');
-        if (active) active.classList.add('active');
+  // Active tracking on scroll
+  var observer=new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(e.isIntersecting){
+        var links=nav.querySelectorAll('a');
+        for(var k=0;k<links.length;k++)links[k].classList.remove('active');
+        var link=nav.querySelector('a[href="#'+e.target.id+'"]');
+        if(link)link.classList.add('active');
       }
     });
-  }, { rootMargin: '-20% 0px -80% 0px' });
-
-  sections.forEach(section => observer.observe(section));
-});
+  },{rootMargin:'-20% 0px -70% 0px'});
+  for(var m=0;m<headings.length;m++)observer.observe(headings[m]);
+})();
 </script>
 </body>
 </html>

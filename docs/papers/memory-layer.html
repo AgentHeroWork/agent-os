@@ -3,1269 +3,1752 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Part III: Memory Layer — Typed Filesystem for Persistent Agent Cognition</title>
+<title>Memory Layer — The AI Operating System, Part III</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
-  onload="renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'\\[',right:'\\]',display:true},{left:'$',right:'$',display:false},{left:'\\(',right:'\\)',display:false}],throwOnError:false});"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" onload="renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'\\[',right:'\\]',display:true},{left:'$',right:'$',display:false},{left:'\\(',right:'\\)',display:false}]});"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{--bg:#0a0a0f;--surface:#12121a;--surface2:#1a1a28;--text:#e4e4ef;--text2:#a0a0b8;--accent:#6c5ce7;--accent2:#a29bfe;--border:#2a2a3a;--code-bg:#0d0d18;--green:#2ecc71;--orange:#f39c12;--red:#e74c3c;--blue:#3498db;--font-body:Inter,system-ui,-apple-system,sans-serif;--font-mono:'SF Mono','Fira Code','Cascadia Code',monospace;--max-w:860px;--sidebar-w:260px}
-html{font-size:17px;scroll-behavior:smooth;scroll-padding-top:80px}
-body{background:var(--bg);color:var(--text);font-family:var(--font-body);line-height:1.72;-webkit-font-smoothing:antialiased}
-a{color:var(--accent2);text-decoration:none;transition:color .15s}
+:root{
+  --bg:#0a0a0f;--surface:#12121a;--surface2:#1a1a2e;
+  --text:#e4e4ef;--text-dim:#9494a7;
+  --accent:#6c5ce7;--accent2:#a29bfe;--accent-dim:rgba(108,92,231,0.15);
+  --border:#2a2a3e;--code-bg:#0d0d14;
+  --success:#00b894;--warning:#fdcb6e;--error:#e17055;
+  --font-body:Inter,system-ui,-apple-system,sans-serif;
+  --font-mono:'SF Mono','Fira Code','JetBrains Mono',monospace;
+  --max-w:860px;--sidebar-w:260px
+}
+html{scroll-behavior:smooth;font-size:17px}
+body{background:var(--bg);color:var(--text);font-family:var(--font-body);line-height:1.75;-webkit-font-smoothing:antialiased}
+a{color:var(--accent2);text-decoration:none;transition:color .2s}
 a:hover{color:var(--accent);text-decoration:underline}
 
-/* NAV SIDEBAR */
-.toc-toggle{display:none;position:fixed;top:16px;left:16px;z-index:1001;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:1.3rem;width:42px;height:42px;border-radius:8px;cursor:pointer;line-height:42px;text-align:center}
-nav.toc{position:fixed;top:0;left:0;width:var(--sidebar-w);height:100vh;overflow-y:auto;background:var(--surface);border-right:1px solid var(--border);padding:24px 16px;z-index:1000;font-size:.82rem}
-nav.toc .toc-title{font-weight:700;color:var(--accent2);margin-bottom:12px;font-size:.9rem;text-transform:uppercase;letter-spacing:.06em}
-nav.toc ol{list-style:none;padding-left:0}
-nav.toc li{margin:4px 0}
-nav.toc li ol{padding-left:14px}
-nav.toc a{color:var(--text2);display:block;padding:3px 8px;border-radius:4px;transition:all .15s}
-nav.toc a:hover,nav.toc a.active{color:var(--accent2);background:var(--surface2);text-decoration:none}
+.page-wrapper{display:flex;min-height:100vh}
+.sidebar{position:fixed;top:0;left:0;width:var(--sidebar-w);height:100vh;background:var(--surface);border-right:1px solid var(--border);padding:1.5rem 1rem;overflow-y:auto;z-index:100;transition:transform .3s}
+.sidebar-header{margin-bottom:1.5rem;padding-bottom:1rem;border-bottom:1px solid var(--border)}
+.sidebar-header a{font-size:.85rem;color:var(--text-dim);display:flex;align-items:center;gap:.4rem}
+.sidebar-header a:hover{color:var(--accent2)}
+.sidebar-title{font-size:.8rem;font-weight:600;color:var(--accent2);margin-top:.5rem;letter-spacing:.03em}
 
-/* MAIN */
-main{margin-left:var(--sidebar-w);padding:40px 48px 80px;max-width:calc(var(--max-w) + 96px)}
-@media(max-width:960px){
-  .toc-toggle{display:block}
-  nav.toc{transform:translateX(-100%);transition:transform .25s ease}
-  nav.toc.open{transform:translateX(0);box-shadow:4px 0 24px rgba(0,0,0,.5)}
-  main{margin-left:0;padding:24px 20px 60px}
+.toc-nav{font-size:.82rem}
+.toc-nav ul{list-style:none;padding:0}
+.toc-nav li{margin-bottom:.25rem}
+.toc-nav a{display:block;padding:.3rem .6rem;border-radius:6px;color:var(--text-dim);transition:all .15s;font-size:.8rem;line-height:1.4}
+.toc-nav a:hover,.toc-nav a.active{background:var(--accent-dim);color:var(--accent2);text-decoration:none}
+.toc-nav ul ul{padding-left:.8rem}
+.toc-nav ul ul a{font-size:.75rem}
+
+.main-content{margin-left:var(--sidebar-w);flex:1;max-width:var(--max-w);padding:3rem 2.5rem 4rem}
+
+.paper-header{margin-bottom:3rem;padding-bottom:2rem;border-bottom:1px solid var(--border)}
+.paper-part{font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.12em;color:var(--accent);background:var(--accent-dim);padding:4px 12px;border-radius:100px;display:inline-block;margin-bottom:1rem}
+.paper-header h1{font-size:2rem;font-weight:800;letter-spacing:-.03em;line-height:1.2;margin-bottom:.5rem;background:linear-gradient(135deg,var(--text),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.paper-subtitle{font-size:1rem;color:var(--text-dim);margin-bottom:1rem}
+.paper-meta-row{display:flex;gap:1rem;flex-wrap:wrap;font-size:.82rem;color:var(--text-dim)}
+.paper-meta-row a{font-size:.82rem}
+
+h1,h2,h3,h4,h5,h6{color:var(--text);letter-spacing:-.01em;margin-top:2.5rem;margin-bottom:.8rem}
+h2{font-size:1.5rem;font-weight:700;padding-bottom:.5rem;border-bottom:1px solid var(--border)}
+h3{font-size:1.2rem;font-weight:600}
+h4{font-size:1.05rem;font-weight:600;color:var(--accent2)}
+
+p{margin-bottom:1rem}
+ul,ol{margin-bottom:1rem;padding-left:1.5rem}
+li{margin-bottom:.3rem}
+
+code{font-family:var(--font-mono);font-size:.88em;background:var(--code-bg);color:var(--accent2);padding:.15em .4em;border-radius:4px}
+pre{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;padding:1.2rem 1.5rem;overflow-x:auto;margin:1.5rem 0;line-height:1.5}
+pre code{background:none;padding:0;font-size:.85rem;color:var(--text)}
+
+.sourceCode{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;padding:1.2rem 1.5rem;overflow-x:auto;margin:1.5rem 0}
+.sourceCode pre{background:none;border:none;padding:0;margin:0}
+.sourceCode code{font-size:.85rem;color:var(--text)}
+
+blockquote{border-left:3px solid var(--accent);padding:.8rem 1.2rem;margin:1.5rem 0;background:var(--accent-dim);border-radius:0 8px 8px 0;color:var(--text-dim);font-style:italic}
+
+table{width:100%;border-collapse:collapse;margin:1.5rem 0;font-size:.88rem}
+th{text-align:left;padding:.6rem .8rem;background:var(--surface2);color:var(--accent2);font-weight:600;font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--border)}
+td{padding:.6rem .8rem;border-bottom:1px solid var(--border);color:var(--text-dim)}
+tr:hover td{background:rgba(108,92,231,0.03);color:var(--text)}
+
+.theorem,.definition,.proposition,.lemma,.corollary,.invariant,.remark{
+  background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--accent);
+  border-radius:0 8px 8px 0;padding:1.2rem 1.5rem;margin:1.5rem 0
+}
+.theorem-title,.def-title{font-weight:700;color:var(--accent2);margin-bottom:.5rem;font-size:.9rem}
+
+figure{margin:1.5rem 0;text-align:center}
+figcaption{font-size:.82rem;color:var(--text-dim);margin-top:.5rem;font-style:italic}
+img{max-width:100%;height:auto;border-radius:8px}
+
+.menu-toggle{display:none;position:fixed;top:1rem;left:1rem;z-index:200;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:.5rem .7rem;color:var(--text);cursor:pointer;font-size:1.2rem}
+
+@media(max-width:900px){
+  .sidebar{transform:translateX(-100%)}
+  .sidebar.open{transform:translateX(0)}
+  .main-content{margin-left:0;padding:2rem 1.2rem}
+  .menu-toggle{display:block}
 }
 
-/* HEADER */
-.paper-header{text-align:center;margin-bottom:48px;padding-bottom:32px;border-bottom:1px solid var(--border)}
-.paper-header .series{color:var(--accent);font-weight:600;font-size:.9rem;letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px}
-.paper-header h1{font-size:1.9rem;line-height:1.3;color:#fff;margin-bottom:16px;font-weight:700}
-.paper-header .authors{color:var(--text2);font-size:.95rem;margin-bottom:4px}
-.paper-header .affiliation{color:var(--text2);font-size:.85rem;margin-bottom:12px}
-.paper-header .date{color:var(--text2);font-size:.85rem;margin-bottom:16px}
-.paper-header .links{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
-.paper-header .links a{display:inline-flex;align-items:center;gap:6px;padding:6px 16px;border:1px solid var(--border);border-radius:6px;font-size:.82rem;color:var(--text2);transition:all .15s}
-.paper-header .links a:hover{border-color:var(--accent);color:var(--accent2);text-decoration:none}
-
-/* SECTIONS */
-h2{font-size:1.5rem;color:#fff;margin:48px 0 20px;padding-bottom:8px;border-bottom:1px solid var(--border);font-weight:700}
-h3{font-size:1.15rem;color:var(--accent2);margin:32px 0 14px;font-weight:600}
-h4{font-size:1rem;color:var(--text);margin:24px 0 10px;font-weight:600}
-p{margin:0 0 14px}
-ul,ol{margin:0 0 16px;padding-left:28px}
-li{margin:4px 0}
-
-/* ABSTRACT */
-.abstract{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:28px 32px;margin-bottom:36px}
-.abstract h2{font-size:1.1rem;margin:0 0 12px;border:none;padding:0;color:var(--accent2)}
-.abstract p{color:var(--text2);font-size:.93rem;line-height:1.7}
-.abstract .keywords{font-size:.85rem;color:var(--text2);margin-top:12px}
-.abstract .keywords strong{color:var(--text)}
-
-/* THEOREM/DEF/PROOF BOXES */
-.theorem-box{border-left:3px solid var(--accent);background:var(--surface);border-radius:0 8px 8px 0;padding:18px 24px;margin:20px 0}
-.theorem-box.definition{border-left-color:var(--blue)}
-.theorem-box.remark{border-left-color:var(--orange)}
-.theorem-box.proposition{border-left-color:var(--green)}
-.theorem-box.corollary{border-left-color:var(--accent2)}
-.theorem-box .label{font-weight:700;color:var(--accent2);margin-bottom:8px;font-size:.95rem}
-.theorem-box.definition .label{color:var(--blue)}
-.theorem-box.remark .label{color:var(--orange)}
-.theorem-box.proposition .label{color:var(--green)}
-.theorem-box.corollary .label{color:var(--accent2)}
-.proof-box{border-left:2px solid var(--text2);padding:14px 24px;margin:16px 0;font-size:.93rem}
-.proof-box .proof-label{font-style:italic;font-weight:600;color:var(--text2);margin-bottom:6px}
-.proof-box .qed{text-align:right;color:var(--text2)}
-
-/* CODE BLOCKS */
-pre.code-block{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;padding:18px 22px;overflow-x:auto;margin:16px 0;font-family:var(--font-mono);font-size:.82rem;line-height:1.6;color:var(--text)}
-pre.code-block .comment{color:#5c6370;font-style:italic}
-pre.code-block .keyword{color:#c678dd;font-weight:bold}
-pre.code-block .string{color:#e5c07b}
-pre.code-block .function{color:#61afef}
-pre.code-block .atom{color:#56b6c2}
-pre.code-block .operator{color:#c678dd}
-pre.code-block .type{color:#e06c75}
-pre.code-block .module{color:#e5c07b}
-pre.code-block .number{color:#d19a66}
-.code-caption{font-size:.8rem;color:var(--text2);margin-top:-8px;margin-bottom:16px;font-style:italic}
-
-/* DIAGRAM */
-pre.diagram{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px 24px;overflow-x:auto;font-family:var(--font-mono);font-size:.78rem;line-height:1.5;color:var(--accent2);text-align:center;margin:16px 0}
-
-/* ALGORITHM */
-.algorithm-box{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px 24px;margin:16px 0;font-family:var(--font-mono);font-size:.85rem;line-height:1.7}
-.algorithm-box .alg-title{font-family:var(--font-body);font-weight:700;color:var(--accent2);margin-bottom:10px}
-.algorithm-box .alg-line{color:var(--text)}
-.algorithm-box .alg-kw{color:#c678dd;font-weight:bold}
-.algorithm-box .alg-fn{color:#61afef}
-.algorithm-box .indent{padding-left:24px}
-.algorithm-box .indent2{padding-left:48px}
-
-/* TABLE */
-table{width:100%;border-collapse:collapse;margin:16px 0;font-size:.9rem}
-table caption{font-size:.85rem;color:var(--text2);margin-bottom:8px;font-style:italic}
-th{background:var(--surface2);color:var(--accent2);font-weight:600;text-align:left;padding:10px 14px;border-bottom:2px solid var(--accent)}
-td{padding:8px 14px;border-bottom:1px solid var(--border);vertical-align:top}
-tr:hover td{background:var(--surface)}
-
-/* SERIES NAV */
-.series-nav{margin-top:64px;padding-top:32px;border-top:1px solid var(--border)}
-.series-nav h3{color:var(--text);margin-bottom:16px}
-.series-nav .parts{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
-.series-nav .part-link{display:block;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text2);font-size:.85rem;transition:all .15s}
-.series-nav .part-link:hover{border-color:var(--accent);color:var(--accent2);text-decoration:none}
-.series-nav .part-link.current{border-color:var(--accent);color:var(--accent2);background:var(--surface2)}
-.series-nav .part-link .part-num{font-weight:700;color:var(--accent);display:block;font-size:.75rem;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px}
-
-/* REFERENCES */
-.references{font-size:.85rem;line-height:1.6}
-.references .ref{margin:8px 0;padding-left:28px;text-indent:-28px;color:var(--text2)}
-.references .ref-key{color:var(--accent2);font-weight:600}
-
-/* MATH DISPLAY */
-.math-display{overflow-x:auto;margin:16px 0;padding:8px 0;text-align:center}
-
-/* MISC */
-.section-num{color:var(--accent);margin-right:6px}
-.enum-label{color:var(--accent2);font-weight:600;margin-right:4px}
+#TOC{display:none}
+.header-section-number{color:var(--accent);margin-right:.4rem;font-weight:600}
+.smallcaps{font-variant:small-caps}
+.references li{margin-bottom:.4rem}
 </style>
 </head>
 <body>
-
-<button class="toc-toggle" onclick="document.querySelector('nav.toc').classList.toggle('open')" aria-label="Toggle table of contents">&#9776;</button>
-
-<nav class="toc">
-<div class="toc-title">Contents</div>
-<ol>
-<li><a href="#abstract">Abstract</a></li>
-<li><a href="#sec-1">1. Introduction</a></li>
-<li><a href="#sec-2">2. Background</a>
-  <ol>
-    <li><a href="#sec-2-1">2.1 Virtual Memory &amp; Filesystems</a></li>
-    <li><a href="#sec-2-2">2.2 Knowledge Representation</a></li>
-    <li><a href="#sec-2-3">2.3 Embeddings &amp; Semantic Search</a></li>
-    <li><a href="#sec-2-4">2.4 Category Theory Preliminaries</a></li>
-  </ol>
-</li>
-<li><a href="#sec-3">3. Memory Model</a>
-  <ol>
-    <li><a href="#sec-3-1">3.1 The Schema Category</a></li>
-    <li><a href="#sec-3-2">3.2 The Storage Category</a></li>
-    <li><a href="#sec-3-3">3.3 The Memory Functor</a></li>
-    <li><a href="#sec-3-4">3.4 Representability &amp; Yoneda</a></li>
-    <li><a href="#sec-3-5">3.5 Versioning as Temporal Functor</a></li>
-  </ol>
-</li>
-<li><a href="#sec-4">4. Type System</a>
-  <ol>
-    <li><a href="#sec-4-1">4.1 Schema-Indexed Types</a></li>
-    <li><a href="#sec-4-2">4.2 The 24 Memory Types</a></li>
-    <li><a href="#sec-4-3">4.3 Type-Safe Operations</a></li>
-    <li><a href="#sec-4-4">4.4 The Schema Registry</a></li>
-  </ol>
-</li>
-<li><a href="#sec-5">5. Versioning and Lineage</a>
-  <ol>
-    <li><a href="#sec-5-1">5.1 The Reason Category</a></li>
-    <li><a href="#sec-5-2">5.2 Versioned Memory</a></li>
-    <li><a href="#sec-5-3">5.3 Graph Relationships as 2-Morphisms</a></li>
-    <li><a href="#sec-5-4">5.4 Memory Operations as a Monad</a></li>
-  </ol>
-</li>
-<li><a href="#sec-6">6. Storage Architecture</a>
-  <ol>
-    <li><a href="#sec-6-1">6.1 Multi-Backend Router</a></li>
-    <li><a href="#sec-6-2">6.2 Semantic Search</a></li>
-    <li><a href="#sec-6-3">6.3 Graph Traversal</a></li>
-    <li><a href="#sec-6-4">6.4 Capability Preservation</a></li>
-  </ol>
-</li>
-<li><a href="#sec-7">7. Reliability Guarantees</a>
-  <ol>
-    <li><a href="#sec-7-1">7.1 Vector Clocks</a></li>
-    <li><a href="#sec-7-2">7.2 Content Hashing</a></li>
-    <li><a href="#sec-7-3">7.3 Soft Deletes</a></li>
-    <li><a href="#sec-7-4">7.4 ACID Properties</a></li>
-  </ol>
-</li>
-<li><a href="#sec-8">8. Elixir/OTP Implementation</a>
-  <ol>
-    <li><a href="#sec-8-1">8.1 Architecture Overview</a></li>
-    <li><a href="#sec-8-2">8.2 Schema Definitions</a></li>
-    <li><a href="#sec-8-3">8.3 Typed Memory GenServer</a></li>
-    <li><a href="#sec-8-4">8.4 Versioning</a></li>
-    <li><a href="#sec-8-5">8.5 Graph Relationships</a></li>
-    <li><a href="#sec-8-6">8.6 Storage Backend</a></li>
-    <li><a href="#sec-8-7">8.7 Working Memory vs. Persistent</a></li>
-    <li><a href="#sec-8-8">8.8 MCP Server Interface</a></li>
-  </ol>
-</li>
-<li><a href="#sec-9">9. Case Studies</a>
-  <ol>
-    <li><a href="#sec-9-1">9.1 Agent Learning</a></li>
-    <li><a href="#sec-9-2">9.2 Cross-Session Continuity</a></li>
-    <li><a href="#sec-9-3">9.3 Multi-Agent Shared Knowledge</a></li>
-  </ol>
-</li>
-<li><a href="#sec-10">10. Discussion</a></li>
-<li><a href="#sec-11">11. Related Work</a></li>
-<li><a href="#sec-12">12. Conclusion</a></li>
-<li><a href="#references">References</a></li>
-<li><a href="#appendix-a">A. Type Hierarchy</a></li>
-<li><a href="#appendix-b">B. Storage Diagrams</a></li>
-<li><a href="#appendix-c">C. MCP Protocol</a></li>
-<li><a href="#appendix-d">D. Monad Laws (Detailed)</a></li>
-</ol>
-</nav>
-
-<main>
-
-<!-- HEADER -->
-<div class="paper-header">
-  <div class="series">The AI Operating System Series</div>
-  <h1>Part III: Memory Layer &mdash; Typed Filesystem for Persistent Agent Cognition</h1>
-  <div class="authors">Matthew Long</div>
-  <div class="affiliation">The YonedaAI Collaboration &middot; YonedaAI Research Collective &middot; Chicago, IL<br>
-    <a href="mailto:matthew@yonedaai.com">matthew@yonedaai.com</a> &middot; <a href="https://yonedaai.com">yonedaai.com</a></div>
-  <div class="date">March 10, 2026 &nbsp;|&nbsp; GrokRxiv:2026.03.memory-layer-ai-os [cs.AI]</div>
-  <div class="links">
-    <a href="https://github.com/AgentHeroWork/agent-os/blob/main/papers/pdf/memory-layer.pdf">&#x1F4C4; PDF</a>
-    <a href="../">&#x2190; Back to Index</a>
+<button class="menu-toggle" onclick="document.querySelector('.sidebar').classList.toggle('open')">&#9776;</button>
+<div class="page-wrapper">
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <a href="../index.html">&larr; All Papers</a>
+    <div class="sidebar-title">Memory Layer — The AI Operating System, Part III</div>
   </div>
-</div>
-
-<!-- ABSTRACT -->
-<section class="abstract" id="abstract">
-<h2>Abstract</h2>
-<p>Autonomous AI agents require persistent memory that transcends session boundaries, yet no analogue of the operating-system filesystem has been formalized for agent cognition. Traditional filesystems store untyped byte streams; agent memory demands typed schemas, causal versioning, semantic search, and graph-structured lineage. We introduce a <em>categorical memory model</em> in which memory is a functor $M\colon \mathcal{S} \to \mathcal{S}\!t$ from a schema category $\mathcal{S}$ (whose objects are typed schemas and morphisms are schema transformations) to a storage category $\mathcal{S}\!t$ (whose objects are storage backends and morphisms are queries). Type safety is expressed as natural transformations between memory functors; versioning is a temporal functor $V\colon \mathsf{Timeline} \to \mathcal{S}\!t$; and graph lineage is a 2-categorical structure layered over the base categories. We prove that the generic typed wrapper $\mathsf{Mem}[S]$ is a representable functor (a Yoneda-lemma connection), that type structure is preserved under storage round-trips, and that the memory operations <code>evolve</code>, <code>merge</code>, and <code>split</code> form a monad on the memory category. The reference implementation, <span style="font-variant:small-caps">ContextFS</span>, realizes this framework with 24 memory-type variants, a multi-backend storage router (SQLite, ChromaDB, FalkorDB, PostgreSQL), vector clocks for causal consistency, content hashing for deduplication, and an MCP server for universal client access. We provide a production-quality Elixir/OTP implementation using ETS for working memory and Mnesia for persistent knowledge, demonstrating that the categorical abstractions yield both formal guarantees and practical performance.</p>
-<p class="keywords"><strong>Keywords:</strong> agent memory, typed filesystem, category theory, knowledge representation, persistent cognition, OTP, MCP, semantic search</p>
-</section>
-
-<!-- 1. INTRODUCTION -->
-<h2 id="sec-1"><span class="section-num">1</span> Introduction</h2>
-
-<p>The first two installments of this series established the kernel architecture and the scheduler for an AI Operating System. Yet an operating system without a memory subsystem is merely a stateless dispatcher: it can schedule computations but cannot accumulate knowledge across them. Every traditional OS dedicates a substantial fraction of its complexity to memory management&mdash;virtual memory, page tables, filesystem hierarchies, caching layers&mdash;because persistent, organized storage is the foundation upon which all higher-level abstractions rest.</p>
-
+  <nav class="toc-nav" id="toc-nav"></nav>
+  <div style="margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--border)">
+    <a href="../latex/memory-layer.pdf" style="font-size:.8rem;color:var(--accent2);display:flex;align-items:center;gap:.4rem">PDF Version &darr;</a>
+  </div>
+</aside>
+<main class="main-content" id="content">
+  <div class="paper-header">
+    <span class="paper-part">Part III</span>
+    <h1 style="margin-top:0">Memory Layer — The AI Operating System, Part III</h1>
+    <div class="paper-meta-row">
+      <span>Matthew Long</span>
+      <span>&middot;</span>
+      <span>YonedaAI Research Collective</span>
+      <span>&middot;</span>
+      <span>Chicago, IL</span>
+      <span>&middot;</span>
+      <a href="../latex/memory-layer.pdf">PDF</a>
+    </div>
+  </div>
+<h1 id="sec:introduction"><span class="header-section-number">1</span> Introduction</h1>
+<p>The first two installments of this series established the kernel architecture and the scheduler for an AI Operating System. Yet an operating system without a memory subsystem is merely a stateless dispatcher: it can schedule computations but cannot accumulate knowledge across them. Every traditional OS dedicates a substantial fraction of its complexity to memory management—virtual memory, page tables, filesystem hierarchies, caching layers—because persistent, organized storage is the foundation upon which all higher-level abstractions rest.</p>
 <p>For autonomous AI agents, the memory problem is simultaneously more constrained and more ambitious than its classical counterpart. More constrained because agents do not need byte-addressable random access to flat address spaces; more ambitious because agent memory must support:</p>
-
 <ol>
-<li><strong>Typed schemas</strong>: each memory entry conforms to a domain-specific type, not a raw byte stream.</li>
-<li><strong>Causal versioning</strong>: memory evolves over time, and the system must track <em>why</em> each change occurred (observation, inference, correction, decay).</li>
-<li><strong>Semantic search</strong>: retrieval by meaning, not merely by address or filename.</li>
-<li><strong>Graph lineage</strong>: memories relate to one another through typed edges&mdash;one memory may supersede, contradict, reference, or evolve into another.</li>
-<li><strong>Multi-backend coordination</strong>: different storage engines excel at different query patterns (relational, vector, graph), and the memory layer must route transparently.</li>
+<li><p><strong>Typed schemas</strong>: each memory entry conforms to a domain-specific type, not a raw byte stream.</p></li>
+<li><p><strong>Causal versioning</strong>: memory evolves over time, and the system must track <em>why</em> each change occurred (observation, inference, correction, decay).</p></li>
+<li><p><strong>Graph lineage</strong>: memories relate to one another through typed edges—one memory may supersede, contradict, reference, or evolve into another.</p></li>
+<li><p><strong>Multi-backend coordination</strong>: different storage engines excel at different query patterns, and the memory layer must route transparently.</p></li>
+<li><p><strong>Concurrent access</strong>: multiple agents and sessions must read and write shared memories without corruption.</p></li>
 </ol>
-
-<p>Traditional filesystems fail on every count. POSIX provides <code>open</code>/<code>read</code>/<code>write</code>/<code>close</code> on untyped byte sequences organized in a tree hierarchy. Plan 9's union mounts and synthetic filesystems introduced compositional namespace ideas but remained fundamentally untyped. Semantic filesystems added metadata-based retrieval but lacked formal type guarantees. None of these systems address versioning with causal annotations, graph-structured relationships, or the combination of exact and approximate (embedding-based) retrieval that agent cognition requires.</p>
-
-<p>This paper formalizes agent memory using category theory and provides a reference implementation called <span style="font-variant:small-caps">ContextFS</span>. The categorical framework yields three concrete benefits:</p>
-
+<p>Traditional filesystems fail on every count. POSIX provides <code>open</code>/<code>read</code>/<code>write</code>/<code>close</code> on untyped byte sequences organized in a tree hierarchy. Plan 9’s union mounts and synthetic filesystems introduced compositional namespace ideas but remained fundamentally untyped. Semantic filesystems added metadata-based retrieval but lacked formal type guarantees. None of these systems address versioning with causal annotations, graph-structured relationships, or the concurrent multi-agent access patterns that agent cognition requires.</p>
+<p>This paper presents the <em>design and implementation</em> of a typed memory layer for agent cognition, realized in Elixir/OTP and deployed as <span class="smallcaps">ContextFS</span>. Rather than leading with mathematical formalism, we lead with the engineering: the data structures, the protocols, the process architecture, and the code. Where the underlying ideas have roots in type theory or category theory, we note the connection, but the Elixir implementation is the primary artifact.</p>
+<p>The design yields three concrete benefits:</p>
 <ol>
-<li><strong>Compositionality</strong>: memory operations compose cleanly because they are morphisms in well-defined categories.</li>
-<li><strong>Type safety</strong>: the functor $M\colon \mathcal{S} \to \mathcal{S}\!t$ preserves type structure, and we prove round-trip fidelity.</li>
-<li><strong>Extensibility</strong>: new schema types, storage backends, and relationship kinds can be added as new objects and morphisms without modifying the core framework.</li>
+<li><p><strong>Composability</strong>: memory operations compose through Elixir’s pipeline operator (<code>|&gt;</code>), behaviour protocols, and GenServer message passing, enabling complex workflows from simple building blocks.</p></li>
+<li><p><strong>Type safety</strong>: a combination of Dialyzer typespecs (compile-time) and struct enforcement with <code>@enforce_keys</code> (runtime) prevents type confusion across the 24 memory types.</p></li>
+<li><p><strong>Extensibility</strong>: new schema types, storage backends, and relationship kinds can be added by implementing existing behaviours and registering with the schema registry—no modification to core modules required.</p></li>
 </ol>
-
-<p>The structure of the paper is as follows. Section 2 surveys relevant background. Section 3 develops the formal memory model. Section 4 details the type system. Section 5 formalizes versioning and lineage. Section 6 presents the multi-backend storage architecture. Section 7 establishes reliability guarantees. Section 8 provides the Elixir/OTP implementation. Section 9 validates through case studies. Section 10 compares to related work, and Section 12 concludes.</p>
-
-<!-- 2. BACKGROUND -->
-<h2 id="sec-2"><span class="section-num">2</span> Background</h2>
-
-<h3 id="sec-2-1">2.1 Virtual Memory and Filesystems</h3>
-
-<p>The virtual memory subsystem of a modern OS provides each process with an isolated address space mapped onto physical memory and secondary storage through page tables. The key abstraction is <em>indirection</em>: processes reference virtual addresses, and the MMU translates these to physical locations. This indirection enables demand paging, copy-on-write, memory-mapped files, and shared memory regions.</p>
-
-<p>Filesystems layer a persistent namespace on top of block devices. The Unix filesystem introduced the inode/directory model: files are sequences of bytes identified by inodes, organized in a tree of directories. The Virtual Filesystem Switch (VFS) in Linux provides a uniform interface over heterogeneous implementations&mdash;ext4, XFS, NFS, FUSE&mdash;through a common set of operations (<code>inode_operations</code>, <code>file_operations</code>, <code>super_operations</code>).</p>
-
-<p>Plan 9 radicalized the "everything is a file" philosophy: network connections, process state, graphics, and device control are all accessed through filesystem operations on synthetic file servers. These designs are profoundly influential, yet they share a fundamental limitation: <em>files are untyped byte streams</em>. The filesystem knows nothing about the structure of what it stores.</p>
-
-<h3 id="sec-2-2">2.2 Knowledge Representation and Semantic Memory</h3>
-
-<p>Frame systems organize knowledge around stereotypical situations with slots and defaults. Semantic networks represent concepts as nodes and relationships as labeled edges. Description logics provide formal semantics with decidable reasoning for ontological knowledge. Knowledge graphs have become the dominant paradigm, exemplified by Wikidata and Google's Knowledge Graph. The connection to agent memory is direct: an agent's accumulated knowledge forms a personal knowledge graph, with the crucial addition that this graph <em>evolves over time</em>.</p>
-
-<h3 id="sec-2-3">2.3 Embedding Spaces and Semantic Search</h3>
-
-<p>Transformer-based language models produce dense vector representations (embeddings) that capture semantic similarity. Retrieval-augmented generation (RAG) exploits this by storing text chunks as vectors and retrieving relevant context at query time through approximate nearest neighbor (ANN) search. For agent memory, embeddings provide retrieval by meaning&mdash;analogous to human associative memory, where recall is triggered by semantic similarity rather than explicit addressing.</p>
-
-<h3 id="sec-2-4">2.4 Category Theory Preliminaries</h3>
-
-<p>A <em>category</em> $\mathcal{C}$ consists of objects $\mathrm{ob}(\mathcal{C})$, morphisms $\mathrm{mor}(\mathcal{C})$ with source and target maps, an associative composition, and identity morphisms. A <em>functor</em> $F\colon \mathcal{C} \to \mathcal{D}$ maps objects to objects and morphisms to morphisms, preserving composition and identities. A <em>natural transformation</em> $\eta\colon F \Rightarrow G$ between parallel functors is a family of morphisms $\eta_c\colon F(c) \to G(c)$ satisfying the naturality square.</p>
-
-<p>The <em>Yoneda lemma</em> states that for any functor $F\colon \mathcal{C}^{\mathrm{op}} \to \mathbf{Set}$ and object $c \in \mathcal{C}$:</p>
-
-<div class="math-display">$$\mathrm{Nat}(\mathrm{Hom}_{\mathcal{C}}(-,c), F) \cong F(c)$$</div>
-
-<p>A functor is <em>representable</em> if it is naturally isomorphic to $\mathrm{Hom}_{\mathcal{C}}(-,c)$ for some object $c$. A <em>monad</em> on $\mathcal{C}$ is an endofunctor $T\colon \mathcal{C} \to \mathcal{C}$ equipped with natural transformations $\eta\colon \mathrm{id}_{\mathcal{C}} \Rightarrow T$ (unit) and $\mu\colon T^2 \Rightarrow T$ (multiplication) satisfying associativity and unit laws. A <em>2-category</em> extends a category by adding 2-morphisms with two composition operations satisfying interchange laws.</p>
-
-<!-- 3. MEMORY MODEL -->
-<h2 id="sec-3"><span class="section-num">3</span> Memory Model</h2>
-
-<h3 id="sec-3-1">3.1 The Schema Category</h3>
-
-<div class="theorem-box definition">
-<div class="label">Definition 3.1 (Schema Category $\mathcal{S}$)</div>
-<p>The <em>schema category</em> $\mathcal{S}$ has:</p>
+<h2 id="paper-organization"><span class="header-section-number">1.1</span> Paper Organization</h2>
+<p>Section <a href="#sec:background">2</a> surveys relevant background in OS memory management, knowledge representation, and the Elixir/OTP platform. Section <a href="#sec:design-overview">3</a> presents the high-level architecture. Section <a href="#sec:types">4</a> details the type system and schema registry. Section <a href="#sec:memory-genserver">5</a> presents the core Memory GenServer. Section <a href="#sec:versioning">6</a> describes versioning with causal tracking and vector clocks. Section <a href="#sec:graph">7</a> covers the graph relationship manager. Section <a href="#sec:storage">8</a> presents the multi-backend storage router. Section <a href="#sec:reliability">9</a> establishes reliability guarantees. Section <a href="#sec:mcp">10</a> describes the MCP server interface. Section <a href="#sec:case-studies">11</a> validates the framework through case studies. Section <a href="#sec:discussion">12</a> discusses related work and connections to formal frameworks. Section <a href="#sec:conclusion">14</a> concludes.</p>
+<h1 id="sec:background"><span class="header-section-number">2</span> Background</h1>
+<h2 id="subsec:os-memory"><span class="header-section-number">2.1</span> OS Memory Management and Filesystems</h2>
+<p>The virtual memory subsystem of a modern OS provides each process with an isolated address space mapped onto physical memory and secondary storage through page tables. The key abstraction is <em>indirection</em>: processes reference virtual addresses, and the memory management unit translates these to physical locations. This indirection enables demand paging, copy-on-write, and shared memory regions.</p>
+<p>Filesystems layer a persistent namespace on top of block devices. The Unix filesystem introduced the inode/directory model: files are sequences of bytes identified by inodes, organized in a tree of directories. The Virtual Filesystem Switch (VFS) in Linux provides a uniform interface over heterogeneous implementations—ext4, XFS, NFS, FUSE—through a common set of operations (<code>inode_operations</code>, <code>file_operations</code>). Plan 9 radicalized the “everything is a file” philosophy, presenting network connections, process state, and device control as synthetic file servers.</p>
+<p>These designs are profoundly influential, yet they share a fundamental limitation: <em>files are untyped byte streams</em>. The filesystem knows nothing about the structure of what it stores. All interpretation is deferred to applications.</p>
+<h2 id="subsec:kr"><span class="header-section-number">2.2</span> Knowledge Representation</h2>
+<p>The knowledge representation community has long studied how to organize structured information for intelligent systems. Frame systems organize knowledge around stereotypical situations with slots and defaults. Semantic networks represent concepts as nodes and relationships as labeled edges. Knowledge graphs have become the dominant paradigm, exemplified by Wikidata and domain-specific graphs in biomedicine and finance.</p>
+<p>The connection to agent memory is direct: an agent’s accumulated knowledge forms a personal knowledge graph, with the crucial addition that this graph <em>evolves over time</em> as the agent observes, infers, corrects, and forgets.</p>
+<h2 id="subsec:embeddings"><span class="header-section-number">2.3</span> Embedding Spaces and Semantic Search</h2>
+<p>Transformer-based language models produce dense vector representations that capture semantic similarity. Retrieval-augmented generation (RAG) exploits this by storing text chunks as vectors and retrieving relevant context at query time through approximate nearest neighbor search. For agent memory, embeddings provide a capability that neither filesystems nor knowledge graphs offer natively: <em>retrieval by meaning</em>.</p>
+<h2 id="subsec:elixir-otp"><span class="header-section-number">2.4</span> Elixir/OTP and the <span class="smallcaps">beam</span> Virtual Machine</h2>
+<p>Elixir is a functional programming language that runs on the <span class="smallcaps">beam</span> virtual machine. The <span class="smallcaps">beam</span> was designed for building fault-tolerant, distributed, soft-real-time systems. Several <span class="smallcaps">beam</span> features make it uniquely suited for implementing an agent memory layer:</p>
 <ul>
-<li><strong>Objects</strong>: typed schemas $S_1, S_2, \ldots$, each specifying a set of typed fields with validation constraints. In <span style="font-variant:small-caps">ContextFS</span>, these include <code>BaseSchema</code> and its 24 domain-specific descendants.</li>
-<li><strong>Morphisms</strong>: schema transformations $f\colon S_i \to S_j$, which are structure-preserving maps between schemas.</li>
-<li><strong>Identity</strong>: the identity transformation $\mathrm{id}_{S}\colon S \to S$.</li>
-<li><strong>Composition</strong>: given $f\colon S_1 \to S_2$ and $g\colon S_2 \to S_3$, the composite $g \circ f\colon S_1 \to S_3$.</li>
+<li><p><strong>Lightweight processes</strong>: the <span class="smallcaps">beam</span> supports millions of concurrent processes, each with isolated memory. A per-memory GenServer process provides natural isolation and concurrent access.</p></li>
+<li><p><strong>OTP behaviours</strong>: GenServer, Supervisor, and Application provide battle-tested patterns for stateful services, fault recovery, and lifecycle management.</p></li>
+<li><p><strong>ETS (Erlang Term Storage)</strong>: in-memory key-value tables with concurrent read/write access and constant-time lookups. Ideal for working memory.</p></li>
+<li><p><strong>Mnesia</strong>: a distributed, real-time database built into OTP. Supports transactions, replication, schema migration, and both RAM and disk storage. Ideal for persistent knowledge.</p></li>
+<li><p><strong>Pattern matching</strong>: Elixir’s pervasive pattern matching enables concise, type-safe dispatch across the 24 memory types.</p></li>
+<li><p><strong>Immutable data</strong>: all Elixir data structures are immutable by default, eliminating shared-state concurrency bugs.</p></li>
+<li><p><strong>Pipeline composition</strong>: the <code>|&gt;</code> operator enables readable data transformation chains.</p></li>
+<li><p><strong>Typespecs and Dialyzer</strong>: optional static type checking via <code>@type</code>, <code>@spec</code>, and the Dialyzer tool catches type mismatches at compile time.</p></li>
 </ul>
-</div>
-
-<p>The schema category has a rich subcategory structure:</p>
-<div class="math-display">$$\mathcal{S} = \mathcal{S}_{\mathrm{core}} \cup \mathcal{S}_{\mathrm{ext}} \cup \mathcal{S}_{\mathrm{wf}} \cup \mathcal{S}_{\mathrm{meta}} \cup \mathcal{S}_{\mathrm{sys}}$$</div>
-
-<div class="theorem-box remark">
-<div class="label">Remark</div>
-<p>The <code>BaseSchema</code> in <span style="font-variant:small-caps">ContextFS</span> serves as an initial object in $\mathcal{S}$ in the sense that every domain schema admits a unique embedding from <code>BaseSchema</code> (via inheritance). The <code>_schema_name</code> class variable acts as a tagging morphism that distinguishes objects.</p>
-</div>
-
-<h3 id="sec-3-2">3.2 The Storage Category</h3>
-
-<div class="theorem-box definition">
-<div class="label">Definition 3.2 (Storage Category $\mathcal{S}\!t$)</div>
-<p>The <em>storage category</em> $\mathcal{S}\!t$ has:</p>
+<h2 id="subsec:cattheory-background"><span class="header-section-number">2.5</span> Design Inspiration: Category Theory</h2>
+<p>The design of the memory layer is informed by ideas from category theory, though we do not develop a full categorical formalism in this paper. The key insights borrowed from this tradition are:</p>
 <ul>
-<li><strong>Objects</strong>: storage backends $B_1, B_2, \ldots$, each providing capabilities (save, recall, search, delete, update). In <span style="font-variant:small-caps">ContextFS</span>: SQLite, ChromaDB, FalkorDB, PostgreSQL.</li>
-<li><strong>Morphisms</strong>: queries $q\colon B_i \to B_j$, representing data-flow operations.</li>
-<li><strong>Identity</strong>: the no-op query $\mathrm{id}_B$.</li>
-<li><strong>Composition</strong>: pipeline composition of queries.</li>
+<li><p><strong>Typed mappings preserve structure</strong>: the memory system maps typed schemas to storage representations in a way that preserves type information across round-trips. This is analogous to a functor preserving structure between categories.</p></li>
+<li><p><strong>Operations compose</strong>: schema transformations, storage queries, and graph traversals compose associatively, just as morphisms compose in a category.</p></li>
+<li><p><strong>Universal constructions</strong>: the BaseSchema serves as a universal type from which all 24 schema types specialize, analogous to an initial object. The storage router aggregates backend capabilities, analogous to a coproduct.</p></li>
 </ul>
+<p>Section <a href="#sec:discussion">12</a> elaborates on these connections for readers interested in the formal underpinnings.</p>
+<h1 id="sec:design-overview"><span class="header-section-number">3</span> Design Overview</h1>
+<p>The memory layer is an OTP application consisting of five core modules organized in a supervision tree. Figure <a href="#fig:architecture">1</a> shows the high-level architecture.</p>
+<figure id="fig:architecture">
+<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:2rem;text-align:center;color:var(--text-dim);font-size:.9rem;">
+<p style="margin-bottom:.5rem;"><strong>Figure 1: Memory Layer Architecture</strong></p>
+<p style="margin:0;">Five core OTP modules arranged in a supervision tree:<br>
+<code>MemoryLayer</code> (Application) &rarr; <code>Schema.Registry</code> (GenServer) + <code>Memory</code> (per-instance GenServer) + <code>Graph</code> (GenServer) + <code>Storage</code> (GenServer)<br>
+<em>[Diagram available in <a href="../latex/memory-layer.pdf">PDF version</a>]</em></p>
 </div>
-
-<p>Each backend $B$ comes with a <em>capability set</em> $\mathrm{Cap}(B) \subseteq \{\texttt{save}, \texttt{recall}, \texttt{search}, \texttt{delete}, \texttt{update}, \texttt{vector\_search}, \texttt{graph\_traverse}\}$, defining a functor $\mathrm{Cap}\colon \mathcal{S}\!t \to \mathcal{P}(\mathrm{Ops})$.</p>
-
-<h3 id="sec-3-3">3.3 The Memory Functor</h3>
-
-<div class="theorem-box definition">
-<div class="label">Definition 3.3 (Memory Functor)</div>
-<p>The <em>memory functor</em> $M\colon \mathcal{S} \to \mathcal{S}\!t$ maps:</p>
-<ul>
-<li>Each schema $S \in \mathrm{ob}(\mathcal{S})$ to a storage representation $M(S) \in \mathrm{ob}(\mathcal{S}\!t)$.</li>
-<li>Each schema transformation $f\colon S_1 \to S_2$ to a storage operation $M(f)\colon M(S_1) \to M(S_2)$.</li>
-</ul>
-<p>subject to: $M(\mathrm{id}_S) = \mathrm{id}_{M(S)}$ and $M(g \circ f) = M(g) \circ M(f)$.</p>
+<figcaption>Memory Layer architecture. Solid lines show OTP supervision and data flow; dashed lines show planned extensions. Each Memory instance is a separate GenServer process.</figcaption>
+</figure>
+<div class="designprinciple">
+<p><strong>Design Principle 1</strong> (Everything an agent knows is a typed memory).  Just as Plan 9 made everything a file, the memory layer makes everything a typed memory instance—facts, decisions, procedures, episodes, tasks, configurations, and even the agent’s own execution traces.</p>
 </div>
-
-<pre class="diagram">
-    S&#x2081; ----f----> S&#x2082;
-    |              |
-    M              M
-    |              |
-    v              v
-  M(S&#x2081;) --M(f)--> M(S&#x2082;)
-</pre>
-
-<h3 id="sec-3-4">3.4 Representability and the Yoneda Connection</h3>
-
-<div class="theorem-box">
-<div class="label">Theorem 3.1 ($\mathsf{Mem}[S]$ is Representable)</div>
-<p>The functor $\mathsf{Mem}[-]\colon \mathcal{S}^{\mathrm{op}} \to \mathbf{Set}$ is representable. There exists a universal schema $U \in \mathrm{ob}(\mathcal{S})$ such that:</p>
-<div class="math-display">$$\mathsf{Mem}[-] \cong \mathrm{Hom}_{\mathcal{S}}(-, U)$$</div>
-<p>The representing object $U$ is the <code>BaseSchema</code> equipped with all optional extensions.</p>
+<div class="designprinciple">
+<p><strong>Design Principle 2</strong> (Dual-layer storage mirrors cognition).  ETS serves as working memory (fast, volatile, bounded); Mnesia serves as long-term memory (durable, queryable, unbounded). Promotion and demotion between layers happens automatically based on access patterns.</p>
 </div>
-
-<div class="proof-box">
-<div class="proof-label">Proof.</div>
-<p>By the Yoneda lemma, $\mathrm{Nat}(\mathrm{Hom}_\mathcal{S}(-, U), \mathsf{Mem}[-]) \cong \mathsf{Mem}[U]$. Let $U = \texttt{BaseSchema}$ with all field types as optional. For any schema $S$ and instance $m \in \mathsf{Mem}[S]$, the unique morphism $\phi_m\colon S \to U$ embeds the instance into the universal schema. This defines a natural bijection:</p>
-<div class="math-display">$$\mathsf{Mem}[S] \ni m \longmapsto (\phi_m, m|_{\mathrm{base}}) \in \mathrm{Hom}_\mathcal{S}(S, U) \times \mathsf{Mem}[U]_{\mathrm{base}}$$</div>
-<p>Since every schema transformation factors through $U$ via the respective embeddings, and the functor respects this factorization by the type-preservation property, the natural transformation is an isomorphism. The Yoneda embedding ensures faithfulness.</p>
-<div class="qed">&#x25A1;</div>
+<div class="designprinciple">
+<p><strong>Design Principle 3</strong> (Per-memory process isolation).  Each memory instance runs as its own GenServer process, providing natural concurrency isolation, independent lifecycle management, and the ability to supervise individual memories.</p>
 </div>
-
-<div class="theorem-box corollary">
-<div class="label">Corollary 3.2</div>
-<p>The set of all memory instances of schema type $S$ is fully determined by the morphisms from $S$ into the universal schema $U$:</p>
-<div class="math-display">$$|\mathsf{Mem}[S]| = |\mathrm{Hom}_\mathcal{S}(S, U)|$$</div>
-</div>
-
-<h3 id="sec-3-5">3.5 Versioning as Temporal Functor</h3>
-
-<div class="theorem-box definition">
-<div class="label">Definition 3.4 (Timeline Category)</div>
-<p>The <em>timeline category</em> $\mathsf{Timeline}$ has timestamps as objects and a unique morphism $t_i \to t_j$ whenever $t_i \leq t_j$ (a thin category / preorder).</p>
-</div>
-
-<div class="theorem-box definition">
-<div class="label">Definition 3.5 (Versioning Functor)</div>
-<p>The <em>versioning functor</em> $V\colon \mathsf{Timeline} \to \mathcal{S}\!t$ maps each timestamp $t$ to the state of storage at time $t$. The versioned memory wrapper is the composite:</p>
-<div class="math-display">$$\mathsf{VMem}[S] = V \circ M|_S \colon \mathsf{Timeline} \to \mathcal{S}\!t$$</div>
-</div>
-
-<pre class="diagram">
-  Timeline ---V---> St
-      \              ^
-       \            /
-     VMem[S]      M
-         \        /
-          v      /
-           Sch
-</pre>
-
-<!-- 4. TYPE SYSTEM -->
-<h2 id="sec-4"><span class="section-num">4</span> Type System</h2>
-
-<h3 id="sec-4-1">4.1 Schema-Indexed Types</h3>
-
-<div class="theorem-box definition">
-<div class="label">Definition 4.1 (Schema-Indexed Memory)</div>
-<p>For a schema $S \in \mathrm{ob}(\mathcal{S})$, the type $\mathsf{Mem}[S]$ provides:</p>
-<ul>
-<li>$\mathsf{Mem}[S].\mathtt{create}(d\colon S) \to \mathsf{Mem}[S]$: construct a new memory wrapping validated data.</li>
-<li>$\mathsf{Mem}[S].\mathtt{wrap}(d\colon S) \to \mathsf{Mem}[S]$: wrap existing data with fresh identifier and timestamp.</li>
-<li>$\mathsf{Mem}[S].\mathtt{data} \to S$: extract the typed payload.</li>
-<li>$\mathsf{Mem}[S].\mathtt{id} \to \mathrm{UUID}$: unique identifier.</li>
-<li>$\mathsf{Mem}[S].\mathtt{schema\_name} \to \mathrm{String}$: the schema's type tag.</li>
-</ul>
-</div>
-
-<p>Type safety is enforced at two levels: <strong>compile-time</strong> (via dialyzer/typespecs in Elixir) and <strong>runtime</strong> (via struct enforcement on every create, wrap, and update operation).</p>
-
-<h3 id="sec-4-2">4.2 The 24 Memory Types</h3>
-
+<p>The five core modules and their responsibilities:</p>
+<ol>
+<li><p><strong><code>MemoryLayer.Schema</code></strong> — Type system: 24 memory type definitions as Elixir structs, subcategory classification, and the <code>Registry</code> GenServer for runtime type resolution.</p></li>
+<li><p><strong><code>MemoryLayer.Memory</code></strong> — Core GenServer: per-memory stateful process with typed data, content hashing, and operations (create, wrap, data, update, evolve, merge, delete).</p></li>
+<li><p><strong><code>MemoryLayer.Version</code></strong> — Versioning: causal change tracking with parent-child lineage, change reason annotations, and vector clocks for multi-agent conflict detection.</p></li>
+<li><p><strong><code>MemoryLayer.Graph</code></strong> — Relationships: nine typed edge relations between memories, graph traversal (BFS with depth limits), neighborhood queries, and conflict detection.</p></li>
+<li><p><strong><code>MemoryLayer.Storage</code></strong> — Multi-backend router: fan-out writes to ETS and Mnesia, tiered recall with automatic promotion, cross-backend search, and LRU eviction.</p></li>
+</ol>
+<p>Table <a href="#tab:module-summary">1</a> summarizes the OTP process types:</p>
+<div id="tab:module-summary">
 <table>
-<caption>Memory type taxonomy in ContextFS.</caption>
-<thead><tr><th>Category</th><th>Type</th><th>Description</th></tr></thead>
+<caption>OTP process types in the memory layer.</caption>
+<thead>
+<tr>
+<th style="text-align: left;"><strong>Module</strong></th>
+<th style="text-align: left;"><strong>Process Type</strong></th>
+<th style="text-align: left;"><strong>State</strong></th>
+</tr>
+</thead>
 <tbody>
-<tr><td rowspan="4"><strong>Core</strong></td><td><code>FACT</code></td><td>Declarative knowledge: verified assertions</td></tr>
-<tr><td><code>DECISION</code></td><td>Decision records with rationale and alternatives</td></tr>
-<tr><td><code>PROCEDURAL</code></td><td>How-to knowledge: steps, preconditions, postconditions</td></tr>
-<tr><td><code>EPISODIC</code></td><td>Experiential records: what happened, when, in what context</td></tr>
-<tr><td rowspan="4"><strong>Extended</strong></td><td><code>TODO</code></td><td>Action items with priority and status</td></tr>
-<tr><td><code>ISSUE</code></td><td>Problem records with severity and resolution</td></tr>
-<tr><td><code>API</code></td><td>External API schemas and access patterns</td></tr>
-<tr><td><code>SCHEMA</code></td><td>Schema definitions (meta-level: schemas about schemas)</td></tr>
-<tr><td rowspan="4"><strong>Workflow</strong></td><td><code>WORKFLOW</code></td><td>End-to-end process definitions</td></tr>
-<tr><td><code>TASK</code></td><td>Individual units of work within workflows</td></tr>
-<tr><td><code>STEP</code></td><td>Atomic operations within tasks</td></tr>
-<tr><td><code>AGENT_RUN</code></td><td>Execution traces of agent invocations</td></tr>
-<tr><td rowspan="4"><strong>Metadata</strong></td><td><code>TAG</code></td><td>Classification labels</td></tr>
-<tr><td><code>ANNOTATION</code></td><td>Human or agent commentary on other memories</td></tr>
-<tr><td><code>EMBEDDING</code></td><td>Vector representations</td></tr>
-<tr><td><code>INDEX</code></td><td>Search index entries</td></tr>
-<tr><td rowspan="4"><strong>System</strong></td><td><code>CONFIG</code></td><td>System configuration parameters</td></tr>
-<tr><td><code>SESSION</code></td><td>Agent session state</td></tr>
-<tr><td><code>CONTEXT</code></td><td>Contextual information bundles</td></tr>
-<tr><td><code>LOG</code></td><td>System event records</td></tr>
-<tr><td rowspan="4"><strong>Relational</strong></td><td><code>PERSON</code></td><td>People known to the agent</td></tr>
-<tr><td><code>PROJECT</code></td><td>Project-level organizational units</td></tr>
-<tr><td><code>ARTIFACT</code></td><td>Produced outputs (documents, code, analyses)</td></tr>
-<tr><td><code>EVENT</code></td><td>Calendar or timeline events</td></tr>
+<tr>
+<td style="text-align: left;"><code>MemoryLayer</code></td>
+<td style="text-align: left;">Application</td>
+<td style="text-align: left;">Initializes ETS tables, starts Mnesia, launches supervisor</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Schema.Registry</code></td>
+<td style="text-align: left;">Named GenServer</td>
+<td style="text-align: left;">Map from schema name strings to module atoms</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Memory</code></td>
+<td style="text-align: left;">Per-instance GenServer</td>
+<td style="text-align: left;">Typed data struct, version, content hash, vector clock, timestamps</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Graph</code></td>
+<td style="text-align: left;">Named GenServer</td>
+<td style="text-align: left;">Stateless coordinator (edges stored in Mnesia)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Storage</code></td>
+<td style="text-align: left;">Named GenServer</td>
+<td style="text-align: left;">Stateless coordinator (data in ETS + Mnesia)</td>
+</tr>
 </tbody>
 </table>
-
-<h3 id="sec-4-3">4.3 Type-Safe Operations as Natural Transformations</h3>
-
-<div class="theorem-box definition">
-<div class="label">Definition 4.2 (Storage Natural Transformation)</div>
-<p>Let $\mathrm{InMem}, \mathrm{OnDisk}\colon \mathcal{S} \to \mathbf{Set}$ be functors mapping each schema $S$ to the set of in-memory and on-disk instances respectively. The <code>save</code> operation is a natural transformation:</p>
-<div class="math-display">$$\mathtt{save}\colon \mathrm{InMem} \Rightarrow \mathrm{OnDisk}$$</div>
-<p>satisfying the naturality condition for every schema morphism $f\colon S_1 \to S_2$.</p>
 </div>
-
-<pre class="diagram">
-  InMem(S&#x2081;) --save_S&#x2081;--> OnDisk(S&#x2081;)
-      |                        |
-  InMem(f)               OnDisk(f)
-      |                        |
-      v                        v
-  InMem(S&#x2082;) --save_S&#x2082;--> OnDisk(S&#x2082;)
-</pre>
-
-<div class="theorem-box">
-<div class="label">Theorem 4.1 (Type Preservation Under Round-Trip)</div>
-<p>For any schema $S \in \mathrm{ob}(\mathcal{S})$ and memory instance $m \in \mathsf{Mem}[S]$:</p>
-<div class="math-display">$$\mathtt{recall}_{S}(\mathtt{save}_{S}(m)) \cong m$$</div>
-<p>The composite $\mathtt{recall} \circ \mathtt{save}\colon \mathrm{InMem} \Rightarrow \mathrm{InMem}$ is naturally isomorphic to $\mathrm{id}_{\mathrm{InMem}}$.</p>
-</div>
-
-<div class="proof-box">
-<div class="proof-label">Proof.</div>
-<p><strong>Bijection</strong>: <code>save</code> serializes $m$ using schema-specific serializers. The content hash $h(m)$ is stored alongside. <code>recall</code> deserializes using the same schema $S$ (resolved via <code>SchemaRegistry</code>). Since serialization and deserialization are inverse operations for the validators, the round-trip is the identity up to isomorphism.</p>
-<p><strong>Naturality</strong>: For a schema morphism $f\colon S_1 \to S_2$ and $m \in \mathrm{InMem}(S_1)$:</p>
-<div class="math-display">$$\mathtt{recall}_{S_2}(\mathrm{OnDisk}(f)(\mathtt{save}_{S_1}(m))) = \mathtt{recall}_{S_2}(\mathtt{save}_{S_2}(\mathrm{InMem}(f)(m))) = \mathrm{InMem}(f)(m)$$</div>
-<div class="qed">&#x25A1;</div>
-</div>
-
-<h3 id="sec-4-4">4.4 The Schema Registry</h3>
-
-<p>The <code>SchemaRegistry</code> provides runtime type resolution. Categorically, it is a section of the forgetful functor $U\colon \mathcal{S} \to \mathbf{Set}$:</p>
-
-<div class="math-display">$$\texttt{SchemaRegistry}\colon \mathrm{Names} \hookrightarrow \mathcal{S}, \qquad U \circ \texttt{SchemaRegistry} = \mathrm{id}_{\mathrm{Names}}$$</div>
-
-<p>This section is injective by construction (schema names are unique), ensuring unambiguous type resolution at runtime.</p>
-
-<!-- 5. VERSIONING AND LINEAGE -->
-<h2 id="sec-5"><span class="section-num">5</span> Versioning and Lineage</h2>
-
-<h3 id="sec-5-1">5.1 The Reason Category</h3>
-
-<div class="theorem-box definition">
-<div class="label">Definition 5.1 (Reason Category $\mathsf{Reason}$)</div>
-<p>The <em>reason category</em> $\mathsf{Reason}$ has:</p>
+<h1 id="sec:types"><span class="header-section-number">4</span> Type System and Schema Registry</h1>
+<h2 id="subsec:type-rationale"><span class="header-section-number">4.1</span> Design Rationale</h2>
+<p>The fundamental design decision in the memory layer is that <em>every memory has a type</em>. Unlike traditional filesystems where a file is an opaque byte sequence, each memory instance carries a schema that defines its fields, their types, and their constraints. This enables:</p>
 <ul>
-<li><strong>Objects</strong>: change reasons {<code>Observation</code>, <code>Inference</code>, <code>Correction</code>, <code>Decay</code>}.</li>
-<li><strong>Morphisms</strong>: subsumption relations. <code>Correction</code> subsumes <code>Observation</code>; <code>Inference</code> extends <code>Observation</code>; <code>Decay</code> is terminal.</li>
+<li><p>Compile-time checking via Dialyzer typespecs</p></li>
+<li><p>Runtime validation via <code>@enforce_keys</code> and struct construction</p></li>
+<li><p>Type-safe deserialization: given a stored <code>schema_name</code> string, the registry resolves the correct Elixir module for reconstruction</p></li>
+<li><p>Domain-specific operations: a <code>TodoData</code> memory can be queried by priority and status; a <code>FactData</code> memory can be filtered by confidence</p></li>
 </ul>
+<h2 id="subsec:base-schema"><span class="header-section-number">4.2</span> BaseSchema: The Universal Type</h2>
+<p>All 24 memory types share a common envelope defined by <code>BaseSchema</code>:</p>
+<pre id="lst:base-schema"><code>defmodule MemoryLayer.Schema.BaseSchema do
+  @enforce_keys [:schema_name, :content]
+  defstruct [
+    :schema_name,
+    :content,
+    :metadata,
+    id: nil,
+    created_at: nil,
+    updated_at: nil,
+    deleted_at: nil,
+    content_hash: nil,
+    tags: []
+  ]
+
+  @type t :: %__MODULE__{
+    schema_name: String.t(),
+    content: map(),
+    metadata: map() | nil,
+    id: String.t() | nil,
+    created_at: DateTime.t() | nil,
+    updated_at: DateTime.t() | nil,
+    deleted_at: DateTime.t() | nil,
+    content_hash: String.t() | nil,
+    tags: [String.t()]
+  }
+end</code></pre>
+<p>The <code>@enforce_keys</code> directive ensures that <code>schema_name</code> and <code>content</code> must be provided at construction time—the Elixir compiler will raise an error if they are omitted. The <code>deleted_at</code> field supports soft deletes (Section <a href="#subsec:soft-delete">5.7</a>), and <code>content_hash</code> enables deduplication (Section <a href="#subsec:content-hash">5.3</a>).</p>
+<h2 id="subsec:24types"><span class="header-section-number">4.3</span> The 24 Memory Types</h2>
+<p><span class="smallcaps">ContextFS</span> defines 24 memory types organized into six subcategories. The classification is defined by pattern matching on the type atom:</p>
+<pre id="lst:subcategory"><code>defmodule MemoryLayer.Schema do
+  @type memory_type ::
+    :fact | :decision | :procedural | :episodic |
+    :todo | :issue | :api | :schema_def |
+    :workflow | :task | :step | :agent_run |
+    :tag | :annotation | :embedding | :index |
+    :config | :session | :context | :log |
+    :person | :project | :artifact | :event
+
+  @type subcategory ::
+    :core | :extended | :workflow |
+    :metadata | :system | :relational
+
+  def subcategory(t) when t in [:fact, :decision,
+    :procedural, :episodic], do: :core
+  def subcategory(t) when t in [:todo, :issue,
+    :api, :schema_def], do: :extended
+  def subcategory(t) when t in [:workflow, :task,
+    :step, :agent_run], do: :workflow
+  def subcategory(t) when t in [:tag, :annotation,
+    :embedding, :index], do: :metadata
+  def subcategory(t) when t in [:config, :session,
+    :context, :log], do: :system
+  def subcategory(t) when t in [:person, :project,
+    :artifact, :event], do: :relational
+end</code></pre>
+<p>Table <a href="#tab:memory-types">2</a> lists all 24 types with their fields and intended use:</p>
+<div id="tab:memory-types">
+<table>
+<caption>The 24 memory types in <span class="smallcaps">ContextFS</span>.</caption>
+<thead>
+<tr>
+<th style="text-align: left;"><strong>Subcategory</strong></th>
+<th style="text-align: left;"><strong>Type</strong></th>
+<th style="text-align: left;"><strong>Purpose and Key Fields</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td rowspan="4" style="text-align: left;"><strong>Core</strong></td>
+<td style="text-align: left;"><code>fact</code></td>
+<td style="text-align: left;">Declarative knowledge: <code>assertion</code>, <code>confidence</code>, <code>evidence</code>, <code>source</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>decision</code></td>
+<td style="text-align: left;">Decision records: <code>decision</code>, <code>rationale</code>, <code>alternatives</code>, <code>confidence</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>procedural</code></td>
+<td style="text-align: left;">How-to knowledge: <code>name</code>, <code>steps</code>, <code>preconditions</code>, <code>postconditions</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>episodic</code></td>
+<td style="text-align: left;">Experiential records: <code>event</code>, <code>outcome</code>, <code>context</code>, <code>duration_ms</code></td>
+</tr>
+<tr>
+<td rowspan="4" style="text-align: left;"><strong>Extended</strong></td>
+<td style="text-align: left;"><code>todo</code></td>
+<td style="text-align: left;">Action items: <code>title</code>, <code>priority</code> (low/med/high/critical), <code>status</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>issue</code></td>
+<td style="text-align: left;">Problem records: <code>title</code>, <code>severity</code>, <code>root_cause</code>, <code>resolution</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>api</code></td>
+<td style="text-align: left;">API schemas and access patterns</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>schema_def</code></td>
+<td style="text-align: left;">Meta-level: schemas about schemas</td>
+</tr>
+<tr>
+<td rowspan="4" style="text-align: left;"><strong>Workflow</strong></td>
+<td style="text-align: left;"><code>workflow</code></td>
+<td style="text-align: left;">End-to-end processes: <code>name</code>, <code>steps</code>, <code>trigger</code>, <code>status</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>task</code></td>
+<td style="text-align: left;">Individual work units within workflows</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>step</code></td>
+<td style="text-align: left;">Atomic operations within tasks</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>agent_run</code></td>
+<td style="text-align: left;">Execution traces: <code>agent_id</code>, <code>task</code>, <code>model</code>, <code>duration_ms</code>, <code>status</code></td>
+</tr>
+<tr>
+<td rowspan="4" style="text-align: left;"><strong>Metadata</strong></td>
+<td style="text-align: left;"><code>tag</code></td>
+<td style="text-align: left;">Classification labels</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>annotation</code></td>
+<td style="text-align: left;">Commentary on other memories</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>embedding</code></td>
+<td style="text-align: left;">Vector representations</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>index</code></td>
+<td style="text-align: left;">Search index entries</td>
+</tr>
+<tr>
+<td rowspan="4" style="text-align: left;"><strong>System</strong></td>
+<td style="text-align: left;"><code>config</code></td>
+<td style="text-align: left;">Configuration parameters</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>session</code></td>
+<td style="text-align: left;">Agent session state</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>context</code></td>
+<td style="text-align: left;">Contextual information bundles</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>log</code></td>
+<td style="text-align: left;">System event records</td>
+</tr>
+<tr>
+<td rowspan="4" style="text-align: left;"><strong>Relational</strong></td>
+<td style="text-align: left;"><code>person</code></td>
+<td style="text-align: left;">People known to the agent</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>project</code></td>
+<td style="text-align: left;">Project-level organizational units</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>artifact</code></td>
+<td style="text-align: left;">Produced outputs (documents, code, analyses)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>event</code></td>
+<td style="text-align: left;">Calendar or timeline events</td>
+</tr>
+</tbody>
+</table>
 </div>
+<h2 id="subsec:domain-schemas"><span class="header-section-number">4.4</span> Domain Schema Definitions</h2>
+<p>Each memory type is an Elixir struct with enforced keys and typespecs. Here are three representative examples spanning the core, extended, and workflow subcategories:</p>
+<pre id="lst:fact-data"><code>defmodule MemoryLayer.Schema.FactData do
+  @moduledoc &quot;Verified assertions with confidence.&quot;
 
-<pre class="code-block"><span class="keyword">defmodule</span> <span class="module">MemoryLayer.ChangeReason</span> <span class="keyword">do</span>
-  <span class="type">@type</span> t :: <span class="atom">:observation</span> | <span class="atom">:inference</span> | <span class="atom">:correction</span> | <span class="atom">:decay</span>
+  @enforce_keys [:assertion]
+  defstruct [
+    :assertion,
+    :evidence,
+    :source,
+    confidence: 1.0,
+    schema_name: &quot;fact&quot;
+  ]
 
-  <span class="keyword">def</span> <span class="function">subsumes?</span>(<span class="atom">:correction</span>, <span class="atom">:observation</span>), <span class="keyword">do</span>: <span class="atom">true</span>
-  <span class="keyword">def</span> <span class="function">subsumes?</span>(<span class="atom">:inference</span>, <span class="atom">:observation</span>), <span class="keyword">do</span>: <span class="atom">true</span>
-  <span class="keyword">def</span> <span class="function">subsumes?</span>(<span class="atom">:decay</span>, _), <span class="keyword">do</span>: <span class="atom">true</span>
-  <span class="keyword">def</span> <span class="function">subsumes?</span>(x, x), <span class="keyword">do</span>: <span class="atom">true</span>
-  <span class="keyword">def</span> <span class="function">subsumes?</span>(_, _), <span class="keyword">do</span>: <span class="atom">false</span>
-<span class="keyword">end</span></pre>
-<div class="code-caption">Listing 1: ChangeReason enum (Elixir representation).</div>
+  @type t :: %__MODULE__{
+    assertion: String.t(),
+    evidence: String.t() | nil,
+    source: String.t() | nil,
+    confidence: float(),
+    schema_name: String.t()
+  }
+end</code></pre>
+<pre id="lst:issue-data"><code>defmodule MemoryLayer.Schema.IssueData do
+  @enforce_keys [:title, :severity]
+  defstruct [
+    :title,
+    :severity,
+    :description,
+    :resolution,
+    :root_cause,
+    status: :open,
+    schema_name: &quot;issue&quot;
+  ]
 
-<h3 id="sec-5-2">5.2 Versioned Memory</h3>
+  @type t :: %__MODULE__{
+    title: String.t(),
+    severity: :low | :medium | :high | :critical,
+    description: String.t() | nil,
+    resolution: String.t() | nil,
+    root_cause: String.t() | nil,
+    status: :open | :investigating | :resolved | :closed,
+    schema_name: String.t()
+  }
+end</code></pre>
+<pre id="lst:agent-run"><code>defmodule MemoryLayer.Schema.AgentRunData do
+  @enforce_keys [:agent_id, :task]
+  defstruct [
+    :agent_id, :task, :result, :error,
+    :input, :output, :duration_ms, :model,
+    status: :running,
+    started_at: nil,
+    completed_at: nil,
+    schema_name: &quot;agent_run&quot;
+  ]
 
-<div class="theorem-box definition">
-<div class="label">Definition 5.2 (Versioned Memory)</div>
-<p>For a schema $S$, the <em>versioned memory</em> $\mathsf{VMem}[S]\colon \mathsf{Timeline} \to \mathbf{Set}$ maps each timestamp $t$ to the version at time $t$, consisting of: the typed data $d_t \in S$, the change reason $r_t \in \mathrm{ob}(\mathsf{Reason})$, the version number $v_t \in \mathbb{N}$, and the parent version reference.</p>
-</div>
+  @type t :: %__MODULE__{
+    agent_id: String.t(),
+    task: String.t(),
+    result: term() | nil,
+    error: String.t() | nil,
+    input: map() | nil,
+    output: map() | nil,
+    duration_ms: non_neg_integer() | nil,
+    model: String.t() | nil,
+    status: :running | :completed | :failed | :cancelled,
+    started_at: DateTime.t() | nil,
+    completed_at: DateTime.t() | nil,
+    schema_name: String.t()
+  }
+end</code></pre>
+<p>The pattern is consistent across all 24 types: <code>@enforce_keys</code> declares the mandatory fields, <code>defstruct</code> provides defaults for optional fields, and <code>@type</code> gives the complete typespec for Dialyzer. The <code>schema_name</code> field is always defaulted to the type’s string identifier, linking the struct to its registry entry.</p>
+<h2 id="subsec:registry"><span class="header-section-number">4.5</span> The Schema Registry</h2>
+<p>The <code>Schema.Registry</code> is a GenServer that maps schema name strings to their Elixir modules, enabling type-safe deserialization at runtime:</p>
+<pre id="lst:registry"><code>defmodule MemoryLayer.Schema.Registry do
+  use GenServer
 
-<p>The version chain forms a path:</p>
-<div class="math-display">$$m_{t_0} \xrightarrow{r_1} m_{t_1} \xrightarrow{r_2} m_{t_2} \xrightarrow{r_3} \cdots$$</div>
+  @type registry_state :: %{String.t() =&gt; module()}
 
-<h3 id="sec-5-3">5.3 Graph Relationships as 2-Morphisms</h3>
+  def start_link(opts \\ []) do
+    GenServer.start_link(__MODULE__, opts, name: __MODULE__)
+  end
 
-<div class="theorem-box definition">
-<div class="label">Definition 5.3 (Edge Relation Category)</div>
-<p>The <em>edge relation category</em> $\mathsf{Edge}$ has memory instances as objects and typed edges as morphisms, drawn from: {<code>EVOLVED_INTO</code>, <code>REFERENCES</code>, <code>SUPERSEDES</code>, <code>CONTRADICTS</code>, <code>SUPPORTS</code>, <code>DERIVED_FROM</code>, <code>PART_OF</code>, <code>TRIGGERS</code>, <code>BLOCKED_BY</code>}.</p>
-</div>
+  @spec resolve(String.t()) ::
+    {:ok, module()} | {:error, :not_found}
+  def resolve(schema_name) do
+    GenServer.call(__MODULE__, {:resolve, schema_name})
+  end
 
-<pre class="diagram">
-             EVOLVED_INTO
-        =====================&gt;
-  m&#x2081;                            m&#x2082;
-        =====================&gt;
-             SUPERSEDES
+  @spec register(String.t(), module()) :: :ok
+  def register(schema_name, module) do
+    GenServer.call(__MODULE__,
+      {:register, schema_name, module})
+  end
 
-          &#x21D3; &#x03B1; (2-morphism)
+  @spec list() :: [String.t()]
+  def list do
+    GenServer.call(__MODULE__, :list)
+  end
 
-  The 2-morphism &#x03B1; asserts that "evolved into"
-  and "supersedes" are equivalent lineage paths.
-</pre>
+  # --- GenServer Callbacks ---
 
-<h3 id="sec-5-4">5.4 Memory Operations as a Monad</h3>
-
-<div class="theorem-box proposition">
-<div class="label">Proposition 5.1 (Memory Operations Monad)</div>
-<p>The operations <code>evolve</code>, <code>merge</code>, and <code>split</code> define a monad $(T, \eta, \mu)$ on the category of memory instances $\mathcal{M}$:</p>
-<ul>
-<li>$T\colon \mathcal{M} \to \mathcal{M}$ wraps a memory in a "pending operation" context.</li>
-<li>$\eta\colon \mathrm{id}_\mathcal{M} \Rightarrow T$ embeds an unchanged memory as a trivial pending operation.</li>
-<li>$\mu\colon T^2 \Rightarrow T$ flattens nested pending operations into a single one.</li>
-</ul>
-</div>
-
-<div class="proof-box">
-<div class="proof-label">Proof.</div>
-<p><strong>Left unit</strong>: $\mu \circ T\eta = \mathrm{id}_T$. Starting with $T(m)$, wrapping in a trivial outer context and flattening recovers $T(m)$.</p>
-<p><strong>Right unit</strong>: $\mu \circ \eta T = \mathrm{id}_T$. Embedding via $\eta$ at the outer level and flattening gives back $T(m)$.</p>
-<p><strong>Associativity</strong>: $\mu \circ T\mu = \mu \circ \mu T$. For $T^3(m)$, flattening the inner two then the result equals flattening the outer two then the result, because operation composition is associative&mdash;change reasons accumulate as a list and list concatenation is associative.</p>
-<p>Concretely: <code>evolve(m, r)</code> creates a new version (this is $T$ applied with context $r$); <code>merge(m1, m2)</code> is the tensor product in the monoidal structure; <code>split(m)</code> is the comonadic dual, and together they provide a bimonad structure.</p>
-<div class="qed">&#x25A1;</div>
-</div>
-
-<div class="theorem-box remark">
-<div class="label">Remark</div>
-<p>The merge and split operations extend the monad to a bimonad. The full bimonadic structure ensures that agent memory supports both accumulation (merge) and decomposition (split) of knowledge, essential for multi-agent collaboration.</p>
-</div>
-
-<!-- 6. STORAGE ARCHITECTURE -->
-<h2 id="sec-6"><span class="section-num">6</span> Storage Architecture</h2>
-
-<h3 id="sec-6-1">6.1 Multi-Backend Router as Coproduct</h3>
-
-<div class="theorem-box definition">
-<div class="label">Definition 6.1 (Storage Router)</div>
-<p>The <em>storage router</em> is the coproduct of backend objects in $\mathcal{S}\!t$:</p>
-<div class="math-display">$$\mathrm{Router} = \coprod_{i} B_i = B_{\mathrm{SQLite}} \sqcup B_{\mathrm{Chroma}} \sqcup B_{\mathrm{Falkor}} \sqcup B_{\mathrm{Postgres}}$$</div>
-<p>equipped with injection morphisms $\iota_i\colon B_i \to \mathrm{Router}$ and a universal property.</p>
-</div>
-
-<div class="algorithm-box">
-<div class="alg-title">Algorithm 1: StorageRouter dispatch</div>
-<div class="alg-line"><span class="alg-kw">Input:</span> Operation <code>op</code>, Schema <code>S</code>, Data <code>d</code></div>
-<div class="alg-line"><span class="alg-kw">Output:</span> Result <code>r</code></div>
-<div class="alg-line">backends &larr; <span class="alg-fn">route</span>(S, op)</div>
-<div class="alg-line"><span class="alg-kw">for each</span> B &isin; backends <span class="alg-kw">do</span></div>
-<div class="alg-line indent"><span class="alg-kw">if</span> op &isin; Cap(B) <span class="alg-kw">then</span></div>
-<div class="alg-line indent2">r_B &larr; B.<span class="alg-fn">execute</span>(op, S, d)</div>
-<div class="alg-line">r &larr; <span class="alg-fn">merge_results</span>({r_B})</div>
-<div class="alg-line"><span class="alg-kw">return</span> r</div>
-</div>
-
-<p>The routing policy implements fan-out/fan-in: <strong>Save</strong> writes to all relevant backends; <strong>Recall</strong> reads from the primary backend; <strong>Search</strong> dispatches to the best-suited backend.</p>
-
-<h3 id="sec-6-2">6.2 Semantic Search</h3>
-
-<div class="theorem-box definition">
-<div class="label">Definition 6.2 (Embedding Functor)</div>
-<p>The <em>embedding functor</em> $E\colon \mathcal{S} \to \mathbf{Vect}_\mathbb{R}$ maps each schema $S$ to $\mathbb{R}^d$:</p>
-<div class="math-display">$$E(S) = \mathrm{embed}(\mathrm{text}(S)) \in \mathbb{R}^d$$</div>
-</div>
-
-<p>Semantic search becomes cosine similarity computation:</p>
-<div class="math-display">$$\mathtt{search}(q, k) = \mathrm{top}_k\left\{ m \in \mathsf{Mem}[-] \;\middle|\; \frac{\langle E(q), E(m) \rangle}{\|E(q)\| \cdot \|E(m)\|} > \theta \right\}$$</div>
-
-<h3 id="sec-6-3">6.3 Graph Traversal</h3>
-
-<div class="theorem-box definition">
-<div class="label">Definition 6.3 (Path Query)</div>
-<p>A <em>path query</em> $\pi = r_1 \circ r_2 \circ \cdots \circ r_n$ specifies a pattern of edges. The result of executing $\pi$ from memory $m$ is the set of all memories reachable via matching paths.</p>
-</div>
-
-<pre class="diagram">
-  Query --embed--> R^d --ANN--> Candidates
-    |                              |
-  parse                         filter
-    |                              |
-    v                              v
-  Graph Pattern ---traverse---> Results
-</pre>
-
-<h3 id="sec-6-4">6.4 Capability Preservation</h3>
-
-<div class="theorem-box">
-<div class="label">Theorem 6.1 (StorageRouter Preserves Capabilities)</div>
-<div class="math-display">$$\mathrm{Cap}(\mathrm{Router}) = \bigcup_{i} \mathrm{Cap}(B_i)$$</div>
-</div>
-
-<div class="proof-box">
-<div class="proof-label">Proof.</div>
-<p>By the coproduct construction, the router inherits each backend's capabilities through injection morphisms. For any $\mathtt{op} \in \mathrm{Cap}(B_j)$, the router dispatches to $B_j$ via $\iota_j$. Conversely, the router cannot perform unsupported operations since it only delegates.</p>
-<div class="qed">&#x25A1;</div>
-</div>
-
-<!-- 7. RELIABILITY -->
-<h2 id="sec-7"><span class="section-num">7</span> Reliability Guarantees</h2>
-
-<h3 id="sec-7-1">7.1 Vector Clocks for Causal Consistency</h3>
-
-<div class="theorem-box definition">
-<div class="label">Definition 7.1 (Vector Clock)</div>
-<p>A <em>vector clock</em> for $n$ agents is $\mathrm{vc}\colon \mathrm{Agents} \to \mathbb{N}$. The partial order is:</p>
-<div class="math-display">$$\mathrm{vc}_1 \leq \mathrm{vc}_2 \iff \forall a.\; \mathrm{vc}_1(a) \leq \mathrm{vc}_2(a)$$</div>
-<p>Two clocks are <em>concurrent</em> ($\mathrm{vc}_1 \| \mathrm{vc}_2$) when neither $\leq$ the other.</p>
-</div>
-
-<p>Each write increments the writer's component:</p>
-<div class="math-display">$$\mathrm{vc}'(a) = \begin{cases} \mathrm{vc}(a) + 1 & \text{if } a = \text{writer} \\ \max(\mathrm{vc}(a), \mathrm{vc}_{\text{received}}(a)) & \text{otherwise} \end{cases}$$</div>
-
-<h3 id="sec-7-2">7.2 Content Hashing for Deduplication</h3>
-
-<div class="math-display">$$h(m) = \mathrm{SHA256}(\mathrm{canonical}(m.\mathtt{data}))$$</div>
-
-<div class="theorem-box proposition">
-<div class="label">Proposition 7.1 (Deduplication Soundness)</div>
-<p>Content hashing is sound: if $h(m_1) = h(m_2)$, then $m_1.\mathtt{data} = m_2.\mathtt{data}$ with overwhelming probability ($1 - 2^{-256}$).</p>
-</div>
-
-<h3 id="sec-7-3">7.3 Soft Deletes as Filtered Subcategory</h3>
-
-<div class="theorem-box definition">
-<div class="label">Definition 7.2 (Tombstone Subcategory)</div>
-<p>The <em>active memory subcategory</em> $\mathcal{M}_{\mathrm{active}} \hookrightarrow \mathcal{M}$ is the full subcategory on memories whose <code>deleted_at</code> field is <code>nil</code>. All queries implicitly filter to $\mathcal{M}_{\mathrm{active}}$, while administrative operations access the full category.</p>
-</div>
-
-<h3 id="sec-7-4">7.4 ACID Properties</h3>
-
-<p>Mnesia transactions provide: <strong>Atomicity</strong> (all-or-nothing), <strong>Consistency</strong> (schema validation on every write), <strong>Isolation</strong> (serialized concurrent writes), and <strong>Durability</strong> (disc_copies to both RAM and disk).</p>
-
-<div class="theorem-box proposition">
-<div class="label">Proposition 7.2 (Transaction Safety)</div>
-<p>Every storage operation in the Elixir implementation is wrapped in a Mnesia transaction, ensuring serializability and that partial failures do not corrupt the memory graph.</p>
-</div>
-
-<!-- 8. IMPLEMENTATION -->
-<h2 id="sec-8"><span class="section-num">8</span> Elixir/OTP Implementation</h2>
-
-<h3 id="sec-8-1">8.1 Architecture Overview</h3>
-
-<p>The implementation consists of seven modules organized in a supervision tree, leveraging the BEAM VM's strengths: lightweight processes for per-memory GenServers, ETS for fast working memory, Mnesia for distributed persistent storage, and OTP supervision trees for fault tolerance.</p>
-
-<pre class="diagram">
-                    MemoryLayer.App
-                   (Supervisor)
-                  /      |       \
-                 /       |        \
-    Memory          SchemaRegistry     StorageRouter
-   GenServer          GenServer          GenServer
-      |                  |                  |
-      v                  v                  v
-  ETS (Working)     GraphManager      Mnesia (Persistent)
-</pre>
-
-<h3 id="sec-8-2">8.2 Schema Definitions</h3>
-
-<pre class="code-block"><span class="keyword">defmodule</span> <span class="module">MemoryLayer.Schema</span> <span class="keyword">do</span>
-  <span class="type">@type</span> memory_type ::
-    <span class="atom">:fact</span> | <span class="atom">:decision</span> | <span class="atom">:procedural</span> | <span class="atom">:episodic</span> |
-    <span class="atom">:todo</span> | <span class="atom">:issue</span> | <span class="atom">:api</span> | <span class="atom">:schema_def</span> |
-    <span class="atom">:workflow</span> | <span class="atom">:task</span> | <span class="atom">:step</span> | <span class="atom">:agent_run</span> |
-    <span class="atom">:tag</span> | <span class="atom">:annotation</span> | <span class="atom">:embedding</span> | <span class="atom">:index</span> |
-    <span class="atom">:config</span> | <span class="atom">:session</span> | <span class="atom">:context</span> | <span class="atom">:log</span> |
-    <span class="atom">:person</span> | <span class="atom">:project</span> | <span class="atom">:artifact</span> | <span class="atom">:event</span>
-
-  <span class="keyword">defmodule</span> <span class="module">BaseSchema</span> <span class="keyword">do</span>
-    <span class="type">@enforce_keys</span> [<span class="atom">:schema_name</span>, <span class="atom">:content</span>]
-    <span class="keyword">defstruct</span> [
-      <span class="atom">:schema_name</span>, <span class="atom">:content</span>, <span class="atom">:metadata</span>,
-      id: <span class="atom">nil</span>, created_at: <span class="atom">nil</span>, updated_at: <span class="atom">nil</span>
-    ]
-    <span class="type">@type</span> t :: %__MODULE__{
-      schema_name: String.t(),
-      content: map(),
-      metadata: map() | <span class="atom">nil</span>,
-      id: String.t() | <span class="atom">nil</span>,
-      created_at: DateTime.t() | <span class="atom">nil</span>,
-      updated_at: DateTime.t() | <span class="atom">nil</span>
+  @impl true
+  def init(_opts) do
+    registry = %{
+      &quot;fact&quot;       =&gt; MemoryLayer.Schema.FactData,
+      &quot;decision&quot;   =&gt; MemoryLayer.Schema.DecisionData,
+      &quot;procedural&quot; =&gt; MemoryLayer.Schema.ProceduralData,
+      &quot;episodic&quot;   =&gt; MemoryLayer.Schema.EpisodicData,
+      &quot;todo&quot;       =&gt; MemoryLayer.Schema.TodoData,
+      &quot;issue&quot;      =&gt; MemoryLayer.Schema.IssueData,
+      &quot;workflow&quot;   =&gt; MemoryLayer.Schema.WorkflowData,
+      &quot;agent_run&quot;  =&gt; MemoryLayer.Schema.AgentRunData
     }
-  <span class="keyword">end</span>
+    {:ok, registry}
+  end
 
-  <span class="keyword">defmodule</span> <span class="module">DecisionData</span> <span class="keyword">do</span>
-    <span class="type">@enforce_keys</span> [<span class="atom">:decision</span>, <span class="atom">:rationale</span>]
-    <span class="keyword">defstruct</span> [
-      <span class="atom">:decision</span>, <span class="atom">:rationale</span>, <span class="atom">:alternatives</span>,
-      <span class="atom">:confidence</span>, <span class="atom">:context</span>,
-      schema_name: <span class="string">"decision"</span>
-    ]
-  <span class="keyword">end</span>
-<span class="keyword">end</span></pre>
-<div class="code-caption">Listing 2: Schema definition and registry (abbreviated).</div>
+  @impl true
+  def handle_call({:resolve, name}, _from, state) do
+    case Map.fetch(state, name) do
+      {:ok, module} -&gt; {:reply, {:ok, module}, state}
+      :error -&gt; {:reply, {:error, :not_found}, state}
+    end
+  end
 
-<h3 id="sec-8-3">8.3 Typed Memory GenServer</h3>
+  @impl true
+  def handle_call({:register, name, module}, _from, state) do
+    {:reply, :ok, Map.put(state, name, module)}
+  end
 
-<pre class="code-block"><span class="keyword">defmodule</span> <span class="module">MemoryLayer.Memory</span> <span class="keyword">do</span>
-  <span class="keyword">use</span> <span class="module">GenServer</span>
-  <span class="keyword">alias</span> <span class="module">MemoryLayer</span>.{<span class="module">Schema</span>, <span class="module">Version</span>, <span class="module">Storage</span>}
+  @impl true
+  def handle_call(:list, _from, state) do
+    {:reply, Map.keys(state), state}
+  end
+end</code></pre>
+<p>The registry is initialized with the built-in types at application startup, and new types can be registered dynamically via <code>register/2</code>. The mapping is injective by construction: each schema name maps to exactly one module, ensuring unambiguous type resolution.</p>
+<div class="remark">
+<p><strong>Remark 1</strong> (Extensibility).  Third-party schema types can be registered at runtime without modifying the core <code>Schema</code> module. An agent that discovers a new domain can define a struct, register it, and immediately begin creating typed memories of that new type.</p>
+</div>
+<h2 id="subsec:type-safety"><span class="header-section-number">4.6</span> Type Safety: Two Levels</h2>
+<p>Type safety in the memory layer operates at two complementary levels:</p>
+<p><strong>Compile-time (Dialyzer).</strong> Every public function carries an <code>@spec</code> annotation. The Dialyzer static analysis tool traces type information through the codebase and reports mismatches. For example, if a caller passes a <code>FactData</code> struct to a function expecting <code>IssueData</code>, Dialyzer will flag this at compile time.</p>
+<p><strong>Runtime (struct enforcement).</strong> Elixir’s <code>@enforce_keys</code> and <code>defstruct</code> validate data at construction time. Attempting to create a <code>FactData</code> without the required <code>:assertion</code> field raises an <code>ArgumentError</code> immediately, preventing invalid memories from entering the system. The <code>is_struct/1</code> guard in the Memory GenServer’s <code>create/1</code> function further ensures only valid structs are accepted:</p>
+<pre id="lst:guard"><code>@spec create(struct()) :: {:ok, pid()} | {:error, term()}
+def create(schema_data) when is_struct(schema_data) do
+  GenServer.start_link(__MODULE__, {:create, schema_data})
+end</code></pre>
+<h1 id="sec:memory-genserver"><span class="header-section-number">5</span> The Memory GenServer</h1>
+<h2 id="subsec:process-per-memory"><span class="header-section-number">5.1</span> Process-Per-Memory Architecture</h2>
+<p>The central design choice in the memory layer is that each memory instance is a GenServer process. This is a natural fit for the <span class="smallcaps">beam</span>: lightweight processes are cheap (a few hundred bytes of initial memory), and the <span class="smallcaps">beam</span> scheduler handles millions of them efficiently.</p>
+<p>Each Memory process holds the complete typed state for one memory instance:</p>
+<pre id="lst:memory-state"><code>defmodule MemoryLayer.Memory do
+  use GenServer
 
-  <span class="type">@type</span> t(schema) :: %{
+  alias MemoryLayer.{Version, Storage, Graph}
+
+  @type t :: %{
     id: String.t(),
     schema_name: String.t(),
-    data: schema,
+    data: struct(),
     version: non_neg_integer(),
     content_hash: String.t(),
+    vector_clock: map(),
     created_at: DateTime.t(),
     updated_at: DateTime.t(),
-    deleted_at: DateTime.t() | <span class="atom">nil</span>
-  }
+    deleted_at: DateTime.t() | nil
+  }</code></pre>
+<p>The <code>data</code> field holds the typed schema struct (e.g., a <code>FactData</code> or <code>IssueData</code>). The <code>vector_clock</code> tracks causal ordering across agents (Section <a href="#sec:versioning">6</a>). The <code>content_hash</code> enables deduplication (Section <a href="#subsec:content-hash">5.3</a>).</p>
+<h2 id="subsec:creation"><span class="header-section-number">5.2</span> Creation and Initialization</h2>
+<p>Creating a new memory starts a GenServer process, computes a UUID and content hash, and persists to both storage tiers:</p>
+<pre id="lst:memory-create"><code>@spec create(struct()) :: {:ok, pid()} | {:error, term()}
+  def create(schema_data) when is_struct(schema_data) do
+    GenServer.start_link(__MODULE__, {:create, schema_data})
+  end
 
-  <span class="comment"># --- Public API (Mem[S] interface) ---</span>
+  @impl true
+  def init({:create, schema_data}) do
+    case build_state(schema_data) do
+      {:ok, state} -&gt;
+        persist(state)
+        {:ok, state}
+      {:error, reason} -&gt;
+        {:stop, reason}
+    end
+  end
 
-  <span class="type">@spec</span> <span class="function">create</span>(schema :: struct()) ::
-    {<span class="atom">:ok</span>, pid()} | {<span class="atom">:error</span>, term()}
-  <span class="keyword">def</span> <span class="function">create</span>(schema_data) <span class="keyword">do</span>
-    GenServer.start_link(__MODULE__, schema_data)
-  <span class="keyword">end</span>
-
-  <span class="type">@spec</span> <span class="function">data</span>(pid()) :: {<span class="atom">:ok</span>, struct()} | {<span class="atom">:error</span>, term()}
-  <span class="keyword">def</span> <span class="function">data</span>(pid), <span class="keyword">do</span>: GenServer.call(pid, <span class="atom">:get_data</span>)
-
-  <span class="type">@spec</span> <span class="function">evolve</span>(pid(), map(), Version.change_reason()) ::
-    {<span class="atom">:ok</span>, pid()} | {<span class="atom">:error</span>, term()}
-  <span class="keyword">def</span> <span class="function">evolve</span>(pid, changes, reason) <span class="keyword">do</span>
-    GenServer.call(pid, {<span class="atom">:evolve</span>, changes, reason})
-  <span class="keyword">end</span>
-
-  <span class="comment"># --- GenServer callbacks ---</span>
-
-  <span class="type">@impl</span> <span class="atom">true</span>
-  <span class="keyword">def</span> <span class="function">init</span>(schema_data) <span class="keyword">do</span>
-    id = UUID.uuid4()
+  defp build_state(schema_data, opts \\ []) do
+    id = Keyword.get(opts, :id) || generate_uuid()
     now = DateTime.utc_now()
-    hash = <span class="function">content_hash</span>(schema_data)
 
-    state = %{
+    {:ok, %{
       id: id,
-      schema_name: <span class="function">schema_name</span>(schema_data),
+      schema_name: extract_schema_name(schema_data),
       data: schema_data,
-      version: <span class="number">1</span>,
-      content_hash: hash,
+      version: 1,
+      content_hash: content_hash(schema_data),
+      vector_clock: %{node() =&gt; 1},
       created_at: now,
       updated_at: now,
-      deleted_at: <span class="atom">nil</span>
-    }
+      deleted_at: nil
+    }}
+  rescue
+    e -&gt; {:error, Exception.message(e)}
+  end</code></pre>
+<p>Several details are worth noting:</p>
+<ul>
+<li><p>The <code>vector_clock</code> is initialized with the current <span class="smallcaps">beam</span> node as the sole entry, set to 1. In a distributed deployment, each node contributes its own clock component.</p></li>
+<li><p>The <code>rescue</code> clause catches struct validation errors (e.g., missing enforced keys) and converts them to <code>{:error, reason}</code> tuples, preventing the GenServer from crashing on invalid input.</p></li>
+<li><p>The <code>extract_schema_name/1</code> function extracts the type tag using either the struct’s <code>schema_name</code> field or, as a fallback, the module name.</p></li>
+</ul>
+<h2 id="subsec:content-hash"><span class="header-section-number">5.3</span> Content Hashing</h2>
+<p>Every memory instance receives a SHA-256 content hash computed from its data:</p>
+<pre id="lst:content-hash"><code>@spec content_hash(struct()) :: String.t()
+  def content_hash(data) do
+    data
+    |&gt; :erlang.term_to_binary()
+    |&gt; then(&amp;:crypto.hash(:sha256, &amp;1))
+    |&gt; Base.encode16(case: :lower)
+  end</code></pre>
+<p>This three-step pipeline—serialize, hash, encode—produces a deterministic fingerprint for any Elixir term. Two memories with identical typed data will have the same hash regardless of when or by whom they were created. The <code>update/2</code> handler uses this for deduplication: if the hash has not changed after applying updates, the write is skipped entirely.</p>
+<h2 id="subsec:updates"><span class="header-section-number">5.4</span> Updates with Deduplication</h2>
+<p>The update handler applies changes to the underlying struct, recomputes the hash, and short-circuits if the content is unchanged:</p>
+<pre id="lst:update"><code>@impl true
+  def handle_call({:update, changes}, _from, state) do
+    updated_data = struct(state.data, Map.to_list(changes))
+    new_hash = content_hash(updated_data)
 
-    <span class="comment"># Persist to ETS (working memory)</span>
-    <span class="atom">:ets</span>.insert(<span class="atom">:memory_working</span>, {id, state})
-    <span class="comment"># Persist to storage backend</span>
+    if new_hash == state.content_hash do
+      {:reply, :ok, state}  # No change, skip write
+    else
+      new_state = %{state |
+        data: updated_data,
+        version: state.version + 1,
+        content_hash: new_hash,
+        updated_at: DateTime.utc_now()
+      }
+      persist(new_state)
+      {:reply, :ok, new_state}
+    end
+  end</code></pre>
+<p>The <code>struct/2</code> function applies a keyword list of changes to an existing struct, raising if any key does not exist in the struct definition. This provides an additional layer of runtime type safety: attempting to set a nonexistent field will fail immediately.</p>
+<h2 id="subsec:evolution"><span class="header-section-number">5.5</span> Evolution: Parent-Child Lineage</h2>
+<p>The <code>evolve/3</code> operation creates a new memory (child) from an existing one (parent), establishing a causal link:</p>
+<pre id="lst:evolve"><code>@spec evolve(pid(), map(), Version.change_reason()) ::
+    {:ok, pid()} | {:error, term()}
+  def evolve(pid, changes, reason) do
+    GenServer.call(pid, {:evolve, changes, reason})
+  end
+
+  @impl true
+  def handle_call({:evolve, changes, reason}, _from, state) do
+    evolved_data = struct(state.data, Map.to_list(changes))
+
+    case create(evolved_data) do
+      {:ok, child_pid} -&gt;
+        {:ok, child_state} =
+          GenServer.call(child_pid, :get_state)
+
+        # Record version lineage in Mnesia
+        Version.record(
+          state.id, child_state.id,
+          reason, state.vector_clock
+        )
+
+        # Establish graph edge
+        Graph.link(
+          state.id, child_state.id,
+          :evolved_into, %{reason: reason}
+        )
+
+        {:reply, {:ok, child_pid}, state}
+
+      {:error, reason} -&gt;
+        {:reply, {:error, reason}, state}
+    end
+  end</code></pre>
+<p>Evolution creates a <em>new</em> process (the child) rather than mutating the parent. This is consistent with immutable-data principles: the parent retains its original state, and the version history records the causal chain. The operation coordinates three subsystems: Memory (creating the child process), Version (recording the lineage entry in Mnesia), and Graph (establishing an <code>:evolved_into</code> edge).</p>
+<h2 id="subsec:merge"><span class="header-section-number">5.6</span> Merge: Conflict Resolution</h2>
+<p>When two agents concurrently modify the same memory and their vector clocks are incomparable (indicating a conflict), the merge operation resolves it by creating a new memory that synthesizes both versions:</p>
+<pre id="lst:merge"><code>@spec merge(pid(), pid(), map()) ::
+    {:ok, pid()} | {:error, term()}
+  def merge(pid_a, pid_b, merged_data) do
+    GenServer.call(pid_a, {:merge, pid_b, merged_data})
+  end
+
+  @impl true
+  def handle_call({:merge, pid_b, merged_data},
+                  _from, state_a) do
+    case GenServer.call(pid_b, :get_state) do
+      {:ok, state_b} -&gt;
+        case create(merged_data) do
+          {:ok, merged_pid} -&gt;
+            {:ok, merged_state} =
+              GenServer.call(merged_pid, :get_state)
+
+            # Merge vector clocks: component-wise max
+            merged_clock = merge_vector_clocks(
+              state_a.vector_clock,
+              state_b.vector_clock
+            )
+            GenServer.call(merged_pid,
+              {:set_vector_clock, merged_clock})
+
+            # Link both parents
+            Graph.link(state_a.id, merged_state.id,
+              :derived_from, %{operation: :merge})
+            Graph.link(state_b.id, merged_state.id,
+              :derived_from, %{operation: :merge})
+
+            Version.record(state_a.id, merged_state.id,
+              :correction, merged_clock)
+
+            {:reply, {:ok, merged_pid}, state_a}
+          {:error, reason} -&gt;
+            {:reply, {:error, reason}, state_a}
+        end
+      {:error, reason} -&gt;
+        {:reply, {:error, reason}, state_a}
+    end
+  end
+
+  defp merge_vector_clocks(vc_a, vc_b) do
+    Map.merge(vc_a, vc_b, fn _k, v1, v2 -&gt; max(v1, v2) end)
+  end</code></pre>
+<p>The merged clock takes the component-wise maximum of both parent clocks, guaranteeing that the merged version causally dominates both parents. Both parents are linked to the child via <code>:derived_from</code> edges, preserving the full conflict-resolution history.</p>
+<h2 id="subsec:soft-delete"><span class="header-section-number">5.7</span> Soft Deletes</h2>
+<p>Memories are never physically destroyed. The delete operation sets a <code>deleted_at</code> timestamp (the tombstone pattern):</p>
+<pre id="lst:soft-delete"><code>@impl true
+  def handle_call(:delete, _from, state) do
+    new_state = %{state | deleted_at: DateTime.utc_now()}
+    persist(new_state)
+    {:reply, :ok, new_state}
+  end
+
+  # Data access checks for tombstone
+  @impl true
+  def handle_call(:get_data, _from,
+    %{deleted_at: d} = state) when not is_nil(d) do
+    {:reply, {:error, :deleted}, state}
+  end
+
+  def handle_call(:get_data, _from, state) do
+    touch_lru(state.id)
+    {:reply, {:ok, state.data}, state}
+  end</code></pre>
+<p>The pattern match on <code>deleted_at</code> in the <code>:get_data</code> handler ensures that deleted memories return an error to callers, while the memory’s graph edges and version history remain intact for lineage queries.</p>
+<h2 id="subsec:persist"><span class="header-section-number">5.8</span> Persistence: Dual-Layer Write Path</h2>
+<p>Every state change is persisted to both ETS and Mnesia, with an LRU timestamp for eviction:</p>
+<pre id="lst:persist"><code>defp persist(state) do
+    # ETS: working memory (microsecond access)
+    :ets.insert(:memory_working, {state.id, state})
+
+    # Mnesia: persistent knowledge (durable)
     Storage.save(state)
 
-    {<span class="atom">:ok</span>, state}
-  <span class="keyword">end</span>
+    # LRU tracking for eviction
+    touch_lru(state.id)
+    :ok
+  end
 
-  <span class="type">@impl</span> <span class="atom">true</span>
-  <span class="keyword">def</span> <span class="function">handle_call</span>({<span class="atom">:evolve</span>, changes, reason}, _from, state) <span class="keyword">do</span>
-    evolved = struct(state.data, changes)
-    {<span class="atom">:ok</span>, child_pid} = <span class="function">create</span>(evolved)
-    {<span class="atom">:ok</span>, child_state} = <span class="function">data</span>(child_pid)
-    Version.record(state.id, child_state.id, reason)
-    {<span class="atom">:reply</span>, {<span class="atom">:ok</span>, child_pid}, state}
-  <span class="keyword">end</span>
-<span class="keyword">end</span></pre>
-<div class="code-caption">Listing 3: Typed Memory GenServer (core operations).</div>
+  defp touch_lru(id) do
+    :ets.insert(:memory_lru,
+      {id, System.monotonic_time()})
+  end</code></pre>
+<p>The <code>System.monotonic_time/0</code> call provides a high-resolution, monotonically increasing timestamp suitable for LRU ordering. The <code>:memory_lru</code> ETS table is separate from <code>:memory_working</code> to avoid coupling access metadata with memory content.</p>
+<h1 id="sec:versioning"><span class="header-section-number">6</span> Versioning and Causal Tracking</h1>
+<h2 id="subsec:change-reasons"><span class="header-section-number">6.1</span> Change Reasons</h2>
+<p>Every version transition carries a <em>change reason</em> explaining why the memory changed. The four change reasons form a partial order with a subsumption relation:</p>
+<pre id="lst:change-reasons"><code>defmodule MemoryLayer.Version do
+  @type change_reason ::
+    :observation | :inference | :correction | :decay
 
-<h3 id="sec-8-4">8.4 Versioning</h3>
+  @spec subsumes?(change_reason(), change_reason()) ::
+    boolean()
+  def subsumes?(a, a), do: true
+  def subsumes?(:correction, :observation), do: true
+  def subsumes?(:inference, :observation), do: true
+  def subsumes?(:decay, _), do: true
+  def subsumes?(_, _), do: false
 
-<pre class="code-block"><span class="keyword">defmodule</span> <span class="module">MemoryLayer.Version</span> <span class="keyword">do</span>
-  <span class="type">@type</span> change_reason ::
-    <span class="atom">:observation</span> | <span class="atom">:inference</span> | <span class="atom">:correction</span> | <span class="atom">:decay</span>
+  @spec join_reasons(change_reason(), change_reason()) ::
+    change_reason()
+  def join_reasons(a, b) do
+    cond do
+      subsumes?(a, b) -&gt; a
+      subsumes?(b, a) -&gt; b
+      true -&gt; :correction
+    end
+  end
+end</code></pre>
+<p>The semantics are:</p>
+<ul>
+<li><p><strong><code>:observation</code></strong> — base level: new data was directly observed.</p></li>
+<li><p><strong><code>:inference</code></strong> — extends observation: a conclusion derived from existing data.</p></li>
+<li><p><strong><code>:correction</code></strong> — subsumes observation: a previous version was wrong.</p></li>
+<li><p><strong><code>:decay</code></strong> — terminal: information is becoming stale or irrelevant.</p></li>
+</ul>
+<p>The <code>join_reasons/2</code> function computes the least upper bound when merging version histories from concurrent updates, defaulting to <code>:correction</code> when neither reason subsumes the other.</p>
+<h2 id="subsec:version-entries"><span class="header-section-number">6.2</span> Version Entries</h2>
+<p>Each version entry records the full causal context of a memory change:</p>
+<pre id="lst:version-entry"><code>@type version_entry :: %{
+    memory_id: String.t(),
+    parent_id: String.t() | nil,
+    version: non_neg_integer(),
+    reason: change_reason(),
+    vector_clock: vector_clock(),
+    timestamp: DateTime.t(),
+    metadata: map()
+  }
 
-  <span class="type">@spec</span> <span class="function">record</span>(parent_id :: String.t(),
-               child_id :: String.t(),
-               reason :: change_reason()) :: <span class="atom">:ok</span>
-  <span class="keyword">def</span> <span class="function">record</span>(parent_id, child_id, reason) <span class="keyword">do</span>
+  @spec record(String.t() | nil, String.t(),
+    change_reason(), vector_clock()) :: :ok
+  def record(parent_id, child_id, reason,
+    parent_clock \\ %{}) do
+    new_clock = increment_clock(parent_clock)
+    version = next_version(parent_id)
+
     entry = %{
       memory_id: child_id,
       parent_id: parent_id,
-      version: <span class="function">next_version</span>(parent_id),
+      version: version,
       reason: reason,
-      vector_clock: <span class="function">increment_clock</span>(parent_id),
-      timestamp: DateTime.utc_now()
+      vector_clock: new_clock,
+      timestamp: DateTime.utc_now(),
+      metadata: %{}
     }
-    <span class="atom">:mnesia</span>.transaction(<span class="keyword">fn</span> <span class="operator">-></span>
-      <span class="atom">:mnesia</span>.write({<span class="atom">:versions</span>, child_id, entry})
-    <span class="keyword">end</span>)
-    <span class="atom">:ok</span>
-  <span class="keyword">end</span>
 
-  <span class="type">@spec</span> <span class="function">history</span>(memory_id :: String.t()) :: [version_entry()]
-  <span class="keyword">def</span> <span class="function">history</span>(memory_id) <span class="keyword">do</span>
-    {<span class="atom">:atomic</span>, entries} = <span class="atom">:mnesia</span>.transaction(<span class="keyword">fn</span> <span class="operator">-></span>
-      <span class="atom">:mnesia</span>.match_object({<span class="atom">:versions</span>, memory_id, <span class="atom">:_</span>})
-    <span class="keyword">end</span>)
+    {:atomic, :ok} =
+      :mnesia.transaction(fn -&gt;
+        :mnesia.write({:versions, child_id, entry})
+        :ok
+      end)
+    :ok
+  end</code></pre>
+<p>Version entries are stored in the Mnesia <code>:versions</code> table using the bag table type, which allows multiple entries per key. This enables the complete version history for a memory to be retrieved in a single query. The Mnesia transaction wrapper ensures atomicity: the version entry is either fully written or not at all.</p>
+<h2 id="subsec:history"><span class="header-section-number">6.3</span> History and Lineage Traversal</h2>
+<p>Two query functions provide different views of version history:</p>
+<pre id="lst:history"><code>@spec history(String.t()) :: [version_entry()]
+  def history(memory_id) do
+    {:atomic, entries} =
+      :mnesia.transaction(fn -&gt;
+        :mnesia.match_object(
+          {:versions, memory_id, :_})
+      end)
+
     entries
-    <span class="operator">|></span> Enum.map(<span class="keyword">fn</span> {<span class="atom">:versions</span>, _, entry} <span class="operator">-></span> entry <span class="keyword">end</span>)
-    <span class="operator">|></span> Enum.sort_by(&amp; &amp;<span class="number">1</span>.timestamp)
-  <span class="keyword">end</span>
-<span class="keyword">end</span></pre>
-<div class="code-caption">Listing 4: Version tracking with change reasons.</div>
+    |&gt; Enum.map(fn {:versions, _id, entry} -&gt; entry end)
+    |&gt; Enum.sort_by(&amp; &amp;1.timestamp, DateTime)
+  end
 
-<h3 id="sec-8-5">8.5 Graph Relationships</h3>
+  @spec lineage(String.t()) :: [version_entry()]
+  def lineage(memory_id) do
+    case history(memory_id) do
+      [] -&gt; []
+      [entry | _] = entries -&gt;
+        case entry.parent_id do
+          nil -&gt; entries
+          parent_id -&gt; lineage(parent_id) ++ entries
+        end
+    end
+  end</code></pre>
+<p>The <code>history/1</code> function returns all version entries for a single memory, sorted by timestamp. The <code>lineage/1</code> function follows the <code>parent_id</code> chain recursively back to the root, building the complete causal path.</p>
+<h2 id="subsec:vector-clocks"><span class="header-section-number">6.4</span> Vector Clocks</h2>
+<p>In multi-agent settings, memories may be updated concurrently by different agents. Vector clocks establish causal ordering. Each agent maintains a counter; on write, the writing agent increments its component.</p>
+<pre id="lst:vector-clocks"><code>@type vector_clock ::
+    %{optional(atom() | String.t()) =&gt; non_neg_integer()}
+  @type clock_ordering ::
+    :before | :after | :concurrent | :equal
 
-<pre class="code-block"><span class="keyword">defmodule</span> <span class="module">MemoryLayer.Graph</span> <span class="keyword">do</span>
-  <span class="type">@type</span> edge_relation ::
-    <span class="atom">:evolved_into</span> | <span class="atom">:references</span> | <span class="atom">:supersedes</span> |
-    <span class="atom">:contradicts</span> | <span class="atom">:supports</span> | <span class="atom">:derived_from</span> |
-    <span class="atom">:part_of</span> | <span class="atom">:triggers</span> | <span class="atom">:blocked_by</span>
+  @spec compare_clocks(vector_clock(), vector_clock()) ::
+    clock_ordering()
+  def compare_clocks(vc_a, vc_b) when vc_a == vc_b,
+    do: :equal
 
-  <span class="type">@spec</span> <span class="function">link</span>(from :: String.t(), to :: String.t(),
-             relation :: edge_relation(),
-             metadata :: map()) :: <span class="atom">:ok</span>
-  <span class="keyword">def</span> <span class="function">link</span>(from_id, to_id, relation, metadata \\ %{}) <span class="keyword">do</span>
+  def compare_clocks(vc_a, vc_b) do
+    all_keys = Map.keys(vc_a) ++ Map.keys(vc_b)
+      |&gt; Enum.uniq()
+
+    comparisons = Enum.map(all_keys, fn key -&gt;
+      a_val = Map.get(vc_a, key, 0)
+      b_val = Map.get(vc_b, key, 0)
+      cond do
+        a_val &lt; b_val -&gt; :less
+        a_val &gt; b_val -&gt; :greater
+        true -&gt; :equal
+      end
+    end)
+
+    has_less = :less in comparisons
+    has_greater = :greater in comparisons
+
+    cond do
+      has_less and has_greater -&gt; :concurrent
+      has_less -&gt; :before
+      has_greater -&gt; :after
+      true -&gt; :equal
+    end
+  end
+
+  @spec increment_clock(vector_clock()) :: vector_clock()
+  def increment_clock(vc) do
+    Map.update(vc, node(), 1, &amp;(&amp;1 + 1))
+  end
+
+  @spec merge_clocks(vector_clock(), vector_clock()) ::
+    vector_clock()
+  def merge_clocks(vc_a, vc_b) do
+    Map.merge(vc_a, vc_b,
+      fn _key, v1, v2 -&gt; max(v1, v2) end)
+  end</code></pre>
+<p>Two clocks are <em>concurrent</em> when neither dominates the other (one has a strictly greater component for some agent while the other is strictly greater for a different agent). Concurrent clocks signal a conflict requiring explicit resolution through the merge operation (Section <a href="#subsec:merge">5.6</a>).</p>
+<p>The vector clock operations are pure functions over immutable maps, making them safe for concurrent use and easy to reason about.</p>
+<h1 id="sec:graph"><span class="header-section-number">7</span> Graph Relationships</h1>
+<h2 id="subsec:edge-relations"><span class="header-section-number">7.1</span> Edge Relations</h2>
+<p>The memory graph captures typed relationships between memory instances. Nine edge relations define the vocabulary of relationships:</p>
+<pre id="lst:edge-relations"><code>defmodule MemoryLayer.Graph do
+  use GenServer
+
+  @type edge_relation ::
+    :evolved_into  | :references   | :supersedes |
+    :contradicts   | :supports     | :derived_from |
+    :part_of       | :triggers     | :blocked_by
+
+  @type edge :: %{
+    from: String.t(),
+    to: String.t(),
+    relation: edge_relation(),
+    metadata: map(),
+    created_at: DateTime.t()
+  }</code></pre>
+<p>Table <a href="#tab:edge-relations">3</a> describes the semantics of each edge type:</p>
+<div id="tab:edge-relations">
+<table>
+<caption>Edge relation semantics.</caption>
+<thead>
+<tr>
+<th style="text-align: left;"><strong>Relation</strong></th>
+<th style="text-align: left;"><strong>Semantics</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>evolved_into</code></td>
+<td style="text-align: left;">Memory evolved into a new version (set by <code>evolve/3</code>)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>references</code></td>
+<td style="text-align: left;">Memory refers to another for context</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>supersedes</code></td>
+<td style="text-align: left;">Memory replaces an older, outdated one</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>contradicts</code></td>
+<td style="text-align: left;">Memory conflicts with another (triggers conflict resolution)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>supports</code></td>
+<td style="text-align: left;">Memory provides evidence for another</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>derived_from</code></td>
+<td style="text-align: left;">Memory was derived from one or more parents (set by <code>merge/3</code>)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>part_of</code></td>
+<td style="text-align: left;">Memory is a component of a larger memory</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>triggers</code></td>
+<td style="text-align: left;">Memory causes creation of another</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>blocked_by</code></td>
+<td style="text-align: left;">Memory cannot proceed until another is resolved</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h2 id="subsec:link-unlink"><span class="header-section-number">7.2</span> Link and Unlink</h2>
+<p>Edges are stored in the Mnesia <code>:edges</code> table with a composite key <code>{from_id, to_id}</code>:</p>
+<pre id="lst:link-unlink"><code>@spec link(String.t(), String.t(), edge_relation(),
+    map()) :: :ok | {:error, term()}
+  def link(from_id, to_id, relation, metadata \\ %{}) do
+    GenServer.call(__MODULE__,
+      {:link, from_id, to_id, relation, metadata})
+  end
+
+  @impl true
+  def handle_call({:link, from_id, to_id, relation,
+    metadata}, _from, state) do
     edge = %{
       from: from_id, to: to_id,
       relation: relation, metadata: metadata,
       created_at: DateTime.utc_now()
     }
-    <span class="atom">:mnesia</span>.transaction(<span class="keyword">fn</span> <span class="operator">-></span>
-      <span class="atom">:mnesia</span>.write({<span class="atom">:edges</span>, {from_id, to_id}, edge})
-    <span class="keyword">end</span>)
-    <span class="atom">:ok</span>
-  <span class="keyword">end</span>
+    result = :mnesia.transaction(fn -&gt;
+      :mnesia.write({:edges, {from_id, to_id}, edge})
+    end)
+    case result do
+      {:atomic, _} -&gt; {:reply, :ok, state}
+      {:aborted, reason} -&gt; {:reply, {:error, reason}, state}
+    end
+  end</code></pre>
+<p>The <code>unlink/3</code> operation follows the same tombstone pattern as memory deletion: rather than physically removing the edge, it adds a <code>deleted_at</code> timestamp to the edge metadata. Query functions filter out tombstoned edges.</p>
+<h2 id="subsec:graph-traversal"><span class="header-section-number">7.3</span> Graph Traversal</h2>
+<p>The graph module provides breadth-first traversal with configurable depth, direction, and relation filters:</p>
+<pre id="lst:graph-traverse"><code>@type traverse_opts :: [
+    max_depth: non_neg_integer(),
+    direction: :forward | :reverse | :both,
+    filter_relations: [edge_relation()]
+  ]
 
-  <span class="type">@spec</span> <span class="function">traverse</span>(start :: String.t(),
-                 pattern :: [edge_relation()],
-                 opts :: keyword()) :: [String.t()]
-  <span class="keyword">def</span> <span class="function">traverse</span>(start_id, pattern, opts \\ []) <span class="keyword">do</span>
-    max_depth = Keyword.get(opts, <span class="atom">:max_depth</span>, <span class="number">10</span>)
-    <span class="function">do_traverse</span>([start_id], pattern, max_depth, [])
-  <span class="keyword">end</span>
-<span class="keyword">end</span></pre>
-<div class="code-caption">Listing 5: Graph relationship management.</div>
+  @spec traverse(String.t(), [edge_relation()],
+    traverse_opts()) :: [String.t()]
+  def traverse(start_id, pattern, opts \\ []) do
+    GenServer.call(__MODULE__,
+      {:traverse, start_id, pattern, opts})
+  end
 
-<h3 id="sec-8-6">8.6 Storage Backend</h3>
+  # Private BFS implementation
+  defp do_traverse(_, _, _, 0, visited), do: visited
+  defp do_traverse([], _, _, _, visited), do: visited
 
-<pre class="code-block"><span class="keyword">defmodule</span> <span class="module">MemoryLayer.Storage</span> <span class="keyword">do</span>
-  <span class="type">@behaviour</span> <span class="module">MemoryLayer.StorageBackend</span>
+  defp do_traverse(frontier, relations, direction,
+    depth, visited) do
+    new_visited = Enum.reduce(frontier, visited,
+      &amp;MapSet.put(&amp;2, &amp;1))
 
-  <span class="comment"># Fan-out save: ETS + Mnesia</span>
-  <span class="type">@impl</span> <span class="atom">true</span>
-  <span class="keyword">def</span> <span class="function">save</span>(memory) <span class="keyword">do</span>
-    <span class="atom">:ets</span>.insert(<span class="atom">:memory_working</span>, {memory.id, memory})
-    <span class="atom">:mnesia</span>.transaction(<span class="keyword">fn</span> <span class="operator">-></span>
-      <span class="atom">:mnesia</span>.write({<span class="atom">:memories</span>, memory.id, memory})
-    <span class="keyword">end</span>)
-    <span class="atom">:ok</span>
-  <span class="keyword">end</span>
+    next_frontier =
+      Enum.flat_map(frontier, fn node_id -&gt;
+        edges = case direction do
+          :forward -&gt; do_edges_from(node_id)
+          :reverse -&gt; do_edges_to(node_id)
+          :both -&gt;
+            do_edges_from(node_id) ++
+            do_edges_to(node_id)
+        end
 
-  <span class="comment"># Recall: ETS first (fast path), fallback Mnesia</span>
-  <span class="type">@impl</span> <span class="atom">true</span>
-  <span class="keyword">def</span> <span class="function">recall</span>(id) <span class="keyword">do</span>
-    <span class="keyword">case</span> <span class="atom">:ets</span>.lookup(<span class="atom">:memory_working</span>, id) <span class="keyword">do</span>
-      [{^id, memory}] <span class="operator">-></span> {<span class="atom">:ok</span>, memory}
-      [] <span class="operator">-></span> <span class="function">recall_from_mnesia</span>(id)
-    <span class="keyword">end</span>
-  <span class="keyword">end</span>
+        edges
+        |&gt; Enum.filter(&amp; &amp;1.relation in relations)
+        |&gt; Enum.map(fn edge -&gt;
+          case direction do
+            :forward -&gt; edge.to
+            :reverse -&gt; edge.from
+            :both -&gt;
+              if edge.from == node_id,
+                do: edge.to, else: edge.from
+          end
+        end)
+        |&gt; Enum.reject(&amp;MapSet.member?(new_visited, &amp;1))
+      end)
+      |&gt; Enum.uniq()
 
-  <span class="comment"># Search across backends</span>
-  <span class="type">@impl</span> <span class="atom">true</span>
-  <span class="keyword">def</span> <span class="function">search</span>(query, opts \\ []) <span class="keyword">do</span>
-    backend = Keyword.get(opts, <span class="atom">:backend</span>, <span class="atom">:all</span>)
-    <span class="keyword">case</span> backend <span class="keyword">do</span>
-      <span class="atom">:exact</span>    <span class="operator">-></span> <span class="function">search_mnesia</span>(query, opts)
-      <span class="atom">:semantic</span> <span class="operator">-></span> <span class="function">search_embeddings</span>(query, opts)
-      <span class="atom">:graph</span>    <span class="operator">-></span> <span class="function">search_graph</span>(query, opts)
-      <span class="atom">:all</span>      <span class="operator">-></span> <span class="function">merge_results</span>([
-        <span class="function">search_mnesia</span>(query, opts),
-        <span class="function">search_embeddings</span>(query, opts)
-      ])
-    <span class="keyword">end</span>
-  <span class="keyword">end</span>
-<span class="keyword">end</span></pre>
-<div class="code-caption">Listing 6: Multi-backend StorageRouter.</div>
+    do_traverse(next_frontier, relations, direction,
+      depth - 1, new_visited)
+  end</code></pre>
+<p>The traversal uses a <code>MapSet</code> to track visited nodes, preventing cycles in the graph from causing infinite loops. The pattern parameter specifies which edge relations to follow, enabling targeted queries like “find all memories this one evolved into” or “find the full derivation chain”.</p>
+<h2 id="subsec:neighborhood"><span class="header-section-number">7.4</span> Neighborhood Queries</h2>
+<p>The <code>neighborhood/2</code> function returns all memories connected to a given memory within a depth limit, along with their connecting edges:</p>
+<pre id="lst:neighborhood"><code>@spec neighborhood(String.t(), non_neg_integer()) ::
+    [{String.t(), edge()}]
+  def neighborhood(memory_id, max_depth \\ 2) do
+    GenServer.call(__MODULE__,
+      {:neighborhood, memory_id, max_depth})
+  end</code></pre>
+<p>This is useful for building context around a memory: given a fact, the neighborhood reveals its supporting evidence, contradicting claims, derived decisions, and related tasks.</p>
+<h2 id="subsec:conflict-detection"><span class="header-section-number">7.5</span> Conflict Detection</h2>
+<p>The graph module provides a convenience function for finding unresolved conflicts:</p>
+<pre id="lst:conflicts"><code>@spec conflicts(String.t()) :: [{String.t(), String.t()}]
+  def conflicts(memory_id) do
+    edges_of_type(memory_id, :contradicts)
+    |&gt; Enum.map(fn edge -&gt; {edge.from, edge.to} end)
+  end</code></pre>
+<p>When vector clocks detect concurrent modifications, the system creates <code>:contradicts</code> edges. Agents or operators can query for unresolved conflicts and apply the merge operation to resolve them.</p>
+<h1 id="sec:storage"><span class="header-section-number">8</span> Multi-Backend Storage Router</h1>
+<h2 id="subsec:storage-behaviour"><span class="header-section-number">8.1</span> The StorageBackend Behaviour</h2>
+<p>The storage subsystem is built on an Elixir <em>behaviour</em>—the functional equivalent of an interface or protocol. Any module that implements these five callbacks can serve as a storage backend:</p>
+<pre id="lst:storage-behaviour"><code>defmodule MemoryLayer.StorageBackend do
+  @callback save(memory :: map()) ::
+    :ok | {:error, term()}
+  @callback recall(id :: String.t()) ::
+    {:ok, map()} | {:error, :not_found}
+  @callback search(query :: String.t(), opts :: keyword()) ::
+    {:ok, [map()]} | {:error, term()}
+  @callback delete(id :: String.t()) ::
+    :ok | {:error, term()}
+  @callback update(memory :: map()) ::
+    :ok | {:error, term()}
+end</code></pre>
+<p>This behaviour establishes a contract that all backends must fulfill. The Elixir compiler warns if a module declares <code>@behaviour MemoryLayer.StorageBackend</code> but fails to implement all callbacks.</p>
+<h2 id="subsec:storage-router"><span class="header-section-number">8.2</span> The Storage Router</h2>
+<p>The <code>Storage</code> module implements the <code>StorageBackend</code> behaviour itself, acting as a router that coordinates ETS and Mnesia:</p>
+<pre id="lst:storage-save"><code>defmodule MemoryLayer.Storage do
+  use GenServer
+  @behaviour MemoryLayer.StorageBackend
 
-<h3 id="sec-8-7">8.7 Working Memory vs. Persistent Knowledge</h3>
+  # Fan-out save: write to both backends
+  @impl MemoryLayer.StorageBackend
+  def save(memory) do
+    # ETS: fast working memory
+    :ets.insert(:memory_working, {memory.id, memory})
 
+    # Mnesia: durable persistent storage
+    result = :mnesia.transaction(fn -&gt;
+      :mnesia.write({:memories, memory.id, memory})
+    end)
+
+    case result do
+      {:atomic, _} -&gt; :ok
+      {:aborted, reason} -&gt; {:error, reason}
+    end
+  end</code></pre>
+<h2 id="subsec:tiered-recall"><span class="header-section-number">8.3</span> Tiered Recall with Automatic Promotion</h2>
+<p>The recall path checks ETS first (microsecond latency) and falls back to Mnesia (millisecond latency), automatically promoting Mnesia-only memories into ETS for subsequent fast access:</p>
+<pre id="lst:storage-recall"><code>@impl MemoryLayer.StorageBackend
+  def recall(id) do
+    case recall_from_ets(id) do
+      {:ok, memory} -&gt;
+        {:ok, memory}
+      {:error, :not_found} -&gt;
+        case recall_from_mnesia(id) do
+          {:ok, memory} -&gt;
+            # Promote to ETS for fast future access
+            :ets.insert(:memory_working, {id, memory})
+            {:ok, memory}
+          error -&gt;
+            error
+        end
+    end
+  end
+
+  defp recall_from_ets(id) do
+    case :ets.lookup(:memory_working, id) do
+      [{^id, memory}] -&gt; {:ok, memory}
+      [] -&gt; {:error, :not_found}
+    end
+  end
+
+  defp recall_from_mnesia(id) do
+    result = :mnesia.transaction(fn -&gt;
+      :mnesia.read({:memories, id})
+    end)
+    case result do
+      {:atomic, [{:memories, ^id, memory}]} -&gt;
+        {:ok, memory}
+      {:atomic, []} -&gt;
+        {:error, :not_found}
+      {:aborted, reason} -&gt;
+        {:error, reason}
+    end
+  end</code></pre>
+<p>Note the use of the pin operator (<code>^id</code>) in the pattern matches to ensure the recalled memory’s ID matches the requested one.</p>
+<h2 id="subsec:cross-backend-search"><span class="header-section-number">8.4</span> Cross-Backend Search</h2>
+<p>The search function dispatches to different backends based on the query type:</p>
+<pre id="lst:storage-search"><code>@impl MemoryLayer.StorageBackend
+  def search(query, opts \\ []) do
+    backend = Keyword.get(opts, :backend, :all)
+    limit = Keyword.get(opts, :limit, 50)
+    include_deleted = Keyword.get(opts, :include_deleted, false)
+    filter = Keyword.get(opts, :filter, %{})
+
+    results = case backend do
+      :ets      -&gt; search_ets(query, filter)
+      :exact    -&gt; search_mnesia(query, filter)
+      :mnesia   -&gt; search_mnesia(query, filter)
+      :semantic -&gt; search_mnesia(query, filter)
+      :graph    -&gt; search_mnesia(query, filter)
+      :all      -&gt; merge_search_results([
+                     search_ets(query, filter),
+                     search_mnesia(query, filter)
+                   ])
+    end
+
+    filtered = results
+      |&gt; maybe_exclude_deleted(include_deleted)
+      |&gt; Enum.take(limit)
+
+    {:ok, filtered}
+  end</code></pre>
+<p>The <code>:semantic</code> and <code>:graph</code> backends currently fall back to Mnesia search; they are extension points for future backends (ChromaDB for vector search, FalkorDB for graph traversal). When dispatching to <code>:all</code>, results from both backends are merged with deduplication by memory ID.</p>
+<h2 id="subsec:text-matching"><span class="header-section-number">8.5</span> Text Matching and Filtering</h2>
+<p>The search pipeline applies structural filtering (matching map fields) and text matching (substring search across the serialized memory):</p>
+<pre id="lst:filter-pipeline"><code>defp apply_filter(memories, filter) when filter == %{},
+    do: memories
+
+  defp apply_filter(memories, filter) do
+    Enum.filter(memories, fn memory -&gt;
+      Enum.all?(filter, fn {key, value} -&gt;
+        Map.get(memory, key) == value
+      end)
+    end)
+  end
+
+  defp apply_text_match(memories, &quot;&quot;), do: memories
+
+  defp apply_text_match(memories, query) do
+    query_lower = String.downcase(query)
+    Enum.filter(memories, fn memory -&gt;
+      memory
+      |&gt; inspect()
+      |&gt; String.downcase()
+      |&gt; String.contains?(query_lower)
+    end)
+  end</code></pre>
+<p>The filter pipeline demonstrates Elixir’s pattern matching on function heads: the empty-filter and empty-query cases are handled by dedicated function clauses that short-circuit the processing.</p>
+<h2 id="subsec:lru-eviction"><span class="header-section-number">8.6</span> LRU Eviction</h2>
+<p>Working memory (ETS) is bounded. The eviction function demotes least-recently-used memories to Mnesia-only storage:</p>
+<pre id="lst:eviction"><code>@spec evict_lru(non_neg_integer()) :: non_neg_integer()
+  def evict_lru(keep \\ 1000) do
+    current_size = :ets.info(:memory_working, :size)
+
+    if current_size &gt; keep do
+      lru_entries = :ets.tab2list(:memory_lru)
+        |&gt; Enum.sort_by(fn {_id, time} -&gt; time end)
+
+      to_evict = Enum.take(lru_entries,
+        current_size - keep)
+
+      Enum.each(to_evict, fn {id, _time} -&gt;
+        :ets.delete(:memory_working, id)
+        :ets.delete(:memory_lru, id)
+      end)
+
+      length(to_evict)
+    else
+      0
+    end
+  end</code></pre>
+<p>Evicted memories are not lost—they remain in Mnesia and will be promoted back to ETS on the next recall. This creates a natural working-set behavior: frequently accessed memories stay in fast storage, while rarely accessed memories settle into durable-only storage.</p>
+<h2 id="subsec:working-vs-persistent"><span class="header-section-number">8.7</span> Working Memory vs. Persistent Knowledge</h2>
 <p>The dual-layer architecture mirrors human cognitive architecture:</p>
-<ul>
-<li><strong>ETS (Working Memory)</strong>: in-process, microsecond access, lost on process crash. Holds the "hot" set of memories currently relevant to the agent's task.</li>
-<li><strong>Mnesia (Persistent Knowledge)</strong>: distributed, disk-backed, survives restarts. Holds the complete memory store.</li>
-</ul>
-
-<p>The promotion/demotion protocol: on <strong>create</strong>, written to both ETS and Mnesia; on <strong>recall</strong>, if in ETS return immediately, otherwise load from Mnesia (promotion); on <strong>evict</strong>, remove from ETS but retain in Mnesia (demotion). ETS is bounded with LRU eviction.</p>
-
-<h3 id="sec-8-8">8.8 MCP Server Interface</h3>
-
+<div id="tab:storage-tiers">
 <table>
-<caption>MCP tools exposed by ContextFS.</caption>
-<thead><tr><th>Tool</th><th>Description</th></tr></thead>
+<caption>Storage tier comparison.</caption>
+<thead>
+<tr>
+<th style="text-align: left;"><strong>Property</strong></th>
+<th style="text-align: left;"><strong>ETS (Working Memory)</strong></th>
+<th style="text-align: left;"><strong>Mnesia (Persistent Knowledge)</strong></th>
+</tr>
+</thead>
 <tbody>
-<tr><td><code>contextfs_save</code></td><td>Create and persist a new typed memory</td></tr>
-<tr><td><code>contextfs_recall</code></td><td>Retrieve a memory by ID with full type reconstruction</td></tr>
-<tr><td><code>contextfs_search</code></td><td>Multi-backend search (exact, semantic, graph)</td></tr>
-<tr><td><code>contextfs_evolve</code></td><td>Create a new version linked to parent with change reason</td></tr>
-<tr><td><code>contextfs_link</code></td><td>Establish a typed edge between two memories</td></tr>
-<tr><td><code>contextfs_delete</code></td><td>Soft-delete (tombstone) a memory</td></tr>
-<tr><td><code>contextfs_update</code></td><td>Update fields of an existing memory</td></tr>
-<tr><td><code>contextfs_list</code></td><td>List memories by type, tag, or time range</td></tr>
-<tr><td><code>contextfs_index</code></td><td>Trigger re-indexing of embedding vectors</td></tr>
-<tr><td><code>contextfs_sync</code></td><td>Synchronize local and cloud backends</td></tr>
+<tr>
+<td style="text-align: left;">Latency</td>
+<td style="text-align: left;">Microseconds</td>
+<td style="text-align: left;">Milliseconds</td>
+</tr>
+<tr>
+<td style="text-align: left;">Durability</td>
+<td style="text-align: left;">Volatile (lost on crash)</td>
+<td style="text-align: left;">Durable (disk-backed)</td>
+</tr>
+<tr>
+<td style="text-align: left;">Capacity</td>
+<td style="text-align: left;">Bounded (LRU eviction)</td>
+<td style="text-align: left;">Unbounded</td>
+</tr>
+<tr>
+<td style="text-align: left;">Access</td>
+<td style="text-align: left;">In-process, concurrent reads</td>
+<td style="text-align: left;">Transactional, distributed</td>
+</tr>
+<tr>
+<td style="text-align: left;">Analogy</td>
+<td style="text-align: left;">Working memory</td>
+<td style="text-align: left;">Long-term memory</td>
+</tr>
 </tbody>
 </table>
-
-<p>The MCP server translates tool calls into GenServer messages, ensuring all access benefits from the type safety guarantees of Theorem 4.1.</p>
-
-<!-- 9. CASE STUDIES -->
-<h2 id="sec-9"><span class="section-num">9</span> Case Studies</h2>
-
-<h3 id="sec-9-1">9.1 Agent Learning from Past Executions</h3>
-
-<p>Consider a testing agent that executes web application tests across multiple sessions. With the memory layer: (1) after each test run, <code>EPISODIC</code> memories record outcomes; (2) failure patterns are stored as <code>FACT</code> memories; (3) semantic search retrieves relevant past episodes; (4) <code>PROCEDURAL</code> memories accumulate learned strategies. The version lineage tracks how understanding evolves: observation &rarr; inference &rarr; correction.</p>
-
-<pre class="code-block"><span class="comment"># Session N: Agent encounters a test failure</span>
-{<span class="atom">:ok</span>, episode} = Memory.create(%EpisodicData{
-  event: <span class="string">"login_test_timeout"</span>,
-  context: %{url: <span class="string">"https://app.example.com/login"</span>},
-  outcome: <span class="atom">:failure</span>,
-  duration_ms: <span class="number">30_000</span>
-})
-
-<span class="comment"># Semantic search for similar past failures</span>
-{<span class="atom">:ok</span>, similar} = Storage.search(
-  <span class="string">"login test timeout failure"</span>,
-  backend: <span class="atom">:semantic</span>, limit: <span class="number">5</span>
-)
-
-<span class="comment"># Found! Apply the fix and record the evolution</span>
-{<span class="atom">:ok</span>, _} = Memory.evolve(episode, %{
-  outcome: <span class="atom">:success</span>,
-  resolution: <span class="string">"Increased timeout to 60s per PROC-442"</span>
-}, <span class="atom">:correction</span>)</pre>
-<div class="code-caption">Listing 7: Agent learning from past test failures.</div>
-
-<h3 id="sec-9-2">9.2 Cross-Session Continuity</h3>
-
-<p>A software engineering agent works on a multi-day project. At session end, it stores context as a <code>SESSION</code> memory. At session start, it recalls its last session and all in-progress <code>TODO</code> items, detects invalidated assumptions, and creates corrected versions.</p>
-
-<pre class="code-block"><span class="comment"># Session start: recall last session state</span>
-{<span class="atom">:ok</span>, sessions} = Storage.search(
-  <span class="string">"session_state"</span>,
-  backend: <span class="atom">:exact</span>,
-  filter: %{schema_name: <span class="string">"session"</span>},
-  sort: <span class="atom">:updated_at_desc</span>, limit: <span class="number">1</span>
-)
-
-<span class="comment"># Check for invalidated assumptions</span>
-<span class="keyword">for</span> todo <span class="operator">&lt;-</span> todos <span class="keyword">do</span>
-  deps = Graph.traverse(todo.id, [<span class="atom">:references</span>], max_depth: <span class="number">2</span>)
-  <span class="keyword">for</span> dep_id <span class="operator">&lt;-</span> deps <span class="keyword">do</span>
-    {<span class="atom">:ok</span>, dep} = Storage.recall(dep_id)
-    <span class="keyword">if</span> <span class="function">stale?</span>(dep), <span class="keyword">do</span>: <span class="function">flag_for_review</span>(dep)
-  <span class="keyword">end</span>
-<span class="keyword">end</span></pre>
-<div class="code-caption">Listing 8: Cross-session context restoration.</div>
-
-<h3 id="sec-9-3">9.3 Multi-Agent Shared Knowledge Base</h3>
-
-<p>Multiple agents collaborate: Agent A (frontend) creates an <code>ISSUE</code>; Agent B (backend) receives it via Mnesia replication, creates a <code>DECISION</code> linked via <code>DERIVED_FROM</code>; Agent A detects the decision via graph traversal and creates <code>TASK</code> memories linked via <code>TRIGGERS</code>.</p>
-
-<pre class="code-block"><span class="comment"># Agent A writes with its clock component</span>
-vc_a = %{agent_a: <span class="number">5</span>, agent_b: <span class="number">3</span>}
-
-<span class="comment"># Agent B writes concurrently</span>
-vc_b = %{agent_a: <span class="number">4</span>, agent_b: <span class="number">4</span>}
-
-<span class="comment"># Conflict detected! Neither dominates.</span>
-<span class="keyword">case</span> Version.compare_clocks(vc_a, vc_b) <span class="keyword">do</span>
-  <span class="atom">:concurrent</span> <span class="operator">-></span>
-    Graph.link(mem_a.id, mem_b.id, <span class="atom">:contradicts</span>,
-      %{resolution: <span class="atom">:pending</span>})
-  <span class="atom">:before</span> <span class="operator">-></span> <span class="atom">:ok</span>
-  <span class="atom">:after</span>  <span class="operator">-></span> <span class="atom">:ok</span>
-<span class="keyword">end</span></pre>
-<div class="code-caption">Listing 9: Multi-agent conflict detection.</div>
-
-<!-- 10. DISCUSSION -->
-<h2 id="sec-10"><span class="section-num">10</span> Discussion</h2>
-
-<h4>Comparison to Unix VFS</h4>
-<p>The Unix VFS and our StorageRouter share the goal of a uniform interface over heterogeneous backends. However, VFS operates at the byte-stream level; our router operates at the typed-schema level. VFS uses inodes organized in a tree; we use typed instances organized in a labeled graph. VFS supports a fixed set of operations; our protocol is extensible, including semantic search.</p>
-
-<h4>Comparison to Plan 9</h4>
-<p>Plan 9's insight: <em>everything should be a file</em>. Our analogous principle: <em>everything an agent knows should be a typed memory</em>&mdash;including execution traces (<code>AGENT_RUN</code>), task queues (<code>TODO</code>), and configuration (<code>CONFIG</code>). Plan 9 used synthetic file servers; we use MCP tools. The key advance: our "files" carry schemas, versions, and graph relationships.</p>
-
-<h4>Comparison to Semantic Filesystems</h4>
-<p>Semantic filesystems pioneered metadata-based retrieval. Our semantic search extends this to <em>meaning-based retrieval</em> via embeddings, with the addition of graph structure and causal versioning.</p>
-
-<h4>Relation to Knowledge Graphs</h4>
-<p>Knowledge graphs typically lack schema-indexed typing (our $\mathsf{Mem}[S]$ enforces strict schemas), causal versioning (our $\mathsf{VMem}[S]$ integrates it as a first-class functor), and embedding integration (our StorageRouter unifies them).</p>
-
-<h4>Limitations and Future Work</h4>
-<ol>
-<li><strong>Garbage collection</strong>: the tombstone pattern means monotonic storage growth. A generational GC policy would bound storage while preserving lineage.</li>
-<li><strong>Schema evolution</strong>: field additions/removals require migration automation.</li>
-<li><strong>Scalability</strong>: Mnesia has limitations beyond a few hundred nodes; CockroachDB or FoundationDB may be needed at scale.</li>
-<li><strong>Embedding drift</strong>: model updates invalidate previously computed vectors.</li>
-<li><strong>Privacy</strong>: the "right to be forgotten" conflicts with tombstones; cryptographic erasure could reconcile this.</li>
-</ol>
-
-<!-- 11. RELATED WORK -->
-<h2 id="sec-11"><span class="section-num">11</span> Related Work</h2>
-
-<p><strong>Agent architectures with memory.</strong> Soar distinguished working, declarative, procedural, and episodic memory&mdash;a taxonomy our 24 types refine. ACT-R formalized activation-based retrieval, inspiring our embedding-based search. Generative agents demonstrated LLM agents benefit from structured memory but lacked type safety and formal versioning.</p>
-
-<p><strong>Type-theoretic databases.</strong> Categorical databases (CQL) formalize schemas as categories and instances as functors, closely paralleling our construction. Our contribution adapts this to <em>agent memory</em> with versioning, lineage, and multi-modal storage.</p>
-
-<p><strong>Version control.</strong> Git uses content-addressable storage with a DAG of commits. Our version lineage operates on typed memory instances with semantic change-reason annotations.</p>
-
-<p><strong>Distributed consistency.</strong> Dynamo popularized vector clocks. Our adaptation applies them to agent memory with the constraint that conflicts must be resolved through typed merge operations.</p>
-
-<p><strong>Memory in LLM systems.</strong> MemGPT introduced OS-inspired memory tiers. LangChain's memory modules provide buffer, summary, and entity memory. Our framework subsumes these with formal type guarantees and a categorical foundation.</p>
-
-<!-- 12. CONCLUSION -->
-<h2 id="sec-12"><span class="section-num">12</span> Conclusion</h2>
-
-<p>We have presented a categorical framework for agent memory that formalizes the memory layer of an AI Operating System. The key contributions are:</p>
-
-<ol>
-<li>A <strong>formal memory model</strong> based on the functor $M\colon \mathcal{S} \to \mathcal{S}\!t$, with the Yoneda-lemma connection establishing $\mathsf{Mem}[S]$ as a representable functor (Theorem 3.1).</li>
-<li>A <strong>type system</strong> with 24 schema-indexed memory types and a proven round-trip type-preservation theorem (Theorem 4.1).</li>
-<li>A <strong>versioning framework</strong> based on the temporal functor $V\colon \mathsf{Timeline} \to \mathcal{S}\!t$, with graph lineage as 2-categorical structure and memory operations forming a monad (Proposition 5.1).</li>
-<li>A <strong>multi-backend storage architecture</strong> formalized as a coproduct with proven capability preservation (Theorem 6.1).</li>
-<li>A <strong>production implementation</strong> in Elixir/OTP using ETS and Mnesia, with ACID guarantees and an MCP server for universal client access.</li>
-<li><strong>Case studies</strong> demonstrating agent learning, cross-session continuity, and multi-agent collaboration.</li>
-</ol>
-
-<p>The memory layer is the third component of the AI Operating System, building on the kernel (Part I) and scheduler (Part II). Together, these provide process management, resource allocation, and persistent knowledge. Part IV will address the tool interface layer.</p>
-
-<p>The categorical perspective provides the compositional guarantees that make the memory layer <em>trustworthy</em>. When an agent stores a decision and later recalls it, the type-preservation theorem ensures conformance. When two agents concurrently update shared knowledge, vector clocks detect conflicts and the monad structure ensures sound resolution. When storage is extended, the coproduct construction preserves existing capabilities.</p>
-
-<p>Agent cognition requires memory that is typed, versioned, searchable, and graph-structured. The filesystem analogy is apt but insufficient: what agents need is not a filesystem but a <em>knowledge system</em>. The categorical memory layer provides exactly this.</p>
-
-<!-- REFERENCES -->
-<h2 id="references"><span class="section-num"></span> References</h2>
-
-<div class="references">
-<p class="ref"><span class="ref-key">[Anderson et al., 2004]</span> J. R. Anderson, D. Bothell, M. D. Byrne, S. Douglass, C. Lebiere, and Y. Qin. An integrated theory of the mind. <em>Psychological Review</em>, 111(4):1036&ndash;1060, 2004.</p>
-<p class="ref"><span class="ref-key">[Anthropic, 2024]</span> Anthropic. Model Context Protocol specification. Technical report, 2024. <a href="https://modelcontextprotocol.io">modelcontextprotocol.io</a>.</p>
-<p class="ref"><span class="ref-key">[Baader et al., 2003]</span> F. Baader et al. <em>The Description Logic Handbook</em>. Cambridge University Press, 2003.</p>
-<p class="ref"><span class="ref-key">[Baddeley, 1992]</span> A. Baddeley. Working memory. <em>Science</em>, 255(5044):556&ndash;559, 1992.</p>
-<p class="ref"><span class="ref-key">[B&eacute;nabou, 1967]</span> J. B&eacute;nabou. Introduction to bicategories. In <em>Reports of the Midwest Category Seminar</em>, LNCS 47, pages 1&ndash;77. Springer, 1967.</p>
-<p class="ref"><span class="ref-key">[Chacon &amp; Straub, 2014]</span> S. Chacon and B. Straub. <em>Pro Git</em>. Apress, 2nd edition, 2014.</p>
-<p class="ref"><span class="ref-key">[DeCandia et al., 2007]</span> G. DeCandia et al. Dynamo: Amazon's highly available key-value store. In <em>Proc. 21st ACM SOSP</em>, pages 205&ndash;220, 2007.</p>
-<p class="ref"><span class="ref-key">[Denning, 1970]</span> P. J. Denning. Virtual memory. <em>ACM Computing Surveys</em>, 2(3):153&ndash;189, 1970.</p>
-<p class="ref"><span class="ref-key">[Devlin et al., 2019]</span> J. Devlin et al. BERT: Pre-training of deep bidirectional transformers for language understanding. In <em>Proc. NAACL-HLT</em>, pages 4171&ndash;4186, 2019.</p>
-<p class="ref"><span class="ref-key">[Fidge, 1988]</span> C. J. Fidge. Timestamps in message-passing systems that preserve the partial ordering. In <em>Proc. 11th Australian CS Conference</em>, pages 56&ndash;66, 1988.</p>
-<p class="ref"><span class="ref-key">[Gifford et al., 1991]</span> D. K. Gifford et al. Semantic file systems. In <em>Proc. 13th ACM SOSP</em>, pages 16&ndash;25, 1991.</p>
-<p class="ref"><span class="ref-key">[Gopal &amp; Manber, 1999]</span> B. Gopal and U. Manber. Integrating content-based access mechanisms with hierarchical file systems. In <em>Proc. 3rd USENIX OSDI</em>, pages 265&ndash;278, 1999.</p>
-<p class="ref"><span class="ref-key">[Hogan et al., 2021]</span> A. Hogan et al. Knowledge graphs. <em>ACM Computing Surveys</em>, 54(4):1&ndash;37, 2021.</p>
-<p class="ref"><span class="ref-key">[Johnson et al., 2019]</span> J. Johnson, M. Douze, and H. J&eacute;gou. Billion-scale similarity search with GPUs. <em>IEEE Trans. Big Data</em>, 7(3):535&ndash;547, 2019.</p>
-<p class="ref"><span class="ref-key">[Kahana, 2012]</span> M. J. Kahana. <em>Foundations of Human Memory</em>. Oxford University Press, 2012.</p>
-<p class="ref"><span class="ref-key">[Kleppmann, 2017]</span> M. Kleppmann. <em>Designing Data-Intensive Applications</em>. O'Reilly Media, 2017.</p>
-<p class="ref"><span class="ref-key">[Laird, 2012]</span> J. E. Laird. <em>The Soar Cognitive Architecture</em>. MIT Press, 2012.</p>
-<p class="ref"><span class="ref-key">[Lamport, 1978]</span> L. Lamport. Time, clocks, and the ordering of events in a distributed system. <em>Communications of the ACM</em>, 21(7):558&ndash;565, 1978.</p>
-<p class="ref"><span class="ref-key">[LangChain, 2023]</span> LangChain. LangChain documentation: Memory. <a href="https://docs.langchain.com/docs/components/memory">docs.langchain.com</a>, 2023.</p>
-<p class="ref"><span class="ref-key">[Lewis et al., 2020]</span> P. Lewis et al. Retrieval-augmented generation for knowledge-intensive NLP tasks. In <em>Proc. NeurIPS</em>, pages 9459&ndash;9474, 2020.</p>
-<p class="ref"><span class="ref-key">[Love, 2010]</span> R. Love. <em>Linux Kernel Development</em>. Addison-Wesley, 3rd edition, 2010.</p>
-<p class="ref"><span class="ref-key">[Mac Lane, 1978]</span> S. Mac Lane. <em>Categories for the Working Mathematician</em>. Springer, 2nd edition, 1978.</p>
-<p class="ref"><span class="ref-key">[Minsky, 1974]</span> M. Minsky. A framework for representing knowledge. MIT AI Laboratory Memo 306, 1974.</p>
-<p class="ref"><span class="ref-key">[Moggi, 1991]</span> E. Moggi. Notions of computation and monads. <em>Information and Computation</em>, 93(1):55&ndash;92, 1991.</p>
-<p class="ref"><span class="ref-key">[Packer et al., 2023]</span> C. Packer et al. MemGPT: Towards LLMs as operating systems. <em>arXiv:2310.08560</em>, 2023.</p>
-<p class="ref"><span class="ref-key">[Park et al., 2023]</span> J. S. Park et al. Generative agents: Interactive simulacra of human behavior. In <em>Proc. 36th ACM UIST</em>, pages 1&ndash;22, 2023.</p>
-<p class="ref"><span class="ref-key">[Pike et al., 1995]</span> R. Pike et al. Plan 9 from Bell Labs. <em>Computing Systems</em>, 8(3):221&ndash;254, 1995.</p>
-<p class="ref"><span class="ref-key">[Quillian, 1968]</span> M. R. Quillian. Semantic memory. In <em>Semantic Information Processing</em>, pages 227&ndash;270. MIT Press, 1968.</p>
-<p class="ref"><span class="ref-key">[Reimers &amp; Gurevych, 2019]</span> N. Reimers and I. Gurevych. Sentence-BERT. In <em>Proc. EMNLP-IJCNLP</em>, pages 3982&ndash;3992, 2019.</p>
-<p class="ref"><span class="ref-key">[Ritchie &amp; Thompson, 1974]</span> D. M. Ritchie and K. Thompson. The UNIX time-sharing system. <em>Communications of the ACM</em>, 17(7):365&ndash;375, 1974.</p>
-<p class="ref"><span class="ref-key">[Schultz et al., 2017]</span> P. Schultz, D. I. Spivak, and C. Vasilakopoulou. Algebraic databases. <em>Theory and Applications of Categories</em>, 32(16):547&ndash;619, 2017.</p>
-<p class="ref"><span class="ref-key">[Shapiro et al., 2011]</span> M. Shapiro et al. Conflict-free replicated data types. In <em>Proc. 13th SSS</em>, pages 386&ndash;400, 2011.</p>
-<p class="ref"><span class="ref-key">[Spivak, 2014]</span> D. I. Spivak. <em>Category Theory for the Sciences</em>. MIT Press, 2014.</p>
-<p class="ref"><span class="ref-key">[Wadler, 1992]</span> P. Wadler. Monads for functional programming. In <em>Advanced Functional Programming</em>, LNCS 925, pages 24&ndash;52. Springer, 1992.</p>
-<p class="ref"><span class="ref-key">[Armstrong, 2013]</span> J. Armstrong. <em>Programming Erlang</em>. Pragmatic Bookshelf, 2nd edition, 2013.</p>
-<p class="ref"><span class="ref-key">[Thomas &amp; Hunt, 2018]</span> D. Thomas and A. Hunt. <em>Programming Elixir &ge; 1.6</em>. Pragmatic Bookshelf, 2018.</p>
-<p class="ref"><span class="ref-key">[Mattsson et al., 1999]</span> H. Mattsson, H. Nilsson, and C. Wikstr&ouml;m. Mnesia &mdash; A distributed robust DBMS for telecommunications applications. In <em>Proc. PADL</em>, pages 152&ndash;163, 1999.</p>
-<p class="ref"><span class="ref-key">[Leinster, 2014]</span> T. Leinster. <em>Basic Category Theory</em>. Cambridge University Press, 2014.</p>
-<p class="ref"><span class="ref-key">[Riehl, 2017]</span> E. Riehl. <em>Category Theory in Context</em>. Dover Publications, 2017.</p>
-<p class="ref"><span class="ref-key">[Awodey, 2010]</span> S. Awodey. <em>Category Theory</em>. Oxford University Press, 2nd edition, 2010.</p>
-<p class="ref"><span class="ref-key">[Barr &amp; Wells, 1990]</span> M. Barr and C. Wells. <em>Category Theory for Computing Science</em>. Prentice Hall, 1990.</p>
 </div>
-
-<!-- APPENDICES -->
-<h2 id="appendix-a"><span class="section-num">A</span> Complete Memory Type Hierarchy</h2>
-
-<pre class="diagram">
-                          BaseSchema
-            __________________|__________________
-           /     /     |      |      \     \     \
-          /     /      |      |       \     \     \
-       FACT  DECISION PROC  EPISODIC  TODO ISSUE  API  SCHEMA
-                                      |
-                  WORKFLOW  TASK  STEP  AGENT_RUN
-                                      |
-                  TAG  ANNOTATION  EMBEDDING  INDEX
-                                      |
-                  CONFIG  SESSION  CONTEXT  LOG
-                                      |
-                  PERSON  PROJECT  ARTIFACT  EVENT
-
-  Categories:
-    Core:       FACT, DECISION, PROCEDURAL, EPISODIC
-    Extended:   TODO, ISSUE, API, SCHEMA
-    Workflow:   WORKFLOW, TASK, STEP, AGENT_RUN
-    Metadata:   TAG, ANNOTATION, EMBEDDING, INDEX
-    System:     CONFIG, SESSION, CONTEXT, LOG
-    Relational: PERSON, PROJECT, ARTIFACT, EVENT
-</pre>
-
-<h2 id="appendix-b"><span class="section-num">B</span> Commutative Diagrams for Storage Operations</h2>
-
-<p>The full round-trip diagram for save/recall across the multi-backend router:</p>
-
-<pre class="diagram">
-  Mem[S] ---save---> B_SQLite
-    |                    |
-  embed             replicate
-    |                    |
-    v                    v
-  B_Chroma ---sync--> B_Postgres
-</pre>
-
-<p>The versioning chain with change reasons:</p>
-
-<pre class="diagram">
-  m&#x2080; --Observation--> m&#x2081; --Inference--> m&#x2082; --Correction--> m&#x2083;
-                                          ^
-                                         /
-                          m&#x2082;' ---Merge--'
-</pre>
-
-<h2 id="appendix-c"><span class="section-num">C</span> MCP Protocol Messages</h2>
-
-<p>Example MCP tool call for <code>contextfs_save</code>:</p>
-
-<pre class="code-block">{
-  <span class="string">"jsonrpc"</span>: <span class="string">"2.0"</span>,
-  <span class="string">"method"</span>: <span class="string">"tools/call"</span>,
-  <span class="string">"params"</span>: {
-    <span class="string">"name"</span>: <span class="string">"contextfs_save"</span>,
-    <span class="string">"arguments"</span>: {
-      <span class="string">"content"</span>: <span class="string">"Login test requires 60s timeout"</span>,
-      <span class="string">"memory_type"</span>: <span class="string">"fact"</span>,
-      <span class="string">"metadata"</span>: {
-        <span class="string">"confidence"</span>: <span class="number">0.95</span>,
-        <span class="string">"source"</span>: <span class="string">"test_run_2026_03_10"</span>
+<p>The promotion/demotion protocol:</p>
+<ol>
+<li><p><strong>Create</strong>: written to both ETS and Mnesia (fan-out).</p></li>
+<li><p><strong>Recall</strong>: if in ETS, return immediately; if only in Mnesia, load into ETS (promotion).</p></li>
+<li><p><strong>Evict</strong>: remove from ETS, retain in Mnesia (demotion).</p></li>
+<li><p><strong>Bound</strong>: LRU eviction triggers when ETS size exceeds threshold.</p></li>
+</ol>
+<h1 id="sec:reliability"><span class="header-section-number">9</span> Reliability Guarantees</h1>
+<h2 id="subsec:acid"><span class="header-section-number">9.1</span> ACID Properties via Mnesia Transactions</h2>
+<p>All Mnesia operations in the memory layer are wrapped in transactions:</p>
+<ol>
+<li><p><strong>Atomicity</strong>: Mnesia transactions are all-or-nothing; a failed write rolls back all changes within the transaction.</p></li>
+<li><p><strong>Consistency</strong>: schema validation via struct enforcement and typespecs ensures that only valid memory instances are persisted.</p></li>
+<li><p><strong>Isolation</strong>: Mnesia’s transaction manager serializes concurrent writes to the same memory.</p></li>
+<li><p><strong>Durability</strong>: Mnesia’s <code>disc_copies</code> table type writes to both RAM and disk, surviving node restarts.</p></li>
+</ol>
+<h2 id="subsec:round-trip"><span class="header-section-number">9.2</span> Type Preservation Under Round-Trip</h2>
+<div id="thm:round-trip" class="theorem">
+<p><strong>Theorem 2</strong> (Round-Trip Type Preservation).  <em>For any schema type $S$ and memory instance $m$ of type $S$: if $m$ is saved to storage and subsequently recalled, the recalled data is type-equivalent to $m$. That is, <code>recall(save(m)).data</code> reconstructs a struct of the same type with identical field values.</em></p>
+</div>
+<div class="proof">
+<p><em>Proof sketch.</em> The save path serializes the Elixir term (including struct metadata) via <code>:erlang.term_to_binary/1</code> when stored in Mnesia, or stores the term directly in ETS. The recall path retrieves the exact term. Since Elixir structs carry their module name as part of the term representation, and ETS/Mnesia preserve Erlang terms exactly, the recalled value is identical to the stored value. The <code>schema_name</code> field provides a secondary check: the Schema Registry resolves it to the correct module, confirming type consistency. ◻</p>
+</div>
+<h2 id="subsec:dedup-soundness"><span class="header-section-number">9.3</span> Deduplication Soundness</h2>
+<div id="prop:dedup" class="proposition">
+<p><strong>Proposition 3</strong> (Deduplication Soundness).  <em>Content hashing is sound for deduplication: if $h(m_1) = h(m_2)$, then $m_1.\texttt{data} = m_2.\texttt{data}$ with overwhelming probability ($1 - 2^{-256}$).</em></p>
+</div>
+<p>The SHA-256 hash is computed over the canonical binary serialization of the data struct. The <code>:erlang.term_to_binary/1</code> function produces a deterministic encoding for any Elixir term, ensuring that structurally identical data always produces the same hash.</p>
+<h2 id="subsec:conflict-completeness"><span class="header-section-number">9.4</span> Conflict Detection Completeness</h2>
+<div id="prop:conflict" class="proposition">
+<p><strong>Proposition 4</strong> (Conflict Detection).  <em>Vector clock comparison detects all concurrent modifications. If two agents independently modify a memory without observing each other’s changes, their resulting vector clocks will be incomparable, and <code>compare_clocks/2</code> will return <code>:concurrent</code>.</em></p>
+</div>
+<p>This follows directly from the properties of vector clocks: the comparison returns <code>:concurrent</code> exactly when neither clock component-wise dominates the other, which occurs precisely when the modifications are causally independent.</p>
+<h2 id="subsec:lineage-preservation"><span class="header-section-number">9.5</span> Soft Delete Lineage Preservation</h2>
+<div class="proposition">
+<p><strong>Proposition 5</strong> (Lineage Preservation).  <em>Soft deletion preserves the complete graph structure. All edges incident to a deleted memory remain in the Mnesia <code>:edges</code> table, and lineage queries (<code>Version.lineage/1</code>, <code>Graph.traverse/3</code>) can still traverse through deleted nodes.</em></p>
+</div>
+<p>This is essential for maintaining an accurate history: even when a fact is retracted (soft-deleted), the chain of reasoning that led to it—and the corrections that followed—remains queryable.</p>
+<h1 id="sec:mcp"><span class="header-section-number">10</span> MCP Server Interface</h1>
+<p><span class="smallcaps">ContextFS</span> exposes memory operations via the Model Context Protocol (MCP), enabling any MCP-compatible client (Claude, GPT, custom agents) to access the memory layer. The MCP server translates tool calls into GenServer messages, ensuring that all access goes through the typed memory interface.</p>
+<div id="tab:mcp-tools">
+<table>
+<caption>MCP tools exposed by <span class="smallcaps">ContextFS</span>.</caption>
+<thead>
+<tr>
+<th style="text-align: left;"><strong>Tool</strong></th>
+<th style="text-align: left;"><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>contextfs_save</code></td>
+<td style="text-align: left;">Create and persist a new typed memory</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>contextfs_recall</code></td>
+<td style="text-align: left;">Retrieve a memory by ID with full type reconstruction</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>contextfs_search</code></td>
+<td style="text-align: left;">Multi-backend search (exact, semantic, graph)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>contextfs_evolve</code></td>
+<td style="text-align: left;">Create a new version linked to parent with change reason</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>contextfs_link</code></td>
+<td style="text-align: left;">Establish a typed edge between two memories</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>contextfs_delete</code></td>
+<td style="text-align: left;">Soft-delete (tombstone) a memory</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>contextfs_update</code></td>
+<td style="text-align: left;">Update fields of an existing memory</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>contextfs_list</code></td>
+<td style="text-align: left;">List memories by type, tag, or time range</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>contextfs_index</code></td>
+<td style="text-align: left;">Trigger re-indexing of embedding vectors</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>contextfs_sync</code></td>
+<td style="text-align: left;">Synchronize local and cloud backends</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>An example MCP tool call:</p>
+<pre id="lst:mcp-example"><code>{
+  &quot;jsonrpc&quot;: &quot;2.0&quot;,
+  &quot;method&quot;: &quot;tools/call&quot;,
+  &quot;params&quot;: {
+    &quot;name&quot;: &quot;contextfs_save&quot;,
+    &quot;arguments&quot;: {
+      &quot;content&quot;: &quot;Login test requires 60s timeout&quot;,
+      &quot;memory_type&quot;: &quot;fact&quot;,
+      &quot;metadata&quot;: {
+        &quot;confidence&quot;: 0.95,
+        &quot;source&quot;: &quot;test_run_2026_03_10&quot;
       },
-      <span class="string">"tags"</span>: [<span class="string">"testing"</span>, <span class="string">"timeout"</span>, <span class="string">"login"</span>]
+      &quot;tags&quot;: [&quot;testing&quot;, &quot;timeout&quot;, &quot;login&quot;]
     }
   },
-  <span class="string">"id"</span>: <span class="number">42</span>
-}</pre>
-<div class="code-caption">Example: MCP JSON-RPC tool call.</div>
+  &quot;id&quot;: 42
+}</code></pre>
+<p>The MCP server receives this JSON-RPC message, constructs a <code>FactData</code> struct from the arguments, calls <code>Memory.create/1</code>, and returns the resulting memory ID and metadata to the client.</p>
+<h1 id="sec:case-studies"><span class="header-section-number">11</span> Case Studies</h1>
+<h2 id="subsec:case-learning"><span class="header-section-number">11.1</span> Agent Learning from Past Executions</h2>
+<p>Consider a testing agent that executes web application tests across multiple sessions. Without persistent memory, each session starts with no knowledge of past failures. With the memory layer:</p>
+<ol>
+<li><p>After each test run, the agent creates <code>episodic</code> memories recording what was tested, what failed, and what succeeded.</p></li>
+<li><p>Failed test patterns are stored as <code>fact</code> memories with confidence scores and suspected causes.</p></li>
+<li><p>When the agent encounters a similar failure in a subsequent session, search retrieves relevant past episodes, and the agent applies learned strategies.</p></li>
+<li><p>Over time, <code>procedural</code> memories accumulate: “When test X fails with error Y, the root cause is usually Z.”</p></li>
+</ol>
+<p>The version lineage tracks how the agent’s understanding evolves:</p>
+<pre id="lst:case-learning"><code># Session N: Agent encounters a test failure
+{:ok, episode} = Memory.create(%EpisodicData{
+  event: &quot;login_test_timeout&quot;,
+  context: %{url: &quot;https://app.example.com/login&quot;},
+  outcome: :failure,
+  duration_ms: 30_000
+})
 
-<h2 id="appendix-d"><span class="section-num">D</span> Proof: Monad Laws for Memory Operations (Detailed)</h2>
+# Search for similar past failures
+{:ok, similar} = Storage.search(
+  &quot;login test timeout failure&quot;,
+  backend: :all, limit: 5
+)
 
-<p><strong>Setup.</strong> Let $\mathcal{M}$ be the category of typed memory instances. Define $T\colon \mathcal{M} \to \mathcal{M}$ by:</p>
-<div class="math-display">$$T(m) = (m, \bot, \mathtt{pending})$$</div>
-<p>where $\bot$ denotes "no changes yet" and $\mathtt{pending}$ marks the operation as unevaluated. The unit $\eta_m = (m, \emptyset, \mathtt{noop})$ wraps $m$ in a trivial operation. The multiplication $\mu$ collapses $(T(m), \delta_1, r_1)$ with outer $(-, \delta_2, r_2)$ into $(m, \delta_1 \cup \delta_2, r_1 \sqcup r_2)$ where $\sqcup$ is the join in the reason lattice.</p>
+# Found a previous procedural fix -- apply and record
+{:ok, _evolved} = Memory.evolve(episode, %{
+  outcome: :success,
+  context: %{
+    url: &quot;https://app.example.com/login&quot;,
+    resolution: &quot;Increased timeout to 60s per PROC-442&quot;
+  }
+}, :correction)</code></pre>
+<h2 id="subsec:case-continuity"><span class="header-section-number">11.2</span> Cross-Session Continuity</h2>
+<p>A software engineering agent works on a multi-day project. Between sessions, the user may make changes that invalidate the agent’s assumptions:</p>
+<pre id="lst:case-continuity"><code># Session start: recall last session state
+{:ok, sessions} = Storage.search(&quot;&quot;,
+  backend: :exact,
+  filter: %{schema_name: &quot;session&quot;},
+  limit: 1
+)
+last_session = hd(sessions)
 
-<p><strong>Left unit</strong>: $\mu_{m} \circ T(\eta_m) = \mu_m((m, \emptyset, \mathtt{noop}), \bot, \mathtt{pending}) = (m, \emptyset, \mathtt{noop}) = T(m)$ after simplification.</p>
+# Recall all in-progress TODOs
+{:ok, todos} = Storage.search(&quot;&quot;,
+  backend: :exact,
+  filter: %{schema_name: &quot;todo&quot;}
+)
 
-<p><strong>Right unit</strong>: $\mu_m \circ \eta_{T(m)} = \mu_m(\eta((m, \delta, r))) = \mu_m(((m,\delta,r), \emptyset, \mathtt{noop})) = (m, \delta, r) = T(m)$.</p>
+# Check for invalidated assumptions
+for todo &lt;- todos do
+  deps = Graph.traverse(todo.id, [:references],
+    max_depth: 2)
+  for dep_id &lt;- deps do
+    {:ok, dep} = Storage.recall(dep_id)
+    if stale?(dep) do
+      # Evolve the stale fact with correction reason
+      Memory.evolve(dep.id, %{
+        confidence: 0.3
+      }, :decay)
+    end
+  end
+end</code></pre>
+<p>The graph lineage preserves the full narrative: original plan, partial execution, external change, plan revision.</p>
+<h2 id="subsec:case-multi-agent"><span class="header-section-number">11.3</span> Multi-Agent Shared Knowledge Base</h2>
+<p>Multiple agents collaborate on a shared codebase, each responsible for different modules:</p>
+<ol>
+<li><p>Agent A (frontend) discovers a bug and creates an <code>issue</code> memory.</p></li>
+<li><p>Agent B (backend) receives the issue via Mnesia replication.</p></li>
+<li><p>Agent B investigates and creates a <code>decision</code> memory linked to the issue via <code>:derived_from</code>.</p></li>
+<li><p>Agent A detects the decision via graph traversal and creates <code>task</code> memories linked via <code>:triggers</code>.</p></li>
+</ol>
+<p>Vector clocks detect concurrent edits:</p>
+<pre id="lst:case-multi"><code># Agent A writes with its clock component
+vc_a = %{agent_a: 5, agent_b: 3}
 
-<p><strong>Associativity</strong>: For $T^3(m)$ with changes $\delta_1, \delta_2, \delta_3$ and reasons $r_1, r_2, r_3$:</p>
-<div class="math-display">$$\mu \circ T\mu : (m, \delta_1 \cup \delta_2 \cup \delta_3, r_1 \sqcup r_2 \sqcup r_3)$$</div>
-<div class="math-display">$$\mu \circ \mu T : (m, \delta_1 \cup \delta_2 \cup \delta_3, (r_1 \sqcup r_2) \sqcup r_3)$$</div>
-<p>These are equal by associativity of $\cup$ and $\sqcup$. &#x25A1;</p>
+# Agent B writes concurrently
+vc_b = %{agent_a: 4, agent_b: 4}
 
-<!-- SERIES NAV -->
-<div class="series-nav">
-<h3>The AI Operating System Series</h3>
-<div class="parts">
-  <a class="part-link" href="#">
-    <span class="part-num">Part I</span>
-    Kernel Architecture
-  </a>
-  <a class="part-link" href="#">
-    <span class="part-num">Part II</span>
-    Scheduler &mdash; Process Algebra for Agent Orchestration
-  </a>
-  <a class="part-link current" href="#">
-    <span class="part-num">Part III</span>
-    Memory Layer &mdash; Typed Filesystem for Persistent Agent Cognition
-  </a>
-  <a class="part-link" href="#">
-    <span class="part-num">Part IV</span>
-    Tool Interface Layer
-  </a>
-  <a class="part-link" href="#">
-    <span class="part-num">Part V</span>
-    Security &amp; Governance
-  </a>
+# Neither dominates: conflict detected
+case Version.compare_clocks(vc_a, vc_b) do
+  :concurrent -&gt;
+    # Flag for merge resolution
+    Graph.link(mem_a_id, mem_b_id, :contradicts,
+      %{resolution: :pending})
+
+    # Resolve by merging
+    {:ok, _merged} = Memory.merge(
+      mem_a_pid, mem_b_pid,
+      reconciled_data
+    )
+  :before -&gt; :ok
+  :after  -&gt; :ok
+end</code></pre>
+<h1 id="sec:discussion"><span class="header-section-number">12</span> Discussion</h1>
+<h2 id="subsec:unix-vfs"><span class="header-section-number">12.1</span> Comparison to Unix VFS</h2>
+<p>The Unix Virtual Filesystem Switch and our Storage router share the goal of providing a uniform interface over heterogeneous storage backends. However, the VFS operates at the byte-stream level: <code>read(fd, buf, count)</code> makes no type promises about the bytes returned. Our Storage router operates at the typed-schema level: <code>recall(id)</code> returns a memory with compile-time and runtime type guarantees.</p>
+<p>The VFS uses inodes as the unit of storage; we use typed memory instances. The VFS organizes files in a tree hierarchy; we organize memories in a labeled graph. The VFS supports a fixed set of operations; our <code>StorageBackend</code> behaviour supports extensible operation sets.</p>
+<h2 id="subsec:plan9"><span class="header-section-number">12.2</span> Comparison to Plan 9</h2>
+<p>Plan 9’s insight was that <em>everything should be a file</em>. Our analogous principle is that <em>everything an agent knows should be a typed memory</em>—including execution traces (<code>agent_run</code>), task queues (<code>todo</code>), and configuration (<code>config</code>).</p>
+<p>Plan 9 used synthetic file servers to present dynamic state as files. We use MCP tools to present dynamic memory state as structured, queryable knowledge. The key advance is that our “files” carry schemas, versions, and graph relationships.</p>
+<h2 id="subsec:kg-comparison"><span class="header-section-number">12.3</span> Comparison to Knowledge Graphs</h2>
+<p>Knowledge graphs (Wikidata, Neo4j) store entities and relationships but typically lack:</p>
+<ul>
+<li><p><strong>Schema-indexed typing</strong>: KG nodes are loosely typed with optional properties. Our structs enforce strict schemas with compile-time and runtime checking.</p></li>
+<li><p><strong>Causal versioning</strong>: KGs store current state; versioning is external. Our Version module integrates versioning as a first-class concern with causal annotations.</p></li>
+<li><p><strong>Multi-modal storage</strong>: KGs and vector stores are typically separate systems. Our Storage router unifies them behind a single behaviour.</p></li>
+</ul>
+<h2 id="subsec:cognitive"><span class="header-section-number">12.4</span> Relation to Cognitive Architectures</h2>
+<p>Soar distinguished working memory, long-term declarative, procedural, and episodic memory—a taxonomy our 24 types refine and extend. ACT-R formalized memory retrieval as activation-based competition, which inspired our LRU-based promotion/demotion between ETS and Mnesia. Generative agents demonstrated that LLM agents benefit from structured memory stores, though their implementation lacked type safety and formal versioning.</p>
+<h2 id="subsec:cat-connections"><span class="header-section-number">12.5</span> Connections to Category Theory</h2>
+<p>For readers familiar with category theory, the design has natural categorical interpretations:</p>
+<ul>
+<li><p>The <strong>Schema module</strong> defines a category whose objects are the 24 typed schemas and whose morphisms are schema transformations (field projections, type coercions). The <code>BaseSchema</code> is an initial object.</p></li>
+<li><p>The <strong>Storage router</strong> is a coproduct of storage backends: it exposes the union of all backend capabilities through injection morphisms.</p></li>
+<li><p>The <strong>Memory GenServer</strong> acts as a functor from the schema category to a storage category, mapping each schema type to its storage representation while preserving type structure.</p></li>
+<li><p>The <strong>evolve/merge/split operations</strong> form a monad on the category of memory instances: evolve is the unit (embedding a memory into a “pending change” context), merge is the multiplication (flattening nested changes), and the monad laws correspond to associativity and identity of operation composition.</p></li>
+<li><p><strong>Version tracking</strong> is a functor from a timeline category (a thin category where objects are timestamps and morphisms are temporal orderings) to the storage category.</p></li>
+<li><p>The <strong>graph relationships</strong> exhibit 2-categorical structure: edges are 1-morphisms between memories, and equivalences between different edge paths (e.g., “evolved_into” vs. “supersedes”) are 2-morphisms.</p></li>
+</ul>
+<p>These connections are not decorative—they explain <em>why</em> the design composes cleanly. The functor laws guarantee that type structure is preserved across storage round-trips. The monad laws guarantee that chained evolutions and merges produce consistent results regardless of grouping. The coproduct construction guarantees that adding a new storage backend preserves all existing capabilities.</p>
+<h2 id="subsec:vcs"><span class="header-section-number">12.6</span> Relation to Version Control</h2>
+<p>Git uses content-addressable storage with a DAG of commits. Our version lineage is analogous but operates on typed memory instances rather than file trees. Our change reasons provide semantic annotations that Git commit messages cannot enforce structurally. Our vector clocks provide causal ordering in distributed settings, whereas Git relies on a total ordering of commits within each branch.</p>
+<h2 id="subsec:limitations"><span class="header-section-number">12.7</span> Limitations and Future Work</h2>
+<p>Several limitations merit future investigation:</p>
+<ol>
+<li><p><strong>Garbage collection</strong>: the tombstone pattern means storage grows monotonically. A formal garbage collection policy (analogous to generational GC) would bound storage while preserving essential lineage.</p></li>
+<li><p><strong>Schema migration</strong>: when a schema’s definition changes (fields added or removed), existing memories must be migrated. The framework handles this through schema transformations, but the migration strategy needs automation.</p></li>
+<li><p><strong>Scalability</strong>: Mnesia’s distribution model has known limitations beyond a few hundred nodes. For planetary-scale deployments, a CockroachDB or FoundationDB backend would be needed.</p></li>
+<li><p><strong>Embedding drift</strong>: as embedding models are updated, previously computed vectors may become inconsistent. Re-indexing strategies need formal treatment.</p></li>
+<li><p><strong>Privacy and forgetting</strong>: the “right to be forgotten” conflicts with the tombstone pattern. A cryptographic erasure scheme would reconcile these requirements.</p></li>
+<li><p><strong>Vector search backend</strong>: the current implementation stubs out semantic search. A ChromaDB or Qdrant backend implementing the <code>StorageBackend</code> behaviour would complete the multi-modal search capability.</p></li>
+<li><p><strong>Graph database backend</strong>: similarly, a FalkorDB or Neo4j backend would enable more efficient graph traversal than the current Mnesia-based BFS.</p></li>
+</ol>
+<h1 id="sec:related"><span class="header-section-number">13</span> Related Work</h1>
+<p><strong>Agent architectures with memory.</strong> Soar and ACT-R established the cognitive architecture paradigm with distinct memory systems. MemGPT introduced OS-inspired memory tiers for LLMs, with a main context (working memory) and external storage (archival memory). Our framework provides stronger type guarantees and richer relationship structure than MemGPT. Generative agents demonstrated the value of structured memory for believable agent behavior but used ad-hoc storage without formal typing.</p>
+<p><strong>Type-theoretic databases.</strong> Categorical databases (CQL) formalize database schemas as categories and instances as functors. Our design adapts these ideas to agent memory with the additions of causal versioning, graph lineage, and multi-backend routing.</p>
+<p><strong>Distributed consistency.</strong> Dynamo popularized vector clocks for eventually consistent storage. CRDTs provide conflict-free replicated data types. Our adaptation applies vector clocks to agent memory with the constraint that conflicts require typed merge resolution rather than automatic convergence.</p>
+<p><strong>Memory in LLM systems.</strong> LangChain provides buffer, summary, and entity memory modules. Our framework subsumes these with formal type guarantees, graph relationships, and causal versioning.</p>
+<p><strong>BEAM/OTP for knowledge systems.</strong> The use of ETS and Mnesia for knowledge storage has precedent in telecommunications systems, where Mnesia was designed for soft-real-time, fault-tolerant data management. Our contribution is applying these tools to the agent cognition domain with typed schemas and causal versioning.</p>
+<h1 id="sec:conclusion"><span class="header-section-number">14</span> Conclusion</h1>
+<p>We have presented the design and implementation of a typed memory layer for AI agent cognition, realized in Elixir/OTP. The key contributions are:</p>
+<ol>
+<li><p>A <strong>type system</strong> with 24 schema-indexed memory types organized into six subcategories, enforced at both compile time (Dialyzer) and runtime (struct enforcement), with a GenServer-based registry for dynamic type resolution.</p></li>
+<li><p>A <strong>process-per-memory architecture</strong> using OTP GenServers, providing natural isolation, concurrent access, and fault-tolerant supervision for individual memory instances.</p></li>
+<li><p>A <strong>versioning framework</strong> with four causal change reasons (observation, inference, correction, decay), parent-child lineage chains stored in Mnesia transactions, and vector clocks for multi-agent conflict detection.</p></li>
+<li><p>A <strong>graph relationship manager</strong> with nine typed edge relations, BFS traversal with depth limiting, neighborhood queries, and conflict detection.</p></li>
+<li><p>A <strong>multi-backend storage router</strong> implementing a behaviour protocol, with ETS for microsecond working memory, Mnesia for durable persistent knowledge, tiered recall with automatic promotion, and LRU eviction.</p></li>
+<li><p>A <strong>production deployment</strong> as <span class="smallcaps">ContextFS</span> with an MCP server for universal client access.</p></li>
+<li><p><strong>Case studies</strong> demonstrating agent learning, cross-session continuity, and multi-agent collaboration with conflict resolution.</p></li>
+</ol>
+<p>The memory layer is the third component of the AI Operating System, building on the kernel (Part I) and scheduler (Part II). Together, these three components provide process management, resource allocation, and persistent knowledge—the foundations upon which higher-level agent capabilities can be constructed. Part IV will address the tool interface layer, formalizing how agents interact with external systems through typed, composable tool protocols.</p>
+<p>The functional programming approach is not mere aesthetic preference: immutable data eliminates shared-state concurrency bugs, pattern matching enables exhaustive type dispatch, behaviours provide extensible contracts, and OTP supervision trees deliver fault tolerance. The Elixir implementation demonstrates that these principled abstractions yield both formal guarantees and practical performance.</p>
+<p>Agent cognition requires memory that is typed, versioned, searchable, and graph-structured. The filesystem analogy is apt but insufficient: what agents need is not a filesystem but a <em>knowledge system</em>. The typed memory layer provides exactly this.</p>
+<h2 id="references" style="margin-top:3rem;">References</h2>
+<ol class="references" style="font-size:.9rem;line-height:1.6;padding-left:2rem;">
+<li>J. R. Anderson, D. Bothell, M. D. Byrne, S. Douglass, C. Lebiere, and Y. Qin. An integrated theory of the mind. <em>Psychological Review</em>, 111(4):1036–1060, 2004.</li>
+<li>Anthropic. Model Context Protocol specification. Technical report, Anthropic, 2024. <a href="https://modelcontextprotocol.io">https://modelcontextprotocol.io</a>.</li>
+<li>J. Armstrong. <em>Programming Erlang: Software for a Concurrent World</em>. Pragmatic Bookshelf, 2nd edition, 2013.</li>
+<li>A. Baddeley. Working memory. <em>Science</em>, 255(5044):556–559, 1992.</li>
+<li>S. Chacon and B. Straub. <em>Pro Git</em>. Apress, 2nd edition, 2014.</li>
+<li>G. DeCandia, D. Hastorun, M. Jampani, G. Kakulapati, A. Lakshman, A. Pilchin, S. Sivasubramanian, P. Vosshall, and W. Vogels. Dynamo: Amazon’s highly available key-value store. In <em>Proc. 21st ACM SOSP</em>, pages 205–220, 2007.</li>
+<li>P. J. Denning. Virtual memory. <em>ACM Computing Surveys</em>, 2(3):153–189, 1970.</li>
+<li>J. Devlin, M.-W. Chang, K. Lee, and K. Toutanova. BERT: Pre-training of deep bidirectional transformers for language understanding. In <em>Proc. NAACL-HLT</em>, pages 4171–4186, 2019.</li>
+<li>C. J. Fidge. Timestamps in message-passing systems that preserve the partial ordering. In <em>Proc. 11th Australian Computer Science Conference</em>, pages 56–66, 1988.</li>
+<li>D. K. Gifford, P. Jouvelot, M. A. Sheldon, and J. W. O’Toole Jr. Semantic file systems. In <em>Proc. 13th ACM SOSP</em>, pages 16–25, 1991.</li>
+<li>A. Hogan, E. Blomqvist, M. Cochez, et al. Knowledge graphs. <em>ACM Computing Surveys</em>, 54(4):1–37, 2021.</li>
+<li>M. Kleppmann. <em>Designing Data-Intensive Applications</em>. O’Reilly Media, 2017.</li>
+<li>J. E. Laird. <em>The Soar Cognitive Architecture</em>. MIT Press, 2012.</li>
+<li>L. Lamport. Time, clocks, and the ordering of events in a distributed system. <em>Communications of the ACM</em>, 21(7):558–565, 1978.</li>
+<li>LangChain. LangChain documentation: Memory. <a href="https://docs.langchain.com/docs/components/memory">https://docs.langchain.com/docs/components/memory</a>, 2023.</li>
+<li>P. Lewis, E. Perez, A. Piktus, et al. Retrieval-augmented generation for knowledge-intensive NLP tasks. In <em>Proc. NeurIPS</em>, pages 9459–9474, 2020.</li>
+<li>R. Love. <em>Linux Kernel Development</em>. Addison-Wesley, 3rd edition, 2010.</li>
+<li>H. Mattsson, H. Nilsson, and C. Wikström. Mnesia — A distributed robust DBMS for telecommunications applications. In <em>Proc. PADL</em>, pages 152–163, 1999.</li>
+<li>M. Minsky. A framework for representing knowledge. MIT AI Laboratory Memo 306, 1974.</li>
+<li>C. Packer, V. Fang, S. G. Patil, K. Lin, S. Wooders, and J. E. Gonzalez. MemGPT: Towards LLMs as operating systems. <em>arXiv preprint arXiv:2310.08560</em>, 2023.</li>
+<li>J. S. Park, J. C. O’Brien, C. J. Cai, M. R. Morris, P. Liang, and M. S. Bernstein. Generative agents: Interactive simulacra of human behavior. In <em>Proc. 36th ACM UIST</em>, pages 1–22, 2023.</li>
+<li>R. Pike, D. Presotto, S. Dorward, et al. Plan 9 from Bell Labs. <em>Computing Systems</em>, 8(3):221–254, 1995.</li>
+<li>M. R. Quillian. Semantic memory. In M. Minsky, editor, <em>Semantic Information Processing</em>, pages 227–270. MIT Press, 1968.</li>
+<li>N. Reimers and I. Gurevych. Sentence-BERT: Sentence embeddings using Siamese BERT-networks. In <em>Proc. EMNLP-IJCNLP</em>, pages 3982–3992, 2019.</li>
+<li>D. M. Ritchie and K. Thompson. The UNIX time-sharing system. <em>Communications of the ACM</em>, 17(7):365–375, 1974.</li>
+<li>P. Schultz, D. I. Spivak, and C. Vasilakopoulou. Algebraic databases. <em>Theory and Applications of Categories</em>, 32(16):547–619, 2017.</li>
+<li>M. Shapiro, N. Preguiça, C. Baquero, and M. Zawirski. Conflict-free replicated data types. In <em>Proc. SSS</em>, pages 386–400, 2011.</li>
+<li>D. I. Spivak. <em>Category Theory for the Sciences</em>. MIT Press, 2014.</li>
+<li>D. Thomas and A. Hunt. <em>Programming Elixir &ge; 1.6</em>. Pragmatic Bookshelf, 2018.</li>
+<li>R. Virding, C. Wikström, and M. Williams. <em>Concurrent Programming in Erlang</em>. Prentice Hall, 2nd edition, 1996.</li>
+</ol>
+<h1 id="app:type-hierarchy"><span class="header-section-number">A</span> Complete Memory Type Hierarchy</h1>
+<p>The following diagram shows the 24 memory types organized by subcategory, all deriving from <code>BaseSchema</code>:</p>
+<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1.5rem;margin:1.5rem 0;font-size:.9rem;">
+<p style="text-align:center;margin-bottom:1rem;"><strong>BaseSchema</strong> (universal envelope)</p>
+<table style="width:100%;font-size:.85rem;">
+<tr><td style="vertical-align:top;padding:.5rem;"><strong>Core:</strong><br>fact, decision,<br>procedural, episodic</td><td style="vertical-align:top;padding:.5rem;"><strong>Extended:</strong><br>todo, issue,<br>api, schema_def</td><td style="vertical-align:top;padding:.5rem;"><strong>Workflow:</strong><br>workflow, task,<br>step, agent_run</td></tr>
+<tr><td style="vertical-align:top;padding:.5rem;"><strong>Metadata:</strong><br>tag, annotation,<br>embedding, index</td><td style="vertical-align:top;padding:.5rem;"><strong>System:</strong><br>config, session,<br>context, log</td><td style="vertical-align:top;padding:.5rem;"><strong>Relational:</strong><br>person, project,<br>artifact, event</td></tr>
+</table>
+<p style="text-align:center;margin-top:.5rem;font-style:italic;color:var(--text-dim);">[Full diagram available in <a href="../latex/memory-layer.pdf">PDF version</a>]</p>
 </div>
+<h1 id="app:startup"><span class="header-section-number">B</span> OTP Application Startup</h1>
+<p>The <code>MemoryLayer</code> application module initializes ETS tables and Mnesia before starting the supervision tree:</p>
+<pre id="lst:app-startup"><code>defmodule MemoryLayer do
+  use Application
+
+  @impl true
+  def start(_type, _args) do
+    # Create ETS tables for working memory
+    :ets.new(:memory_working, [
+      :set, :public, :named_table,
+      read_concurrency: true
+    ])
+    :ets.new(:memory_lru, [
+      :set, :public, :named_table
+    ])
+
+    # Initialize Mnesia schema and tables
+    :mnesia.create_schema([node()])
+    :mnesia.start()
+    :mnesia.create_table(:memories, [
+      attributes: [:id, :data],
+      type: :set,
+      disc_copies: [node()]
+    ])
+    :mnesia.create_table(:versions, [
+      attributes: [:id, :entry],
+      type: :bag,
+      disc_copies: [node()]
+    ])
+    :mnesia.create_table(:edges, [
+      attributes: [:key, :edge],
+      type: :bag,
+      disc_copies: [node()]
+    ])
+
+    # Start supervision tree
+    children = [
+      MemoryLayer.Schema.Registry,
+      MemoryLayer.Graph,
+      MemoryLayer.Storage
+    ]
+
+    opts = [
+      strategy: :one_for_one,
+      name: MemoryLayer.Supervisor
+    ]
+    Supervisor.start_link(children, opts)
+  end
+end</code></pre>
+<p>The <code>:one_for_one</code> supervision strategy restarts individual processes independently: if the Graph GenServer crashes, the Schema Registry and Storage continue running unaffected.</p>
+<h1 id="app:mix"><span class="header-section-number">C</span> Mix Project Configuration</h1>
+<p>The project dependencies are minimal, leveraging OTP’s built-in capabilities:</p>
+<pre id="lst:mix"><code>defmodule MemoryLayer.MixProject do
+  use Mix.Project
+
+  def project do
+    [
+      app: :memory_layer,
+      version: &quot;0.1.0&quot;,
+      elixir: &quot;~&gt; 1.16&quot;,
+      start_permanent: Mix.env() == :prod,
+      deps: deps()
+    ]
+  end
+
+  def application do
+    [
+      extra_applications: [:logger, :mnesia, :crypto],
+      mod: {MemoryLayer, []}
+    ]
+  end
+
+  defp deps do
+    [
+      {:uuid, &quot;~&gt; 1.1&quot;},
+      {:jason, &quot;~&gt; 1.4&quot;},
+      {:ex_doc, &quot;~&gt; 0.31&quot;, only: :dev, runtime: false},
+      {:dialyxir, &quot;~&gt; 1.4&quot;, only: [:dev, :test],
+        runtime: false}
+    ]
+  end
+end</code></pre>
+<p>The only runtime dependencies beyond OTP are <code>uuid</code> (for generating memory identifiers) and <code>jason</code> (for JSON serialization in the MCP interface). ETS, Mnesia, and <code>:crypto</code> are all built-in OTP applications.</p>
+<h1 id="app:version-chain"><span class="header-section-number">D</span> Version Chain Diagram</h1>
+<p>A typical memory evolution chain with change reasons:</p>
+<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1.5rem;margin:1.5rem 0;text-align:center;font-family:var(--font-mono);font-size:.85rem;">
+<p>$m_0$ <span style="color:var(--success);">[observation]</span> &rarr; $m_1$ <span style="color:var(--accent2);">[inference]</span> &rarr; $m_2$ <span style="color:var(--warning);">[correction]</span></p>
+<p style="margin-top:.5rem;">$m_1$ &rarr; $m_2'$ <span style="color:var(--accent2);">[inference]</span> (concurrent)</p>
+<p style="margin-top:.5rem;">$m_2$ + $m_2'$ &rarr; $m_3$ <span style="color:var(--warning);">[correction / merge]</span></p>
+<p style="margin-top:.8rem;font-style:italic;color:var(--text-dim);font-family:var(--font-body);font-size:.82rem;">[Full diagram available in <a href="../latex/memory-layer.pdf">PDF version</a>]</p>
 </div>
+<p>In this example, $m_0$ is created via observation, then $m_1$ is inferred from it. A concurrent modification produces $m_2$ and $m_2'$. The conflict is resolved by merging into $m_3$ with a correction reason.</p>
 
 </main>
-
+</div>
 <script>
-// Close mobile nav on link click
-document.querySelectorAll('nav.toc a').forEach(a => {
-  a.addEventListener('click', () => {
-    document.querySelector('nav.toc').classList.remove('open');
-  });
-});
-
-// Highlight active TOC link on scroll
-const sections = document.querySelectorAll('h2[id], h3[id]');
-const tocLinks = document.querySelectorAll('nav.toc a');
-const observer = new IntersectionObserver(entries => {
-  entries.forEach(entry => {
-    if (entry.isIntersecting) {
-      tocLinks.forEach(l => l.classList.remove('active'));
-      const id = entry.target.getAttribute('id');
-      const link = document.querySelector(`nav.toc a[href="#${id}"]`);
-      if (link) link.classList.add('active');
+// Build sidebar TOC from h2/h3 in content
+(function(){
+  var nav=document.getElementById('toc-nav');
+  var headings=document.querySelectorAll('.main-content h2, .main-content h3');
+  if(!headings.length)return;
+  var items=[];
+  for(var i=0;i<headings.length;i++){
+    var h=headings[i];
+    if(!h.id){
+      h.id=h.textContent.trim().toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/-+$/,'');
     }
-  });
-}, { rootMargin: '-80px 0px -70% 0px' });
-sections.forEach(s => observer.observe(s));
-</script>
+    items.push({tag:h.tagName,id:h.id,text:h.textContent.trim()});
+  }
+  var ul=document.createElement('ul');
+  var currentLi=null;
+  var subUl=null;
+  for(var j=0;j<items.length;j++){
+    var item=items[j];
+    var li=document.createElement('li');
+    var a=document.createElement('a');
+    a.href='#'+item.id;
+    a.textContent=item.text;
+    if(item.tag==='H2'){
+      if(subUl&&currentLi){currentLi.appendChild(subUl);subUl=null;}
+      li.appendChild(a);
+      ul.appendChild(li);
+      currentLi=li;
+    } else {
+      if(!subUl)subUl=document.createElement('ul');
+      li.appendChild(a);
+      subUl.appendChild(li);
+    }
+  }
+  if(subUl&&currentLi)currentLi.appendChild(subUl);
+  nav.appendChild(ul);
 
+  // Active tracking on scroll
+  var observer=new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(e.isIntersecting){
+        var links=nav.querySelectorAll('a');
+        for(var k=0;k<links.length;k++)links[k].classList.remove('active');
+        var link=nav.querySelector('a[href="#'+e.target.id+'"]');
+        if(link)link.classList.add('active');
+      }
+    });
+  },{rootMargin:'-20% 0px -70% 0px'});
+  for(var m=0;m<headings.length;m++)observer.observe(headings[m]);
+})();
+</script>
 </body>
 </html>
