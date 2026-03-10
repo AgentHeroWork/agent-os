@@ -1,0 +1,82 @@
+defmodule AgentOS do
+  @moduledoc """
+  The AI Operating System — Unified Runtime for Intelligent Agents.
+
+  AgentOS composes four core subsystems into a unified operating system
+  for AI agents, following the categorical principle that complex systems
+  emerge from the composition of well-defined abstractions:
+
+    * `AgentScheduler` — Process management for agents (Objects in a category)
+    * `ToolInterface` — Capability-based tool access (Morphisms between objects)
+    * `MemoryLayer` — Typed persistent memory (Functors preserving structure)
+    * `PlannerEngine` — Market-based orchestration (Natural transformations)
+
+  ## Architecture
+
+  Built on Erlang/OTP's BEAM VM, AgentOS leverages:
+
+    * **Supervision trees** for fault-tolerant agent lifecycle management
+    * **GenServer** processes for stateful agent, tool, and memory abstractions
+    * **ETS/Mnesia** for high-performance typed memory storage
+    * **Message passing** for inter-agent communication without shared state
+    * **Lightweight processes** for massive agent concurrency
+
+  ## Categorical Foundation
+
+  The four subsystems form a commutative diagram:
+
+      Agents ──Tools──→ Actions
+        │                  │
+      Memory            Planner
+        │                  │
+        ▼                  ▼
+      Knowledge ────────→ Goals
+
+  Where composition of any path yields equivalent results (naturality).
+  """
+
+  @doc """
+  Start the AI Operating System with the given configuration.
+
+  ## Options
+
+    * `:scheduler_config` — Configuration for the agent scheduler
+    * `:tool_config` — Tool registry and capability settings
+    * `:memory_config` — Memory backend configuration
+    * `:planner_config` — Market and orchestration settings
+
+  ## Examples
+
+      AgentOS.start(scheduler_config: %{max_agents: 1000})
+
+  """
+  @spec start(keyword()) :: {:ok, pid()} | {:error, term()}
+  def start(opts \\ []) do
+    AgentOS.Application.start(:normal, opts)
+  end
+
+  @doc """
+  Submit a job to the AI Operating System.
+
+  The job will be decomposed by the planner, matched to agents via the
+  order book, and executed through the scheduler with tool access and
+  memory persistence.
+  """
+  @spec submit_job(map()) :: {:ok, String.t()} | {:error, term()}
+  def submit_job(job_spec) do
+    PlannerEngine.submit_job(job_spec)
+  end
+
+  @doc """
+  Query the current system status across all subsystems.
+  """
+  @spec status() :: map()
+  def status do
+    %{
+      scheduler: AgentScheduler.status(),
+      tools: ToolInterface.status(),
+      memory: MemoryLayer.status(),
+      planner: PlannerEngine.status()
+    }
+  end
+end

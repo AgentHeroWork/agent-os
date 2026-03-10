@@ -1,0 +1,1656 @@
+% memory-layer.tex — Part III of "The AI Operating System" series
+% Memory Layer: Typed Filesystem for Persistent Agent Cognition
+\documentclass[12pt,a4paper]{article}
+
+% ── Core packages ──────────────────────────────────────────────
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{tikz-cd}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,shapes.geometric,calc,decorations.pathmorphing}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{cleveref}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{enumitem}
+\usepackage{algorithm2e}
+\usepackage{float}
+\usepackage{subcaption}
+\usepackage{natbib}
+\usepackage{setspace}
+\usepackage{fancyhdr}
+\usepackage{abstract}
+\usepackage{everypage}
+\usepackage{eso-pic}
+
+% ── GrokRxiv sidebar ──────────────────────────────────────────
+\AddEverypageHook{%
+  \ifnum\value{page}=1
+    \put(527,-400){\rotatebox{90}{\footnotesize\texttt{GrokRxiv:2026.03.memory-layer-ai-os [cs.AI] 10 Mar 2026}}}
+  \fi
+}
+
+% ── Theorem environments ──────────────────────────────────────
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{corollary}[theorem]{Corollary}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{example}[theorem]{Example}
+\newtheorem{remark}[theorem]{Remark}
+
+% ── Code listing style ────────────────────────────────────────
+\definecolor{codegreen}{rgb}{0.0,0.5,0.0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{codeblue}{rgb}{0.0,0.0,0.7}
+\definecolor{backcolour}{rgb}{0.97,0.97,0.97}
+\definecolor{codeorange}{rgb}{0.8,0.4,0.0}
+
+\lstdefinestyle{elixirstyle}{
+    backgroundcolor=\color{backcolour},
+    commentstyle=\color{codegreen}\itshape,
+    keywordstyle=\color{codeblue}\bfseries,
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codeorange},
+    basicstyle=\ttfamily\small,
+    breakatwhitespace=false,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    numbers=left,
+    numbersep=5pt,
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=2,
+    frame=single,
+    rulecolor=\color{codegray},
+    morekeywords={defmodule,def,defp,defstruct,do,end,fn,use,
+      require,alias,import,case,cond,with,when,raise,
+      @moduledoc,@doc,@type,@spec,@typedoc,@enforce_keys,
+      @behaviour,@callback,@impl,defprotocol,defimpl,
+      true,false,nil,and,or,not,in,after,catch,rescue,
+      GenServer,Agent,Supervisor,Application,ETS,Mnesia},
+    sensitive=true,
+    morecomment=[l]{\#},
+    morestring=[b]",
+    literate={|>}{{{\color{codepurple}|>}}}2
+             {->}{{{\color{codepurple}->}}}2
+             {=>}{{{\color{codepurple}=>}}}2
+             {<-}{{{\color{codepurple}<-}}}2
+}
+
+\lstdefinestyle{pythonstyle}{
+    backgroundcolor=\color{backcolour},
+    commentstyle=\color{codegreen}\itshape,
+    keywordstyle=\color{codeblue}\bfseries,
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codeorange},
+    basicstyle=\ttfamily\small,
+    breakatwhitespace=false,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    numbers=left,
+    numbersep=5pt,
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=4,
+    frame=single,
+    rulecolor=\color{codegray},
+    morekeywords={class,def,return,self,None,True,False,from,import,
+      Generic,TypeVar,ClassVar,Protocol,Optional,Dict,List,
+      BaseModel,Field,dataclass},
+    sensitive=true,
+    morecomment=[l]{\#},
+    morestring=[b]",
+}
+
+\lstset{style=elixirstyle}
+
+% ── Hyperref setup ────────────────────────────────────────────
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue!70!black,
+    citecolor=green!50!black,
+    urlcolor=blue!70!black
+}
+
+% ── Headers ───────────────────────────────────────────────────
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textit{Part III: Memory Layer}}
+\fancyhead[R]{\small\textit{The AI Operating System}}
+\fancyfoot[C]{\thepage}
+
+% ── Macros ────────────────────────────────────────────────────
+\newcommand{\Cat}{\mathbf{Cat}}
+\newcommand{\Set}{\mathbf{Set}}
+\newcommand{\Sch}{\mathcal{S}}
+\newcommand{\Stor}{\mathcal{S}\!t}
+\newcommand{\Mem}{\mathsf{Mem}}
+\newcommand{\VMem}{\mathsf{VMem}}
+\newcommand{\Hom}{\mathrm{Hom}}
+\newcommand{\id}{\mathrm{id}}
+\newcommand{\op}{\mathrm{op}}
+\newcommand{\Nat}{\mathrm{Nat}}
+\newcommand{\ob}{\mathrm{ob}}
+\newcommand{\mor}{\mathrm{mor}}
+\newcommand{\Reason}{\mathsf{Reason}}
+\newcommand{\Timeline}{\mathsf{Timeline}}
+\newcommand{\Edge}{\mathsf{Edge}}
+\newcommand{\ContextFS}{\textsc{ContextFS}}
+
+\begin{document}
+
+% ══════════════════════════════════════════════════════════════
+% TITLE
+% ══════════════════════════════════════════════════════════════
+\begin{center}
+{\LARGE\bfseries The AI Operating System, Part III:\\[4pt]
+Memory Layer --- Typed Filesystem for\\[2pt]
+Persistent Agent Cognition}
+
+\vspace{1em}
+{\large Matthew Long}\\[4pt]
+The YonedaAI Collaboration\\
+YonedaAI Research Collective\\
+Chicago, IL\\
+\texttt{matthew@yonedaai.com} $\cdot$ \texttt{https://yonedaai.com}
+
+\vspace{1em}
+{\small March 10, 2026}
+\end{center}
+
+% ══════════════════════════════════════════════════════════════
+% ABSTRACT
+% ══════════════════════════════════════════════════════════════
+\begin{abstract}
+\noindent
+Autonomous AI agents require persistent memory that transcends session boundaries, yet no analogue of the operating-system filesystem has been formalized for agent cognition. Traditional filesystems store untyped byte streams; agent memory demands typed schemas, causal versioning, semantic search, and graph-structured lineage. We introduce a \emph{categorical memory model} in which memory is a functor $M\colon \Sch \to \Stor$ from a schema category~$\Sch$ (whose objects are typed schemas and morphisms are schema transformations) to a storage category~$\Stor$ (whose objects are storage backends and morphisms are queries). Type safety is expressed as natural transformations between memory functors; versioning is a temporal functor $V\colon \Timeline \to \Stor$; and graph lineage is a 2-categorical structure layered over the base categories. We prove that the generic typed wrapper $\Mem[S]$ is a representable functor (a Yoneda-lemma connection), that type structure is preserved under storage round-trips, and that the memory operations \texttt{evolve}, \texttt{merge}, and \texttt{split} form a monad on the memory category. The reference implementation, \ContextFS{}, realizes this framework with 24 memory-type variants, a multi-backend storage router (SQLite, ChromaDB, FalkorDB, PostgreSQL), vector clocks for causal consistency, content hashing for deduplication, and an MCP server for universal client access. We provide a production-quality Elixir/OTP implementation using ETS for working memory and Mnesia for persistent knowledge, demonstrating that the categorical abstractions yield both formal guarantees and practical performance. Case studies in agent learning, cross-session continuity, and multi-agent shared knowledge validate the framework against real workloads.
+
+\medskip
+\noindent\textbf{Keywords:} agent memory, typed filesystem, category theory, knowledge representation, persistent cognition, OTP, MCP, semantic search
+\end{abstract}
+
+\setcounter{tocdepth}{2}
+\tableofcontents
+\newpage
+
+% ══════════════════════════════════════════════════════════════
+\section{Introduction}\label{sec:introduction}
+% ══════════════════════════════════════════════════════════════
+
+The first two installments of this series established the kernel architecture and the scheduler for an AI Operating System. Yet an operating system without a memory subsystem is merely a stateless dispatcher: it can schedule computations but cannot accumulate knowledge across them. Every traditional OS dedicates a substantial fraction of its complexity to memory management---virtual memory, page tables, filesystem hierarchies, caching layers---because persistent, organized storage is the foundation upon which all higher-level abstractions rest.
+
+For autonomous AI agents, the memory problem is simultaneously more constrained and more ambitious than its classical counterpart. More constrained because agents do not need byte-addressable random access to flat address spaces; more ambitious because agent memory must support:
+
+\begin{enumerate}[label=(\roman*)]
+  \item \textbf{Typed schemas}: each memory entry conforms to a domain-specific type, not a raw byte stream.
+  \item \textbf{Causal versioning}: memory evolves over time, and the system must track \emph{why} each change occurred (observation, inference, correction, decay).
+  \item \textbf{Semantic search}: retrieval by meaning, not merely by address or filename.
+  \item \textbf{Graph lineage}: memories relate to one another through typed edges---one memory may supersede, contradict, reference, or evolve into another.
+  \item \textbf{Multi-backend coordination}: different storage engines excel at different query patterns (relational, vector, graph), and the memory layer must route transparently.
+\end{enumerate}
+
+Traditional filesystems fail on every count. POSIX provides \texttt{open}/\texttt{read}/\texttt{write}/\texttt{close} on untyped byte sequences organized in a tree hierarchy. Plan~9's union mounts and synthetic filesystems~\citep{pike1995plan9} introduced compositional namespace ideas but remained fundamentally untyped. Semantic filesystems~\citep{gifford1991semantic} added metadata-based retrieval but lacked formal type guarantees. None of these systems address versioning with causal annotations, graph-structured relationships, or the combination of exact and approximate (embedding-based) retrieval that agent cognition requires.
+
+This paper formalizes agent memory using category theory and provides a reference implementation called \ContextFS{}. The categorical framework yields three concrete benefits:
+
+\begin{enumerate}
+  \item \textbf{Compositionality}: memory operations compose cleanly because they are morphisms in well-defined categories.
+  \item \textbf{Type safety}: the functor $M\colon \Sch \to \Stor$ preserves type structure, and we prove round-trip fidelity.
+  \item \textbf{Extensibility}: new schema types, storage backends, and relationship kinds can be added as new objects and morphisms without modifying the core framework.
+\end{enumerate}
+
+The structure of the paper is as follows. Section~\ref{sec:background} surveys relevant background in OS memory management, knowledge representation, and category theory. Section~\ref{sec:model} develops the formal memory model. Section~\ref{sec:types} details the type system built on schema-indexed memory. Section~\ref{sec:versioning} formalizes versioning and lineage. Section~\ref{sec:storage} presents the multi-backend storage architecture. Section~\ref{sec:reliability} establishes reliability guarantees. Section~\ref{sec:implementation} provides the Elixir/OTP implementation. Section~\ref{sec:case-studies} validates the framework through case studies. Section~\ref{sec:discussion} compares to related work, and Section~\ref{sec:conclusion} concludes.
+
+% ══════════════════════════════════════════════════════════════
+\section{Background}\label{sec:background}
+% ══════════════════════════════════════════════════════════════
+
+\subsection{Virtual Memory and Filesystems}\label{subsec:vm}
+
+The virtual memory subsystem of a modern OS provides each process with an isolated address space mapped onto physical memory and secondary storage through page tables~\citep{denning1970virtual}. The key abstraction is \emph{indirection}: processes reference virtual addresses, and the memory management unit (MMU) translates these to physical locations. This indirection enables demand paging, copy-on-write, memory-mapped files, and shared memory regions.
+
+Filesystems layer a persistent namespace on top of block devices. The Unix filesystem~\citep{ritchie1974unix} introduced the inode/directory model: files are sequences of bytes identified by inodes, organized in a tree of directories. The Virtual Filesystem Switch (VFS) in Linux~\citep{love2010linux} provides a uniform interface over heterogeneous filesystem implementations---ext4, XFS, NFS, FUSE---through a common set of operations (\texttt{inode\_operations}, \texttt{file\_operations}, \texttt{super\_operations}).
+
+Plan~9~\citep{pike1995plan9} radicalized the ``everything is a file'' philosophy: network connections, process state, graphics, and device control are all accessed through filesystem operations on synthetic file servers. The \texttt{/proc} filesystem, \texttt{/net}, and \texttt{/dev} present dynamic system state as navigable file trees. Union mounts allow multiple file trees to be overlaid into a single namespace.
+
+These designs are profoundly influential, yet they share a fundamental limitation: \emph{files are untyped byte streams}. The filesystem knows nothing about the structure of what it stores. All interpretation is deferred to applications.
+
+\subsection{Knowledge Representation and Semantic Memory}\label{subsec:kr}
+
+The knowledge representation (KR) community has long studied how to organize structured information for intelligent systems. Frame systems~\citep{minsky1974framework} organize knowledge around stereotypical situations with slots and defaults. Semantic networks~\citep{quillian1968semantic} represent concepts as nodes and relationships as labeled edges. Description logics~\citep{baader2003description} provide formal semantics with decidable reasoning for ontological knowledge.
+
+More recently, knowledge graphs~\citep{hogan2021knowledge} have become the dominant paradigm for structured knowledge storage, exemplified by Wikidata, Google's Knowledge Graph, and domain-specific graphs in biomedicine and finance. Knowledge graphs represent entities as nodes and relationships as typed edges, with schemas defined by ontologies.
+
+The connection to agent memory is direct: an agent's accumulated knowledge forms a personal knowledge graph, with the crucial addition that this graph \emph{evolves over time} as the agent observes, infers, corrects, and forgets.
+
+\subsection{Embedding Spaces and Semantic Search}\label{subsec:embeddings}
+
+Transformer-based language models produce dense vector representations (embeddings) that capture semantic similarity~\citep{reimers2019sentence, devlin2019bert}. Retrieval-augmented generation (RAG)~\citep{lewis2020rag} exploits this by storing text chunks as vectors and retrieving relevant context at query time through approximate nearest neighbor (ANN) search~\citep{johnson2019faiss}.
+
+For agent memory, embeddings provide a crucial capability that neither filesystems nor knowledge graphs offer natively: \emph{retrieval by meaning}. An agent can recall memories semantically related to its current context without knowing exact keys or traversal paths. This is analogous to human associative memory~\citep{kahana2012foundations}, where recall is triggered by semantic similarity rather than explicit addressing.
+
+\subsection{Category Theory Preliminaries}\label{subsec:cattheory}
+
+We assume familiarity with categories, functors, and natural transformations at the level of Mac~Lane~\citep{maclane1978categories}. A \emph{category} $\mathcal{C}$ consists of objects $\ob(\mathcal{C})$, morphisms $\mor(\mathcal{C})$ with source and target maps, an associative composition, and identity morphisms. A \emph{functor} $F\colon \mathcal{C} \to \mathcal{D}$ maps objects to objects and morphisms to morphisms, preserving composition and identities. A \emph{natural transformation} $\eta\colon F \Rightarrow G$ between parallel functors $F,G\colon \mathcal{C} \to \mathcal{D}$ is a family of morphisms $\eta_c\colon F(c) \to G(c)$ satisfying the naturality square for every morphism in $\mathcal{C}$.
+
+The \emph{Yoneda lemma} states that for any functor $F\colon \mathcal{C}^{\op} \to \Set$ and object $c \in \mathcal{C}$:
+\[
+  \Nat(\Hom_{\mathcal{C}}(-,c), F) \cong F(c)
+\]
+A functor is \emph{representable} if it is naturally isomorphic to $\Hom_{\mathcal{C}}(-,c)$ for some object $c$. A \emph{monad} on $\mathcal{C}$ is an endofunctor $T\colon \mathcal{C} \to \mathcal{C}$ equipped with natural transformations $\eta\colon \id_{\mathcal{C}} \Rightarrow T$ (unit) and $\mu\colon T^2 \Rightarrow T$ (multiplication) satisfying associativity and unit laws.
+
+A \emph{2-category} extends a category by adding 2-morphisms (morphisms between morphisms), with two composition operations (horizontal and vertical) satisfying interchange laws~\citep{benabou1967bicategories}. We will use 2-categorical structure to formalize relationships between memory lineage paths.
+
+% ══════════════════════════════════════════════════════════════
+\section{Memory Model}\label{sec:model}
+% ══════════════════════════════════════════════════════════════
+
+We now develop the formal categorical framework for agent memory. The central construction is a functor from a category of typed schemas to a category of storage backends, with additional structure for versioning and lineage.
+
+\subsection{The Schema Category}\label{subsec:schema-cat}
+
+\begin{definition}[Schema Category $\Sch$]\label{def:schema-cat}
+The \emph{schema category} $\Sch$ has:
+\begin{itemize}
+  \item \textbf{Objects}: typed schemas $S_1, S_2, \ldots$, each specifying a set of typed fields with validation constraints. In \ContextFS{}, these include \texttt{BaseSchema} and its 24 domain-specific descendants (see Section~\ref{sec:types}).
+  \item \textbf{Morphisms}: schema transformations $f\colon S_i \to S_j$, which are structure-preserving maps between schemas. A morphism $f$ maps each field of $S_i$ to a (possibly computed) field of $S_j$, preserving type compatibility.
+  \item \textbf{Identity}: the identity transformation $\id_{S}\colon S \to S$.
+  \item \textbf{Composition}: given $f\colon S_1 \to S_2$ and $g\colon S_2 \to S_3$, the composite $g \circ f\colon S_1 \to S_3$ applies $f$ then $g$.
+\end{itemize}
+\end{definition}
+
+The schema category has a rich subcategory structure. Let $\Sch_{\mathrm{core}}$ denote the full subcategory on the four core memory types (FACT, DECISION, PROCEDURAL, EPISODIC); $\Sch_{\mathrm{ext}}$ the extended types (TODO, ISSUE, API, SCHEMA); and $\Sch_{\mathrm{wf}}$ the workflow types (WORKFLOW, TASK, STEP, AGENT\_RUN). These subcategories compose:
+\[
+  \Sch = \Sch_{\mathrm{core}} \cup \Sch_{\mathrm{ext}} \cup \Sch_{\mathrm{wf}} \cup \Sch_{\mathrm{meta}} \cup \Sch_{\mathrm{sys}}
+\]
+where $\Sch_{\mathrm{meta}}$ and $\Sch_{\mathrm{sys}}$ contain metadata and system-level schemas respectively.
+
+\begin{remark}
+The \texttt{BaseSchema} in \ContextFS{} serves as an initial object in $\Sch$ in the sense that every domain schema admits a unique embedding from \texttt{BaseSchema} (via inheritance). The \texttt{\_schema\_name} class variable acts as a tagging morphism that distinguishes objects.
+\end{remark}
+
+\subsection{The Storage Category}\label{subsec:storage-cat}
+
+\begin{definition}[Storage Category $\Stor$]\label{def:storage-cat}
+The \emph{storage category} $\Stor$ has:
+\begin{itemize}
+  \item \textbf{Objects}: storage backends $B_1, B_2, \ldots$, each providing a set of capabilities (save, recall, search, delete, update). In \ContextFS{}, these include SQLite (local relational), ChromaDB (vector embeddings), FalkorDB (graph), and PostgreSQL (cloud relational).
+  \item \textbf{Morphisms}: queries $q\colon B_i \to B_j$, representing data-flow operations that may retrieve from one backend and store in another, or translate between storage representations.
+  \item \textbf{Identity}: the no-op query $\id_B$ that returns data unchanged.
+  \item \textbf{Composition}: pipeline composition of queries.
+\end{itemize}
+\end{definition}
+
+Each backend $B$ comes equipped with a \emph{capability set} $\mathrm{Cap}(B) \subseteq \{\texttt{save}, \texttt{recall}, \texttt{search}, \texttt{delete}, \texttt{update}, \texttt{vector\_search}, \texttt{graph\_traverse}\}$. This defines a functor $\mathrm{Cap}\colon \Stor \to \mathcal{P}(\mathrm{Ops})$ to the powerset category of operations.
+
+\subsection{The Memory Functor}\label{subsec:mem-functor}
+
+\begin{definition}[Memory Functor]\label{def:mem-functor}
+The \emph{memory functor} $M\colon \Sch \to \Stor$ maps:
+\begin{itemize}
+  \item Each schema $S \in \ob(\Sch)$ to a storage representation $M(S) \in \ob(\Stor)$, which is the backend (or product of backends) where instances of $S$ are persisted.
+  \item Each schema transformation $f\colon S_1 \to S_2$ to a storage operation $M(f)\colon M(S_1) \to M(S_2)$ that transforms stored instances accordingly.
+\end{itemize}
+subject to the functor laws: $M(\id_S) = \id_{M(S)}$ and $M(g \circ f) = M(g) \circ M(f)$.
+\end{definition}
+
+The generic typed wrapper $\Mem[S]$ in \ContextFS{} is precisely the action of this functor on a specific schema object $S$: it produces a typed container that mediates between the schema type and the storage representation.
+
+The following commutative diagram captures the fundamental structure:
+
+\begin{center}
+\begin{tikzcd}[column sep=large, row sep=large]
+  S_1 \arrow[r, "f"] \arrow[d, "M"'] & S_2 \arrow[d, "M"] \\
+  M(S_1) \arrow[r, "M(f)"'] & M(S_2)
+\end{tikzcd}
+\end{center}
+
+\subsection{Representability and the Yoneda Connection}\label{subsec:yoneda}
+
+We now establish the key theoretical result connecting $\Mem[S]$ to the Yoneda lemma.
+
+Consider the contravariant functor $\Mem[-]\colon \Sch^{\op} \to \Set$ that sends each schema $S$ to the set of all memory instances of type $S$ (i.e., the set $\Mem[S].\mathrm{instances}$), and each schema morphism $f\colon S_1 \to S_2$ to the pullback function $f^*\colon \Mem[S_2].\mathrm{instances} \to \Mem[S_1].\mathrm{instances}$.
+
+\begin{theorem}[$\Mem[S]$ is Representable]\label{thm:representable}
+The functor $\Mem[-]\colon \Sch^{\op} \to \Set$ is representable. Specifically, there exists a universal schema $U \in \ob(\Sch)$ such that:
+\[
+  \Mem[-] \cong \Hom_{\Sch}(-, U)
+\]
+The representing object $U$ is the \texttt{BaseSchema} equipped with all optional extensions.
+\end{theorem}
+
+\begin{proof}
+By the Yoneda lemma, $\Nat(\Hom_\Sch(-, U), \Mem[-]) \cong \Mem[U]$. We must show that there exists a universal element $u \in \Mem[U]$ such that the induced natural transformation is an isomorphism.
+
+Let $U = \texttt{BaseSchema}$ with the universal schema carrying all field types as optional. For any schema $S$ and instance $m \in \Mem[S]$, the unique morphism $\phi_m\colon S \to U$ embeds the instance into the universal schema (setting unused fields to their zero values). This defines a natural bijection:
+\[
+  \Mem[S] \ni m \longmapsto (\phi_m, m|_{\mathrm{base}}) \in \Hom_\Sch(S, U) \times \Mem[U]_{\mathrm{base}}
+\]
+
+Since every schema transformation $f\colon S_1 \to S_2$ factors through $U$ via the respective embeddings, and the functor $\Mem[-]$ respects this factorization (by the type-preservation property of the storage layer), the natural transformation is an isomorphism. The Yoneda embedding ensures faithfulness.
+\end{proof}
+
+\begin{corollary}\label{cor:yoneda-instances}
+The set of all memory instances of schema type $S$ is fully determined by the morphisms from $S$ into the universal schema $U$:
+\[
+  |\Mem[S]| = |\Hom_\Sch(S, U)|
+\]
+\end{corollary}
+
+\subsection{Versioning as Temporal Functor}\label{subsec:temporal}
+
+\begin{definition}[Timeline Category $\Timeline$]\label{def:timeline}
+The \emph{timeline category} $\Timeline$ has:
+\begin{itemize}
+  \item \textbf{Objects}: timestamps $t_0, t_1, t_2, \ldots$ (elements of a totally ordered set).
+  \item \textbf{Morphisms}: a unique morphism $t_i \to t_j$ whenever $t_i \leq t_j$ (making $\Timeline$ a thin category, i.e., a preorder viewed as a category).
+\end{itemize}
+\end{definition}
+
+\begin{definition}[Versioning Functor]\label{def:versioning-functor}
+The \emph{versioning functor} $V\colon \Timeline \to \Stor$ maps each timestamp $t$ to the state of storage at time $t$, and each morphism $t_i \leq t_j$ to the sequence of storage operations applied between $t_i$ and $t_j$.
+\end{definition}
+
+The versioned memory wrapper $\VMem[S]$ in \ContextFS{} is the composite functor:
+\[
+  \VMem[S] = V \circ M|_S \colon \Timeline \to \Stor
+\]
+where $M|_S$ restricts the memory functor to the single schema $S$. Each version carries a \texttt{ChangeReason} annotation drawn from the reason category (Definition~\ref{def:reason-cat} in Section~\ref{sec:versioning}).
+
+\begin{center}
+\begin{tikzcd}[column sep=huge, row sep=large]
+  \Timeline \arrow[r, "V"] \arrow[dr, "\VMem[S]"'] & \Stor \\
+  & \Sch \arrow[u, "M"']
+\end{tikzcd}
+\end{center}
+
+% ══════════════════════════════════════════════════════════════
+\section{Type System}\label{sec:types}
+% ══════════════════════════════════════════════════════════════
+
+\subsection{Schema-Indexed Types}\label{subsec:schema-indexed}
+
+The fundamental type-theoretic construction in \ContextFS{} is the \emph{schema-indexed memory wrapper} $\Mem[S]$, parameterized by a schema type $S$. This is a dependent type in the sense that the operations available on a memory instance depend on the schema it wraps.
+
+\begin{definition}[Schema-Indexed Memory]\label{def:schema-mem}
+For a schema $S \in \ob(\Sch)$, the type $\Mem[S]$ provides:
+\begin{itemize}
+  \item $\Mem[S].\mathtt{create}(d\colon S) \to \Mem[S]$: construct a new memory wrapping validated data of type $S$.
+  \item $\Mem[S].\mathtt{wrap}(d\colon S) \to \Mem[S]$: wrap existing data, assigning a fresh identifier and timestamp.
+  \item $\Mem[S].\mathtt{data} \to S$: extract the typed payload.
+  \item $\Mem[S].\mathtt{id} \to \mathrm{UUID}$: unique identifier.
+  \item $\Mem[S].\mathtt{schema\_name} \to \mathrm{String}$: the schema's type tag (from $S$'s \texttt{\_schema\_name} class variable).
+\end{itemize}
+\end{definition}
+
+The key property is that $\Mem[S]$ enforces type safety at two levels:
+
+\begin{enumerate}
+  \item \textbf{Compile-time} (via mypy in the Python reference, or dialyzer/typespecs in Elixir): the generic parameter $S$ is propagated through all operations, preventing type confusion.
+  \item \textbf{Runtime} (via Pydantic validators in Python, or struct enforcement in Elixir): data is validated against the schema on every create, wrap, and update operation.
+\end{enumerate}
+
+\subsection{The 24 Memory Types}\label{subsec:24types}
+
+\ContextFS{} defines 24 memory-type variants organized into five subcategories. Each variant is an object in the schema category $\Sch$:
+
+\begin{table}[H]
+\centering
+\caption{Memory type taxonomy in \ContextFS{}.}
+\label{tab:memory-types}
+\begin{tabularx}{\textwidth}{llX}
+\toprule
+\textbf{Category} & \textbf{Type} & \textbf{Description} \\
+\midrule
+\multirow{4}{*}{Core} & \texttt{FACT} & Declarative knowledge: verified assertions \\
+  & \texttt{DECISION} & Decision records with rationale and alternatives \\
+  & \texttt{PROCEDURAL} & How-to knowledge: steps, preconditions, postconditions \\
+  & \texttt{EPISODIC} & Experiential records: what happened, when, in what context \\
+\midrule
+\multirow{4}{*}{Extended} & \texttt{TODO} & Action items with priority and status \\
+  & \texttt{ISSUE} & Problem records with severity and resolution \\
+  & \texttt{API} & External API schemas and access patterns \\
+  & \texttt{SCHEMA} & Schema definitions (meta-level: schemas about schemas) \\
+\midrule
+\multirow{4}{*}{Workflow} & \texttt{WORKFLOW} & End-to-end process definitions \\
+  & \texttt{TASK} & Individual units of work within workflows \\
+  & \texttt{STEP} & Atomic operations within tasks \\
+  & \texttt{AGENT\_RUN} & Execution traces of agent invocations \\
+\midrule
+\multirow{4}{*}{Metadata} & \texttt{TAG} & Classification labels \\
+  & \texttt{ANNOTATION} & Human or agent commentary on other memories \\
+  & \texttt{EMBEDDING} & Vector representations \\
+  & \texttt{INDEX} & Search index entries \\
+\midrule
+\multirow{4}{*}{System} & \texttt{CONFIG} & System configuration parameters \\
+  & \texttt{SESSION} & Agent session state \\
+  & \texttt{CONTEXT} & Contextual information bundles \\
+  & \texttt{LOG} & System event records \\
+\midrule
+\multirow{4}{*}{Relational} & \texttt{PERSON} & People known to the agent \\
+  & \texttt{PROJECT} & Project-level organizational units \\
+  & \texttt{ARTIFACT} & Produced outputs (documents, code, analyses) \\
+  & \texttt{EVENT} & Calendar or timeline events \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Type-Safe Operations as Natural Transformations}\label{subsec:type-ops}
+
+The storage operations (save, recall, search, update, delete) are natural transformations between functors defined over the schema category.
+
+\begin{definition}[Storage Natural Transformation]\label{def:storage-nat}
+Let $\mathrm{InMem}, \mathrm{OnDisk}\colon \Sch \to \Set$ be functors mapping each schema $S$ to, respectively, the set of in-memory instances and the set of on-disk representations. The \texttt{save} operation is a natural transformation:
+\[
+  \mathtt{save}\colon \mathrm{InMem} \Rightarrow \mathrm{OnDisk}
+\]
+satisfying the naturality condition: for every schema morphism $f\colon S_1 \to S_2$,
+\begin{center}
+\begin{tikzcd}[column sep=large, row sep=large]
+  \mathrm{InMem}(S_1) \arrow[r, "\mathtt{save}_{S_1}"] \arrow[d, "\mathrm{InMem}(f)"'] & \mathrm{OnDisk}(S_1) \arrow[d, "\mathrm{OnDisk}(f)"] \\
+  \mathrm{InMem}(S_2) \arrow[r, "\mathtt{save}_{S_2}"'] & \mathrm{OnDisk}(S_2)
+\end{tikzcd}
+\end{center}
+\end{definition}
+
+Similarly, \texttt{recall} is a natural transformation $\mathrm{OnDisk} \Rightarrow \mathrm{InMem}$, and the composition $\mathtt{recall} \circ \mathtt{save}$ must be naturally isomorphic to the identity---this is the round-trip theorem.
+
+\begin{theorem}[Type Preservation Under Round-Trip]\label{thm:round-trip}
+For any schema $S \in \ob(\Sch)$ and memory instance $m \in \Mem[S]$:
+\[
+  \mathtt{recall}_{S}(\mathtt{save}_{S}(m)) \cong m
+\]
+More precisely, the composite natural transformation $\mathtt{recall} \circ \mathtt{save}\colon \mathrm{InMem} \Rightarrow \mathrm{InMem}$ is naturally isomorphic to the identity natural transformation $\id_{\mathrm{InMem}}$.
+\end{theorem}
+
+\begin{proof}
+We must show that for each schema $S$, the component $(\mathtt{recall} \circ \mathtt{save})_S = \mathtt{recall}_S \circ \mathtt{save}_S$ is a bijection on $\mathrm{InMem}(S)$ that commutes with schema transformations.
+
+\textbf{Bijection}: The \texttt{save} operation serializes $m$ into a storage representation using schema-specific serializers derived from $S$'s field definitions. The content hash $h(m)$ is computed and stored alongside. The \texttt{recall} operation deserializes using the same schema $S$ (resolved via \texttt{SchemaRegistry} from the stored \texttt{\_schema\_name} tag). Since serialization and deserialization are inverse operations for the Pydantic/struct validators (which enforce canonical forms), the round-trip is the identity up to isomorphism (UUID and timestamp may be refreshed, but the typed content is preserved).
+
+\textbf{Naturality}: For a schema morphism $f\colon S_1 \to S_2$ and $m \in \mathrm{InMem}(S_1)$:
+\begin{align*}
+  \mathtt{recall}_{S_2}(\mathrm{OnDisk}(f)(\mathtt{save}_{S_1}(m))) &= \mathtt{recall}_{S_2}(\mathtt{save}_{S_2}(\mathrm{InMem}(f)(m))) \\
+  &= \mathrm{InMem}(f)(m)
+\end{align*}
+where the first equality uses naturality of \texttt{save}, and the second uses the bijection property for $S_2$.
+\end{proof}
+
+\subsection{The Schema Registry}\label{subsec:registry}
+
+The \texttt{SchemaRegistry} in \ContextFS{} provides runtime type resolution: given a schema name string, it returns the corresponding schema class. Categorically, the registry is a section of the forgetful functor $U\colon \Sch \to \Set$ that sends each schema to its name:
+\[
+  \texttt{SchemaRegistry}\colon \mathrm{Names} \hookrightarrow \Sch, \qquad U \circ \texttt{SchemaRegistry} = \id_{\mathrm{Names}}
+\]
+
+This section is injective by construction (schema names are unique), ensuring unambiguous type resolution at runtime.
+
+% ══════════════════════════════════════════════════════════════
+\section{Versioning and Lineage}\label{sec:versioning}
+% ══════════════════════════════════════════════════════════════
+
+\subsection{The Reason Category}\label{subsec:reason}
+
+\begin{definition}[Reason Category $\Reason$]\label{def:reason-cat}
+The \emph{reason category} $\Reason$ has:
+\begin{itemize}
+  \item \textbf{Objects}: change reasons $\{$\texttt{Observation}, \texttt{Inference}, \texttt{Correction}, \texttt{Decay}$\}$.
+  \item \textbf{Morphisms}: subsumption relations between reasons. \texttt{Correction} subsumes \texttt{Observation} (a correction implies a prior observation was wrong); \texttt{Inference} extends \texttt{Observation} (an inference is derived from observations); \texttt{Decay} is terminal (all knowledge eventually decays).
+\end{itemize}
+\end{definition}
+
+The reason annotations in $\VMem[S]$ are drawn from $\ob(\Reason)$:
+
+\begin{lstlisting}[style=elixirstyle, caption={ChangeReason enum (Elixir representation).}, label={lst:change-reason}]
+defmodule MemoryLayer.ChangeReason do
+  @type t :: :observation | :inference | :correction | :decay
+
+  def subsumes?(:correction, :observation), do: true
+  def subsumes?(:inference, :observation), do: true
+  def subsumes?(:decay, _), do: true
+  def subsumes?(x, x), do: true
+  def subsumes?(_, _), do: false
+end
+\end{lstlisting}
+
+\subsection{Versioned Memory}\label{subsec:versioned-mem}
+
+\begin{definition}[Versioned Memory]\label{def:versioned-mem}
+For a schema $S$, the \emph{versioned memory} $\VMem[S]$ is a functor:
+\[
+  \VMem[S]\colon \Timeline \to \Set
+\]
+mapping each timestamp $t$ to the version of the memory at time $t$, consisting of:
+\begin{itemize}
+  \item The typed data $d_t \in S$
+  \item The change reason $r_t \in \ob(\Reason)$
+  \item The version number $v_t \in \mathbb{N}$
+  \item The parent version reference (if any)
+\end{itemize}
+\end{definition}
+
+The version chain forms a path in the timeline category:
+\[
+  m_{t_0} \xrightarrow{r_1} m_{t_1} \xrightarrow{r_2} m_{t_2} \xrightarrow{r_3} \cdots
+\]
+where each arrow is labeled with its change reason.
+
+\subsection{Graph Relationships as 2-Morphisms}\label{subsec:graph-2morph}
+
+Memory lineage in \ContextFS{} is captured by the \texttt{EdgeRelation} enum, which defines typed edges between memories:
+
+\begin{definition}[Edge Relation Category]\label{def:edge-rel}
+The \emph{edge relation category} $\Edge$ has:
+\begin{itemize}
+  \item \textbf{Objects}: memories (instances of $\Mem[S]$ for various $S$).
+  \item \textbf{Morphisms}: typed edges between memories, drawn from the set $\{$\texttt{EVOLVED\_INTO}, \texttt{REFERENCES}, \texttt{SUPERSEDES}, \texttt{CONTRADICTS}, \texttt{SUPPORTS}, \texttt{DERIVED\_FROM}, \texttt{PART\_OF}, \texttt{TRIGGERS}, \texttt{BLOCKED\_BY}$\}$.
+\end{itemize}
+\end{definition}
+
+The 2-categorical structure emerges when we consider paths of edges as 1-morphisms and equivalences between paths as 2-morphisms:
+
+\begin{center}
+\begin{tikzcd}[column sep=huge, row sep=huge]
+  m_1 \arrow[r, bend left=30, "\texttt{EVOLVED\_INTO}"{name=U}]
+       \arrow[r, bend right=30, "\texttt{SUPERSEDES}"'{name=D}]
+  & m_2
+  \arrow[Rightarrow, from=U, to=D, "\alpha"]
+\end{tikzcd}
+\end{center}
+
+Here $\alpha$ is a 2-morphism asserting that ``evolved into'' and ``supersedes'' are equivalent lineage paths between $m_1$ and $m_2$ in a particular context. This 2-categorical viewpoint allows the system to reason about the \emph{equivalence of different lineage narratives}.
+
+\subsection{Memory Operations as a Monad}\label{subsec:monad}
+
+\begin{proposition}[Memory Operations Monad]\label{prop:monad}
+The memory operations \texttt{evolve}, \texttt{merge}, and \texttt{split} define a monad $(T, \eta, \mu)$ on the category of memory instances $\mathcal{M}$:
+\begin{itemize}
+  \item The endofunctor $T\colon \mathcal{M} \to \mathcal{M}$ wraps a memory in a ``pending operation'' context.
+  \item The unit $\eta\colon \id_\mathcal{M} \Rightarrow T$ embeds an unchanged memory as a trivial pending operation.
+  \item The multiplication $\mu\colon T^2 \Rightarrow T$ flattens nested pending operations (e.g., evolving the result of an evolution) into a single pending operation.
+\end{itemize}
+\end{proposition}
+
+\begin{proof}
+We verify the monad laws:
+
+\textbf{Left unit}: $\mu \circ T\eta = \id_T$. Starting with a pending operation $T(m)$, wrapping it in a trivial outer context via $T\eta$ and then flattening via $\mu$ recovers $T(m)$, because $\eta$ creates a no-op evolution and $\mu$ collapses the no-op.
+
+\textbf{Right unit}: $\mu \circ \eta T = \id_T$. Starting with $T(m)$, embedding via $\eta$ at the outer level and flattening gives back $T(m)$, because the outer wrapper is trivial.
+
+\textbf{Associativity}: $\mu \circ T\mu = \mu \circ \mu T$. Given $T^3(m)$ (a triply-nested pending operation), flattening the inner two then the result equals flattening the outer two then the result. This holds because operation composition is associative: \texttt{evolve(evolve(evolve(m, r1), r2), r3)} produces the same final memory regardless of which pair of evolutions is collapsed first (the change reasons accumulate as a list, and list concatenation is associative).
+
+Concretely:
+\begin{itemize}
+  \item $\mathtt{evolve}(m, r)$ creates a new version $m'$ with $m$ as parent, reason $r$, and incremented version number. This is $T$ applied to $m$ with context $r$.
+  \item $\mathtt{merge}(m_1, m_2)$ creates $m'$ with two parents. This is the tensor product in the monoidal structure.
+  \item $\mathtt{split}(m)$ creates $(m_1, m_2)$ from $m$. This is the comonadic dual, and together with merge provides the bimonad structure.
+\end{itemize}
+\end{proof}
+
+\begin{remark}
+The merge and split operations extend the monad to a bimonad when we consider the comonad structure of split (extract = project to either component, duplicate = split each component further). The full bimonadic structure ensures that agent memory supports both accumulation (merge) and decomposition (split) of knowledge, which is essential for multi-agent collaboration.
+\end{remark}
+
+% ══════════════════════════════════════════════════════════════
+\section{Storage Architecture}\label{sec:storage}
+% ══════════════════════════════════════════════════════════════
+
+\subsection{Multi-Backend Router as Coproduct}\label{subsec:router-coprod}
+
+\ContextFS{} employs multiple storage backends, each optimized for different query patterns. The \texttt{StorageRouter} coordinates across them.
+
+\begin{definition}[Storage Router]\label{def:storage-router}
+The \emph{storage router} is the coproduct (disjoint union) of backend objects in $\Stor$:
+\[
+  \mathrm{Router} = \coprod_{i} B_i = B_{\mathrm{SQLite}} \sqcup B_{\mathrm{Chroma}} \sqcup B_{\mathrm{Falkor}} \sqcup B_{\mathrm{Postgres}}
+\]
+equipped with injection morphisms $\iota_i\colon B_i \to \mathrm{Router}$ and a universal property: for any backend $C$ with morphisms $f_i\colon B_i \to C$, there exists a unique $[f_1, \ldots, f_n]\colon \mathrm{Router} \to C$.
+\end{definition}
+
+In practice, the router dispatches operations based on a routing policy:
+
+\begin{algorithm}[H]
+\SetAlgoLined
+\KwIn{Operation $\mathtt{op}$, Schema $S$, Data $d$}
+\KwOut{Result $r$}
+$\mathtt{backends} \leftarrow \mathtt{route}(S, \mathtt{op})$\;
+\ForEach{$B \in \mathtt{backends}$}{
+  \If{$\mathtt{op} \in \mathrm{Cap}(B)$}{
+    $r_B \leftarrow B.\mathtt{execute}(\mathtt{op}, S, d)$\;
+  }
+}
+$r \leftarrow \mathtt{merge\_results}(\{r_B\})$\;
+\Return{$r$}
+\caption{StorageRouter dispatch algorithm.}\label{alg:router}
+\end{algorithm}
+
+The routing policy implements a fan-out/fan-in pattern:
+\begin{itemize}
+  \item \textbf{Save}: writes to all relevant backends (SQLite for structured data, ChromaDB for embeddings, FalkorDB for graph edges).
+  \item \textbf{Recall}: reads from the primary backend (SQLite or PostgreSQL) with the authoritative copy.
+  \item \textbf{Search}: dispatches to the backend best suited for the query type (ChromaDB for semantic, FalkorDB for graph traversal, SQLite for exact match).
+\end{itemize}
+
+\subsection{Semantic Search}\label{subsec:semantic-search}
+
+Semantic search maps queries to the embedding space and performs approximate nearest neighbor retrieval.
+
+\begin{definition}[Embedding Functor]\label{def:embed-functor}
+The \emph{embedding functor} $E\colon \Sch \to \mathbf{Vect}_\mathbb{R}$ maps each schema $S$ to a vector space $\mathbb{R}^d$ (where $d$ is the embedding dimension) by:
+\[
+  E(S) = \mathrm{embed}(\mathrm{text}(S)) \in \mathbb{R}^d
+\]
+where $\mathrm{text}\colon \Sch \to \mathrm{String}$ extracts a textual representation and $\mathrm{embed}\colon \mathrm{String} \to \mathbb{R}^d$ is the embedding model.
+\end{definition}
+
+Semantic search then becomes inner product (or cosine similarity) computation in $\mathbb{R}^d$:
+\[
+  \mathtt{search}(q, k) = \mathrm{top}_k\left\{ m \in \Mem[-] \;\middle|\; \frac{\langle E(q), E(m) \rangle}{\|E(q)\| \cdot \|E(m)\|} > \theta \right\}
+\]
+
+\subsection{Graph Traversal}\label{subsec:graph-traversal}
+
+Graph queries in FalkorDB are formalized as path compositions in the edge relation category $\Edge$.
+
+\begin{definition}[Path Query]\label{def:path-query}
+A \emph{path query} $\pi$ specifies a pattern of edges:
+\[
+  \pi = r_1 \circ r_2 \circ \cdots \circ r_n
+\]
+where each $r_i \in \mor(\Edge)$ is an edge relation. The result of executing $\pi$ starting from memory $m$ is the set of all memories reachable via paths matching the pattern.
+\end{definition}
+
+Graph traversal composes with semantic search via the router:
+
+\begin{center}
+\begin{tikzcd}[column sep=large, row sep=large]
+  \text{Query} \arrow[r, "\text{embed}"] \arrow[d, "\text{parse}"'] & \mathbb{R}^d \arrow[r, "\text{ANN}"] & \text{Candidates} \arrow[d, "\text{filter}"] \\
+  \text{Graph Pattern} \arrow[rr, "\text{traverse}"'] & & \text{Results}
+\end{tikzcd}
+\end{center}
+
+\subsection{Capability Preservation}\label{subsec:cap-preservation}
+
+\begin{theorem}[StorageRouter Preserves Capabilities]\label{thm:cap-preservation}
+The capability functor $\mathrm{Cap}\colon \Stor \to \mathcal{P}(\mathrm{Ops})$ satisfies:
+\[
+  \mathrm{Cap}(\mathrm{Router}) = \bigcup_{i} \mathrm{Cap}(B_i)
+\]
+That is, the router exposes the union of all backend capabilities.
+\end{theorem}
+
+\begin{proof}
+By the coproduct construction, the router inherits each backend's capabilities through the injection morphisms $\iota_i$. For any operation $\mathtt{op} \in \mathrm{Cap}(B_j)$, the router can dispatch to $B_j$ via $\iota_j$. Conversely, the router cannot perform an operation not supported by any backend, since it has no intrinsic computational capability---it only delegates. Thus $\mathrm{Cap}(\mathrm{Router}) = \bigcup_i \mathrm{Cap}(B_i)$.
+\end{proof}
+
+% ══════════════════════════════════════════════════════════════
+\section{Reliability Guarantees}\label{sec:reliability}
+% ══════════════════════════════════════════════════════════════
+
+\subsection{Vector Clocks for Causal Consistency}\label{subsec:vector-clocks}
+
+In multi-agent settings, memories may be updated concurrently by different agents. \ContextFS{} uses vector clocks~\citep{lamport1978time, fidge1988timestamps} to establish causal ordering.
+
+\begin{definition}[Vector Clock]\label{def:vclock}
+A \emph{vector clock} for $n$ agents is a function $\mathrm{vc}\colon \mathrm{Agents} \to \mathbb{N}$, where $\mathrm{vc}(a)$ represents the number of events agent $a$ has processed. The partial order on vector clocks is:
+\[
+  \mathrm{vc}_1 \leq \mathrm{vc}_2 \iff \forall a.\; \mathrm{vc}_1(a) \leq \mathrm{vc}_2(a)
+\]
+Two clocks are \emph{concurrent} ($\mathrm{vc}_1 \| \mathrm{vc}_2$) when neither $\leq$ the other.
+\end{definition}
+
+Each memory write increments the writing agent's component:
+\[
+  \mathrm{vc}'(a) = \begin{cases} \mathrm{vc}(a) + 1 & \text{if } a = \text{writer} \\ \max(\mathrm{vc}(a), \mathrm{vc}_{\text{received}}(a)) & \text{otherwise} \end{cases}
+\]
+
+When two versions are concurrent, the system flags a conflict requiring resolution (via the merge operation or an explicit correction).
+
+\subsection{Content Hashing for Deduplication}\label{subsec:content-hash}
+
+\ContextFS{} computes a content hash for every memory instance:
+\[
+  h(m) = \mathrm{SHA256}(\mathrm{canonical}(m.\mathtt{data}))
+\]
+where $\mathrm{canonical}$ produces a deterministic serialization (sorted keys, normalized whitespace). Two memories with the same content hash are identified as duplicates, regardless of when or by whom they were created.
+
+\begin{proposition}[Deduplication Soundness]\label{prop:dedup}
+Content hashing is sound for deduplication: if $h(m_1) = h(m_2)$, then $m_1.\mathtt{data} = m_2.\mathtt{data}$ with overwhelming probability ($1 - 2^{-256}$).
+\end{proposition}
+
+\subsection{Soft Deletes as Filtered Subcategory}\label{subsec:soft-delete}
+
+\ContextFS{} never physically deletes memories. Instead, it marks them with a tombstone:
+
+\begin{definition}[Tombstone Subcategory]\label{def:tombstone}
+The \emph{active memory subcategory} $\mathcal{M}_{\mathrm{active}} \hookrightarrow \mathcal{M}$ is the full subcategory on memories whose \texttt{deleted\_at} field is \texttt{nil}. All query operations implicitly filter to $\mathcal{M}_{\mathrm{active}}$, while administrative operations have access to the full category $\mathcal{M}$.
+\end{definition}
+
+This tombstone pattern preserves the complete lineage graph: even ``deleted'' memories retain their edges, allowing historical analysis and potential recovery.
+
+\subsection{ACID Properties}\label{subsec:acid}
+
+For the Elixir/OTP implementation, Mnesia transactions provide ACID guarantees:
+
+\begin{enumerate}
+  \item \textbf{Atomicity}: Mnesia transactions are all-or-nothing; a failed write rolls back all changes.
+  \item \textbf{Consistency}: schema validation (via struct enforcement and typespecs) ensures that only valid memory instances are persisted.
+  \item \textbf{Isolation}: Mnesia's transaction manager serializes concurrent writes to the same memory.
+  \item \textbf{Durability}: Mnesia's disc\_copies table type writes to both RAM and disk, surviving node restarts.
+\end{enumerate}
+
+\begin{proposition}[Transaction Safety]\label{prop:transaction-safety}
+Every storage operation in the Elixir implementation is wrapped in a Mnesia transaction, ensuring that concurrent memory operations by multiple agents are serializable and that partial failures do not corrupt the memory graph.
+\end{proposition}
+
+% ══════════════════════════════════════════════════════════════
+\section{Elixir/OTP Implementation}\label{sec:implementation}
+% ══════════════════════════════════════════════════════════════
+
+We now present the Elixir/OTP reference implementation of the memory layer. The implementation leverages the BEAM VM's strengths: lightweight processes for per-memory GenServers, ETS for fast in-process working memory, Mnesia for distributed persistent storage, and OTP supervision trees for fault tolerance.
+
+\subsection{Architecture Overview}\label{subsec:arch-overview}
+
+The implementation consists of seven modules organized in a supervision tree:
+
+\begin{center}
+\begin{tikzpicture}[
+  node distance=1.5cm and 2cm,
+  every node/.style={draw, rounded corners, minimum width=2.5cm, minimum height=0.8cm, font=\small},
+  sup/.style={fill=blue!15},
+  gen/.style={fill=green!15},
+  ets/.style={fill=orange!15}
+]
+  \node[sup] (app) {MemoryLayer.App};
+  \node[gen, below left=1.2cm and 1.5cm of app] (mem) {Memory GenServer};
+  \node[gen, below=1.2cm of app] (schema) {SchemaRegistry};
+  \node[gen, below right=1.2cm and 1.5cm of app] (store) {StorageRouter};
+  \node[ets, below=1.2cm of mem] (ets) {ETS (Working)};
+  \node[ets, below=1.2cm of store] (mnesia) {Mnesia (Persistent)};
+  \node[gen, below=1.2cm of schema] (graph) {GraphManager};
+
+  \draw[-{Stealth}] (app) -- (mem);
+  \draw[-{Stealth}] (app) -- (schema);
+  \draw[-{Stealth}] (app) -- (store);
+  \draw[-{Stealth}] (mem) -- (ets);
+  \draw[-{Stealth}] (store) -- (mnesia);
+  \draw[-{Stealth}] (mem) -- (graph);
+\end{tikzpicture}
+\end{center}
+
+\subsection{Schema Definitions}\label{subsec:schema-impl}
+
+Schemas are defined as Elixir structs with enforce keys and typespecs, registered at application startup:
+
+\begin{lstlisting}[style=elixirstyle, caption={Schema definition and registry (abbreviated).}, label={lst:schema-def}]
+defmodule MemoryLayer.Schema do
+  @type memory_type ::
+    :fact | :decision | :procedural | :episodic |
+    :todo | :issue | :api | :schema_def |
+    :workflow | :task | :step | :agent_run |
+    :tag | :annotation | :embedding | :index |
+    :config | :session | :context | :log |
+    :person | :project | :artifact | :event
+
+  defmodule BaseSchema do
+    @enforce_keys [:schema_name, :content]
+    defstruct [
+      :schema_name, :content, :metadata,
+      id: nil, created_at: nil, updated_at: nil
+    ]
+    @type t :: %__MODULE__{
+      schema_name: String.t(),
+      content: map(),
+      metadata: map() | nil,
+      id: String.t() | nil,
+      created_at: DateTime.t() | nil,
+      updated_at: DateTime.t() | nil
+    }
+  end
+
+  defmodule DecisionData do
+    @enforce_keys [:decision, :rationale]
+    defstruct [
+      :decision, :rationale, :alternatives,
+      :confidence, :context,
+      schema_name: "decision"
+    ]
+  end
+end
+\end{lstlisting}
+
+\subsection{Typed Memory GenServer}\label{subsec:genserver}
+
+The \texttt{Memory} module implements $\Mem[S]$ as a GenServer that holds typed state:
+
+\begin{lstlisting}[style=elixirstyle, caption={Typed Memory GenServer (core operations).}, label={lst:memory-genserver}]
+defmodule MemoryLayer.Memory do
+  use GenServer
+  alias MemoryLayer.{Schema, Version, Storage}
+
+  @type t(schema) :: %{
+    id: String.t(),
+    schema_name: String.t(),
+    data: schema,
+    version: non_neg_integer(),
+    content_hash: String.t(),
+    created_at: DateTime.t(),
+    updated_at: DateTime.t(),
+    deleted_at: DateTime.t() | nil
+  }
+
+  # --- Public API (Mem[S] interface) ---
+
+  @spec create(schema :: struct()) ::
+    {:ok, pid()} | {:error, term()}
+  def create(schema_data) do
+    GenServer.start_link(__MODULE__, schema_data)
+  end
+
+  @spec data(pid()) :: {:ok, struct()} | {:error, term()}
+  def data(pid), do: GenServer.call(pid, :get_data)
+
+  @spec update(pid(), map()) :: :ok | {:error, term()}
+  def update(pid, changes) do
+    GenServer.call(pid, {:update, changes})
+  end
+
+  @spec evolve(pid(), map(), Version.change_reason()) ::
+    {:ok, pid()} | {:error, term()}
+  def evolve(pid, changes, reason) do
+    GenServer.call(pid, {:evolve, changes, reason})
+  end
+
+  # --- GenServer callbacks ---
+
+  @impl true
+  def init(schema_data) do
+    id = UUID.uuid4()
+    now = DateTime.utc_now()
+    hash = content_hash(schema_data)
+
+    state = %{
+      id: id,
+      schema_name: schema_name(schema_data),
+      data: schema_data,
+      version: 1,
+      content_hash: hash,
+      created_at: now,
+      updated_at: now,
+      deleted_at: nil
+    }
+
+    # Persist to ETS (working memory)
+    :ets.insert(:memory_working, {id, state})
+    # Persist to storage backend
+    Storage.save(state)
+
+    {:ok, state}
+  end
+
+  @impl true
+  def handle_call(:get_data, _from, state) do
+    {:reply, {:ok, state.data}, state}
+  end
+
+  @impl true
+  def handle_call({:update, changes}, _from, state) do
+    updated_data = struct(state.data, changes)
+    new_state = %{state |
+      data: updated_data,
+      version: state.version + 1,
+      content_hash: content_hash(updated_data),
+      updated_at: DateTime.utc_now()
+    }
+    :ets.insert(:memory_working, {state.id, new_state})
+    Storage.update(new_state)
+    {:reply, :ok, new_state}
+  end
+
+  @impl true
+  def handle_call({:evolve, changes, reason}, _from, state) do
+    # Create new memory, linked to parent
+    evolved = struct(state.data, changes)
+    {:ok, child_pid} = create(evolved)
+    {:ok, child_state} = data(child_pid)
+    Version.record(state.id, child_state.id, reason)
+    {:reply, {:ok, child_pid}, state}
+  end
+end
+\end{lstlisting}
+
+\subsection{Versioning}\label{subsec:version-impl}
+
+The \texttt{Version} module tracks causal history with change reason annotations:
+
+\begin{lstlisting}[style=elixirstyle, caption={Version tracking with change reasons.}, label={lst:version}]
+defmodule MemoryLayer.Version do
+  @type change_reason ::
+    :observation | :inference | :correction | :decay
+
+  @type version_entry :: %{
+    memory_id: String.t(),
+    parent_id: String.t() | nil,
+    version: non_neg_integer(),
+    reason: change_reason(),
+    vector_clock: map(),
+    timestamp: DateTime.t()
+  }
+
+  @spec record(parent_id :: String.t(),
+               child_id :: String.t(),
+               reason :: change_reason()) :: :ok
+  def record(parent_id, child_id, reason) do
+    entry = %{
+      memory_id: child_id,
+      parent_id: parent_id,
+      version: next_version(parent_id),
+      reason: reason,
+      vector_clock: increment_clock(parent_id),
+      timestamp: DateTime.utc_now()
+    }
+    :mnesia.transaction(fn ->
+      :mnesia.write({:versions, child_id, entry})
+    end)
+    :ok
+  end
+
+  @spec history(memory_id :: String.t()) ::
+    [version_entry()]
+  def history(memory_id) do
+    {:atomic, entries} = :mnesia.transaction(fn ->
+      :mnesia.match_object({:versions, memory_id, :_})
+    end)
+    entries
+    |> Enum.map(fn {:versions, _, entry} -> entry end)
+    |> Enum.sort_by(& &1.timestamp)
+  end
+end
+\end{lstlisting}
+
+\subsection{Graph Relationships}\label{subsec:graph-impl}
+
+The graph module implements the edge relation category:
+
+\begin{lstlisting}[style=elixirstyle, caption={Graph relationship management.}, label={lst:graph}]
+defmodule MemoryLayer.Graph do
+  @type edge_relation ::
+    :evolved_into | :references | :supersedes |
+    :contradicts | :supports | :derived_from |
+    :part_of | :triggers | :blocked_by
+
+  @spec link(from :: String.t(), to :: String.t(),
+             relation :: edge_relation(),
+             metadata :: map()) :: :ok
+  def link(from_id, to_id, relation, metadata \\ %{}) do
+    edge = %{
+      from: from_id,
+      to: to_id,
+      relation: relation,
+      metadata: metadata,
+      created_at: DateTime.utc_now()
+    }
+    :mnesia.transaction(fn ->
+      :mnesia.write({:edges, {from_id, to_id}, edge})
+    end)
+    :ok
+  end
+
+  @spec traverse(start :: String.t(),
+                 pattern :: [edge_relation()],
+                 opts :: keyword()) :: [String.t()]
+  def traverse(start_id, pattern, opts \\ []) do
+    max_depth = Keyword.get(opts, :max_depth, 10)
+    do_traverse([start_id], pattern, max_depth, [])
+  end
+end
+\end{lstlisting}
+
+\subsection{Storage Backend}\label{subsec:storage-impl}
+
+The storage router coordinates ETS (working memory) and Mnesia (persistent knowledge):
+
+\begin{lstlisting}[style=elixirstyle, caption={Multi-backend StorageRouter.}, label={lst:storage}]
+defmodule MemoryLayer.Storage do
+  @behaviour MemoryLayer.StorageBackend
+
+  @callback save(memory :: map()) ::
+    :ok | {:error, term()}
+  @callback recall(id :: String.t()) ::
+    {:ok, map()} | {:error, :not_found}
+  @callback search(query :: String.t(), opts :: keyword()) ::
+    {:ok, [map()]} | {:error, term()}
+  @callback delete(id :: String.t()) ::
+    :ok | {:error, term()}
+  @callback update(memory :: map()) ::
+    :ok | {:error, term()}
+
+  # Fan-out save: ETS + Mnesia
+  @impl true
+  def save(memory) do
+    :ets.insert(:memory_working, {memory.id, memory})
+    :mnesia.transaction(fn ->
+      :mnesia.write({:memories, memory.id, memory})
+    end)
+    :ok
+  end
+
+  # Recall from ETS first (fast path), fall back to Mnesia
+  @impl true
+  def recall(id) do
+    case :ets.lookup(:memory_working, id) do
+      [{^id, memory}] -> {:ok, memory}
+      [] -> recall_from_mnesia(id)
+    end
+  end
+
+  # Search across backends
+  @impl true
+  def search(query, opts \\ []) do
+    backend = Keyword.get(opts, :backend, :all)
+    case backend do
+      :exact   -> search_mnesia(query, opts)
+      :semantic -> search_embeddings(query, opts)
+      :graph   -> search_graph(query, opts)
+      :all     -> merge_results([
+        search_mnesia(query, opts),
+        search_embeddings(query, opts)
+      ])
+    end
+  end
+end
+\end{lstlisting}
+
+\subsection{Working Memory vs.\ Persistent Knowledge}\label{subsec:working-vs-persistent}
+
+The dual-layer architecture mirrors human cognitive architecture:
+
+\begin{itemize}
+  \item \textbf{ETS (Working Memory)}: in-process, microsecond access, lost on process crash. Holds the ``hot'' set of memories currently relevant to the agent's task. Analogous to working memory in cognitive psychology~\citep{baddeley1992working}.
+  \item \textbf{Mnesia (Persistent Knowledge)}: distributed, disk-backed, survives restarts. Holds the complete memory store. Analogous to long-term memory.
+\end{itemize}
+
+The promotion/demotion protocol between layers is:
+\begin{enumerate}
+  \item On \texttt{create}: written to both ETS and Mnesia.
+  \item On \texttt{recall}: if in ETS, return immediately; if only in Mnesia, load into ETS (promotion).
+  \item On \texttt{evict}: remove from ETS but retain in Mnesia (demotion).
+  \item ETS is bounded; an LRU eviction policy demotes the least-recently-accessed memories.
+\end{enumerate}
+
+\subsection{MCP Server Interface}\label{subsec:mcp}
+
+\ContextFS{} exposes memory operations via the Model Context Protocol (MCP)~\citep{anthropic2024mcp}, enabling any MCP-compatible client to access the memory layer:
+
+\begin{table}[H]
+\centering
+\caption{MCP tools exposed by \ContextFS{}.}
+\label{tab:mcp-tools}
+\begin{tabularx}{\textwidth}{lX}
+\toprule
+\textbf{Tool} & \textbf{Description} \\
+\midrule
+\texttt{contextfs\_save} & Create and persist a new typed memory \\
+\texttt{contextfs\_recall} & Retrieve a memory by ID with full type reconstruction \\
+\texttt{contextfs\_search} & Multi-backend search (exact, semantic, graph) \\
+\texttt{contextfs\_evolve} & Create a new version linked to parent with change reason \\
+\texttt{contextfs\_link} & Establish a typed edge between two memories \\
+\texttt{contextfs\_delete} & Soft-delete (tombstone) a memory \\
+\texttt{contextfs\_update} & Update fields of an existing memory \\
+\texttt{contextfs\_list} & List memories by type, tag, or time range \\
+\texttt{contextfs\_index} & Trigger re-indexing of embedding vectors \\
+\texttt{contextfs\_sync} & Synchronize local and cloud backends \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+The MCP server translates tool calls into GenServer messages, ensuring that all access goes through the typed memory interface and benefits from the type safety guarantees of Theorem~\ref{thm:round-trip}.
+
+% ══════════════════════════════════════════════════════════════
+\section{Case Studies}\label{sec:case-studies}
+% ══════════════════════════════════════════════════════════════
+
+\subsection{Agent Learning from Past Executions}\label{subsec:case-learning}
+
+Consider a testing agent that executes web application tests across multiple sessions. Without persistent memory, each session starts tabula rasa. With the memory layer:
+
+\begin{enumerate}
+  \item After each test run, the agent creates \texttt{EPISODIC} memories recording what was tested, what failed, and what succeeded.
+  \item Failed test patterns are stored as \texttt{FACT} memories with schema fields for failure type, frequency, and suspected cause.
+  \item When the agent encounters a similar failure in a subsequent session, semantic search retrieves relevant past episodes, and the agent applies learned strategies.
+  \item Over time, \texttt{PROCEDURAL} memories accumulate: ``When test X fails with error Y, the root cause is usually Z.''
+\end{enumerate}
+
+The version lineage tracks how the agent's understanding evolves: an initial observation (``test failed'') evolves via inference (``this is a race condition'') and may later be corrected (``actually, it was a configuration issue'').
+
+\begin{lstlisting}[style=elixirstyle, caption={Agent learning from past test failures.}, label={lst:case-learning}]
+# Session N: Agent encounters a test failure
+{:ok, episode} = Memory.create(%EpisodicData{
+  event: "login_test_timeout",
+  context: %{url: "https://app.example.com/login"},
+  outcome: :failure,
+  duration_ms: 30_000
+})
+
+# Semantic search for similar past failures
+{:ok, similar} = Storage.search(
+  "login test timeout failure",
+  backend: :semantic, limit: 5
+)
+
+# Found! Previous session recorded a procedural fix
+# Apply the fix and record the evolution
+{:ok, _} = Memory.evolve(episode, %{
+  outcome: :success,
+  resolution: "Increased timeout to 60s per PROC-442"
+}, :correction)
+\end{lstlisting}
+
+\subsection{Cross-Session Continuity}\label{subsec:case-continuity}
+
+A software engineering agent works on a multi-day project. Between sessions, the user may make changes that the agent needs to integrate:
+
+\begin{enumerate}
+  \item At session end, the agent stores its current context as a \texttt{SESSION} memory, including active tasks, pending decisions, and environmental assumptions.
+  \item At session start, the agent recalls its last session memory and all \texttt{TODO} items marked as in-progress.
+  \item The agent detects that some assumptions (stored as \texttt{FACT} memories) may have been invalidated by external changes. It creates new versions with \texttt{Correction} reasons.
+  \item The graph lineage shows the full narrative: original plan $\to$ partial execution $\to$ external change $\to$ plan revision.
+\end{enumerate}
+
+\begin{lstlisting}[style=elixirstyle, caption={Cross-session context restoration.}, label={lst:case-continuity}]
+# Session start: recall last session state
+{:ok, sessions} = Storage.search(
+  "session_state",
+  backend: :exact,
+  filter: %{schema_name: "session"},
+  sort: :updated_at_desc,
+  limit: 1
+)
+
+last_session = hd(sessions)
+
+# Recall all in-progress TODOs
+{:ok, todos} = Storage.search(
+  "status:in_progress",
+  backend: :exact,
+  filter: %{schema_name: "todo"}
+)
+
+# Check for invalidated assumptions
+for todo <- todos do
+  deps = Graph.traverse(todo.id, [:references], max_depth: 2)
+  for dep_id <- deps do
+    {:ok, dep} = Storage.recall(dep_id)
+    if stale?(dep), do: flag_for_review(dep)
+  end
+end
+\end{lstlisting}
+
+\subsection{Multi-Agent Shared Knowledge Base}\label{subsec:case-multi-agent}
+
+Multiple agents collaborate on a shared codebase, each responsible for different modules:
+
+\begin{enumerate}
+  \item Agent A (frontend) discovers a bug in an API contract and creates an \texttt{ISSUE} memory.
+  \item Agent B (backend) subscribes to \texttt{ISSUE} memories via Mnesia replication and receives the notification.
+  \item Agent B investigates, creates a \texttt{DECISION} memory (``change the API response format''), linked to the original issue via \texttt{DERIVED\_FROM}.
+  \item Agent A detects the decision via graph traversal from its original issue, creates \texttt{TASK} memories to update the frontend, and links them via \texttt{TRIGGERS}.
+\end{enumerate}
+
+Vector clocks ensure that concurrent edits to shared memories are detected:
+\begin{lstlisting}[style=elixirstyle, caption={Multi-agent conflict detection.}, label={lst:case-multi}]
+# Agent A writes with its clock component
+vc_a = %{agent_a: 5, agent_b: 3}
+
+# Agent B writes concurrently
+vc_b = %{agent_a: 4, agent_b: 4}
+
+# Neither dominates: vc_a[a]=5 > vc_b[a]=4, but
+#                    vc_a[b]=3 < vc_b[b]=4
+# Conflict detected! Requires merge resolution.
+case Version.compare_clocks(vc_a, vc_b) do
+  :concurrent ->
+    # Flag for merge resolution
+    Graph.link(mem_a.id, mem_b.id, :contradicts,
+      %{resolution: :pending})
+  :before -> :ok  # vc_a happened-before vc_b
+  :after -> :ok   # vc_b happened-before vc_a
+end
+\end{lstlisting}
+
+% ══════════════════════════════════════════════════════════════
+\section{Discussion}\label{sec:discussion}
+% ══════════════════════════════════════════════════════════════
+
+\subsection{Comparison to Unix VFS}\label{subsec:unix-vfs}
+
+The Unix Virtual Filesystem Switch (VFS) and our StorageRouter share the goal of providing a uniform interface over heterogeneous storage backends. However, the VFS operates at the byte-stream level: \texttt{read(fd, buf, count)} makes no type promises about the bytes returned. Our StorageRouter operates at the typed-schema level: \texttt{recall(id)} returns a $\Mem[S]$ with compile-time and runtime type guarantees.
+
+The VFS uses inodes as the unit of storage; we use typed memory instances. The VFS organizes files in a tree hierarchy; we organize memories in a labeled graph. The VFS supports a fixed set of operations (\texttt{open}, \texttt{read}, \texttt{write}, \texttt{close}, \texttt{stat}); our \texttt{StorageBackend} protocol supports extensible operation sets including semantic search.
+
+\subsection{Comparison to Plan 9}\label{subsec:plan9}
+
+Plan~9's insight was that \emph{everything should be a file}---even network connections, process state, and device control. Our analogous principle is that \emph{everything an agent knows should be a typed memory}---including its own execution traces (\texttt{AGENT\_RUN}), its task queue (\texttt{TODO}), and its configuration (\texttt{CONFIG}).
+
+Plan~9 used synthetic file servers (e.g., \texttt{/proc}) to present dynamic state as files. We use MCP tools (e.g., \texttt{contextfs\_search}) to present dynamic memory state as structured, queryable knowledge. The key advance is that our ``files'' carry schemas, versions, and graph relationships.
+
+\subsection{Comparison to Semantic Filesystems}\label{subsec:semantic-fs}
+
+Semantic filesystems~\citep{gifford1991semantic, gopal1999integrating} pioneered the idea of retrieving files by metadata attributes rather than path names. Our semantic search extends this to \emph{meaning-based retrieval} via embeddings, which captures similarity that metadata tags cannot express. Moreover, semantic filesystems typically operate on a flat attribute space; our memory layer adds graph structure and causal versioning.
+
+\subsection{Relation to Knowledge Graphs}\label{subsec:kg-comparison}
+
+Knowledge graphs (e.g., Wikidata, Neo4j-backed enterprise graphs) store entities and relationships but typically lack:
+\begin{itemize}
+  \item \textbf{Schema-indexed typing}: KG nodes are typically loosely typed with optional properties. Our $\Mem[S]$ enforces strict schemas with compile-time checking.
+  \item \textbf{Causal versioning}: KGs store current state; versioning is an external concern. Our $\VMem[S]$ integrates versioning as a first-class functor.
+  \item \textbf{Embedding integration}: KGs and vector stores are typically separate systems. Our StorageRouter unifies them.
+\end{itemize}
+
+\subsection{Limitations and Future Work}\label{subsec:limitations}
+
+Several limitations merit future investigation:
+
+\begin{enumerate}
+  \item \textbf{Garbage collection}: the tombstone pattern means storage grows monotonically. A formal garbage collection policy (analogous to generational GC in runtime systems) would bound storage while preserving essential lineage.
+  \item \textbf{Schema evolution}: when a schema's definition changes (fields added/removed), existing memories must be migrated. Our framework handles this via schema morphisms, but the migration strategy needs automation.
+  \item \textbf{Scalability}: Mnesia's distribution model has known limitations beyond a few hundred nodes. For planetary-scale agent deployments, a CockroachDB or FoundationDB backend may be necessary.
+  \item \textbf{Embedding drift}: as embedding models are updated, previously computed vectors may become inconsistent with new ones. Re-indexing strategies need formal treatment.
+  \item \textbf{Privacy and forgetting}: the ``right to be forgotten'' conflicts with the tombstone pattern. A cryptographic erasure scheme (encrypt memory content with a key that can be destroyed) would reconcile these requirements.
+\end{enumerate}
+
+% ══════════════════════════════════════════════════════════════
+\section{Related Work}\label{sec:related}
+% ══════════════════════════════════════════════════════════════
+
+The memory layer draws on several research traditions.
+
+\textbf{Agent architectures with memory.} Soar~\citep{laird2012soar} distinguished working memory, long-term declarative, procedural, and episodic memory---a taxonomy our 24 types refine and extend. ACT-R~\citep{anderson2004actr} formalized memory retrieval as activation-based competition, which inspired our embedding-based semantic search. Generative agents~\citep{park2023generative} demonstrated that LLM agents benefit from structured memory stores, though their implementation lacked type safety and formal versioning.
+
+\textbf{Type-theoretic databases.} Categorical databases (CQL)~\citep{spivak2014category, schultz2017algebraic} formalize database schemas as categories and instances as functors, closely paralleling our construction. Our contribution is adapting this framework to \emph{agent memory} with versioning, lineage, and multi-modal storage.
+
+\textbf{Version control.} Git~\citep{chacon2014pro} uses content-addressable storage with a DAG of commits. Our version lineage is analogous but operates on typed memory instances rather than file trees, and our change reasons provide semantic annotations that Git commit messages cannot enforce structurally.
+
+\textbf{Distributed consistency.} Dynamo~\citep{decandia2007dynamo} popularized vector clocks for eventually consistent storage. Our adaptation applies vector clocks to agent memory with the additional constraint that conflicts must be resolved through typed merge operations (not arbitrary last-writer-wins).
+
+\textbf{Memory in LLM systems.} MemGPT~\citep{packer2023memgpt} introduced OS-inspired memory tiers for LLMs. Langchain's memory modules~\citep{langchain2023} provide buffer, summary, and entity memory. Our framework subsumes these with formal type guarantees and a categorical foundation.
+
+% ══════════════════════════════════════════════════════════════
+\section{Conclusion}\label{sec:conclusion}
+% ══════════════════════════════════════════════════════════════
+
+We have presented a categorical framework for agent memory that formalizes the memory layer of an AI Operating System. The key contributions are:
+
+\begin{enumerate}
+  \item A \textbf{formal memory model} based on the functor $M\colon \Sch \to \Stor$, with the Yoneda-lemma connection establishing $\Mem[S]$ as a representable functor (Theorem~\ref{thm:representable}).
+
+  \item A \textbf{type system} with 24 schema-indexed memory types and operations expressed as natural transformations, with a proven round-trip type-preservation theorem (Theorem~\ref{thm:round-trip}).
+
+  \item A \textbf{versioning framework} based on the temporal functor $V\colon \Timeline \to \Stor$, with graph lineage as 2-categorical structure and memory operations forming a monad (Proposition~\ref{prop:monad}).
+
+  \item A \textbf{multi-backend storage architecture} formalized as a coproduct with proven capability preservation (Theorem~\ref{thm:cap-preservation}).
+
+  \item A \textbf{production implementation} in Elixir/OTP using ETS and Mnesia, with Mnesia transactions providing ACID guarantees, and an MCP server enabling universal client access.
+
+  \item \textbf{Case studies} demonstrating agent learning, cross-session continuity, and multi-agent collaboration.
+\end{enumerate}
+
+The memory layer is the third component of the AI Operating System, building on the kernel (Part~I) and scheduler (Part~II). Together, these three components provide process management, resource allocation, and persistent knowledge---the foundations upon which higher-level agent capabilities (planning, tool use, collaboration) can be constructed. Part~IV will address the tool interface layer, formalizing how agents interact with external systems through typed, composable tool protocols.
+
+The categorical perspective is not mere formalism: it provides the compositional guarantees that make the memory layer \emph{trustworthy}. When an agent stores a decision and later recalls it, the type-preservation theorem ensures the recalled data conforms to the decision schema. When two agents concurrently update shared knowledge, vector clocks detect conflicts and the monad structure of merge/split ensures sound resolution. When the storage backend is extended with a new engine, the coproduct construction guarantees that existing capabilities are preserved.
+
+Agent cognition requires memory that is typed, versioned, searchable, and graph-structured. The filesystem analogy is apt but insufficient: what agents need is not a filesystem but a \emph{knowledge system}. The categorical memory layer provides exactly this.
+
+% ══════════════════════════════════════════════════════════════
+% REFERENCES
+% ══════════════════════════════════════════════════════════════
+
+\bibliographystyle{plainnat}
+
+\begin{thebibliography}{50}
+
+\bibitem[Anderson et~al.(2004)]{anderson2004actr}
+J.~R. Anderson, D.~Bothell, M.~D. Byrne, S.~Douglass, C.~Lebiere, and Y.~Qin.
+\newblock An integrated theory of the mind.
+\newblock \emph{Psychological Review}, 111(4):1036--1060, 2004.
+
+\bibitem[Anthropic(2024)]{anthropic2024mcp}
+Anthropic.
+\newblock Model Context Protocol specification.
+\newblock Technical report, Anthropic, 2024.
+\newblock \url{https://modelcontextprotocol.io}.
+
+\bibitem[Baader et~al.(2003)]{baader2003description}
+F.~Baader, D.~Calvanese, D.~L. McGuinness, D.~Nardi, and P.~F. Patel-Schneider.
+\newblock \emph{The Description Logic Handbook: Theory, Implementation, and Applications}.
+\newblock Cambridge University Press, 2003.
+
+\bibitem[Baddeley(1992)]{baddeley1992working}
+A.~Baddeley.
+\newblock Working memory.
+\newblock \emph{Science}, 255(5044):556--559, 1992.
+
+\bibitem[B\'enabou(1967)]{benabou1967bicategories}
+J.~B\'enabou.
+\newblock Introduction to bicategories.
+\newblock In \emph{Reports of the Midwest Category Seminar}, volume~47 of \emph{Lecture Notes in Mathematics}, pages 1--77. Springer, 1967.
+
+\bibitem[Chacon and Straub(2014)]{chacon2014pro}
+S.~Chacon and B.~Straub.
+\newblock \emph{Pro Git}.
+\newblock Apress, 2nd edition, 2014.
+
+\bibitem[DeCandia et~al.(2007)]{decandia2007dynamo}
+G.~DeCandia, D.~Hastorun, M.~Jampani, G.~Kakulapati, A.~Lakshman, A.~Pilchin, S.~Sivasubramanian, P.~Vosshall, and W.~Vogels.
+\newblock Dynamo: Amazon's highly available key-value store.
+\newblock In \emph{Proc.\ 21st ACM SOSP}, pages 205--220, 2007.
+
+\bibitem[Denning(1970)]{denning1970virtual}
+P.~J. Denning.
+\newblock Virtual memory.
+\newblock \emph{ACM Computing Surveys}, 2(3):153--189, 1970.
+
+\bibitem[Devlin et~al.(2019)]{devlin2019bert}
+J.~Devlin, M.-W. Chang, K.~Lee, and K.~Toutanova.
+\newblock {BERT}: Pre-training of deep bidirectional transformers for language understanding.
+\newblock In \emph{Proc.\ NAACL-HLT}, pages 4171--4186, 2019.
+
+\bibitem[Fidge(1988)]{fidge1988timestamps}
+C.~J. Fidge.
+\newblock Timestamps in message-passing systems that preserve the partial ordering.
+\newblock In \emph{Proc.\ 11th Australian Computer Science Conference}, pages 56--66, 1988.
+
+\bibitem[Gifford et~al.(1991)]{gifford1991semantic}
+D.~K. Gifford, P.~Jouvelot, M.~A. Sheldon, and J.~W. O'Toole~Jr.
+\newblock Semantic file systems.
+\newblock In \emph{Proc.\ 13th ACM SOSP}, pages 16--25, 1991.
+
+\bibitem[Gopal and Manber(1999)]{gopal1999integrating}
+B.~Gopal and U.~Manber.
+\newblock Integrating content-based access mechanisms with hierarchical file systems.
+\newblock In \emph{Proc.\ 3rd USENIX OSDI}, pages 265--278, 1999.
+
+\bibitem[Hogan et~al.(2021)]{hogan2021knowledge}
+A.~Hogan, E.~Blomqvist, M.~Cochez, C.~d'Amato, G.~de~Melo, C.~Gutierrez, S.~Kirrane, J.~E.~L. Gayo, R.~Navigli, S.~Neumaier, A.-C.~N. Ngomo, A.~Polleres, S.~M. Rashid, A.~Rula, L.~Schmelzeisen, J.~Sequeda, S.~Staab, and A.~Zimmermann.
+\newblock Knowledge graphs.
+\newblock \emph{ACM Computing Surveys}, 54(4):1--37, 2021.
+
+\bibitem[Johnson et~al.(2019)]{johnson2019faiss}
+J.~Johnson, M.~Douze, and H.~J\'egou.
+\newblock Billion-scale similarity search with {GPUs}.
+\newblock \emph{IEEE Transactions on Big Data}, 7(3):535--547, 2019.
+
+\bibitem[Kahana(2012)]{kahana2012foundations}
+M.~J. Kahana.
+\newblock \emph{Foundations of Human Memory}.
+\newblock Oxford University Press, 2012.
+
+\bibitem[Laird(2012)]{laird2012soar}
+J.~E. Laird.
+\newblock \emph{The Soar Cognitive Architecture}.
+\newblock MIT Press, 2012.
+
+\bibitem[Lamport(1978)]{lamport1978time}
+L.~Lamport.
+\newblock Time, clocks, and the ordering of events in a distributed system.
+\newblock \emph{Communications of the ACM}, 21(7):558--565, 1978.
+
+\bibitem[LangChain(2023)]{langchain2023}
+LangChain.
+\newblock LangChain documentation: Memory.
+\newblock \url{https://docs.langchain.com/docs/components/memory}, 2023.
+
+\bibitem[Lewis et~al.(2020)]{lewis2020rag}
+P.~Lewis, E.~Perez, A.~Piktus, F.~Petroni, V.~Karpukhin, N.~Goyal, H.~K\"uttler, M.~Lewis, W.-t. Yih, T.~Rockt\"aschel, S.~Riedel, and D.~Kiela.
+\newblock Retrieval-augmented generation for knowledge-intensive {NLP} tasks.
+\newblock In \emph{Proc.\ NeurIPS}, pages 9459--9474, 2020.
+
+\bibitem[Love(2010)]{love2010linux}
+R.~Love.
+\newblock \emph{Linux Kernel Development}.
+\newblock Addison-Wesley, 3rd edition, 2010.
+
+\bibitem[Mac~Lane(1978)]{maclane1978categories}
+S.~Mac~Lane.
+\newblock \emph{Categories for the Working Mathematician}.
+\newblock Springer, 2nd edition, 1978.
+
+\bibitem[Minsky(1974)]{minsky1974framework}
+M.~Minsky.
+\newblock A framework for representing knowledge.
+\newblock MIT AI Laboratory Memo 306, 1974.
+
+\bibitem[Packer et~al.(2023)]{packer2023memgpt}
+C.~Packer, V.~Fang, S.~G. Patil, K.~Lin, S.~Wooders, and J.~E. Gonzalez.
+\newblock {MemGPT}: Towards {LLM}s as operating systems.
+\newblock \emph{arXiv preprint arXiv:2310.08560}, 2023.
+
+\bibitem[Park et~al.(2023)]{park2023generative}
+J.~S. Park, J.~C. O'Brien, C.~J. Cai, M.~R. Morris, P.~Liang, and M.~S. Bernstein.
+\newblock Generative agents: Interactive simulacra of human behavior.
+\newblock In \emph{Proc.\ 36th ACM UIST}, pages 1--22, 2023.
+
+\bibitem[Pike et~al.(1995)]{pike1995plan9}
+R.~Pike, D.~Presotto, S.~Dorward, B.~Flandrena, K.~Thompson, H.~Trickey, and P.~Winterbottom.
+\newblock Plan~9 from {Bell Labs}.
+\newblock \emph{Computing Systems}, 8(3):221--254, 1995.
+
+\bibitem[Quillian(1968)]{quillian1968semantic}
+M.~R. Quillian.
+\newblock Semantic memory.
+\newblock In M.~Minsky, editor, \emph{Semantic Information Processing}, pages 227--270. MIT Press, 1968.
+
+\bibitem[Reimers and Gurevych(2019)]{reimers2019sentence}
+N.~Reimers and I.~Gurevych.
+\newblock Sentence-{BERT}: Sentence embeddings using {Siamese BERT}-networks.
+\newblock In \emph{Proc.\ EMNLP-IJCNLP}, pages 3982--3992, 2019.
+
+\bibitem[Ritchie and Thompson(1974)]{ritchie1974unix}
+D.~M. Ritchie and K.~Thompson.
+\newblock The {UNIX} time-sharing system.
+\newblock \emph{Communications of the ACM}, 17(7):365--375, 1974.
+
+\bibitem[Schultz et~al.(2017)]{schultz2017algebraic}
+P.~Schultz, D.~I. Spivak, and C.~Vasilakopoulou.
+\newblock Algebraic databases.
+\newblock \emph{Theory and Applications of Categories}, 32(16):547--619, 2017.
+
+\bibitem[Spivak(2014)]{spivak2014category}
+D.~I. Spivak.
+\newblock \emph{Category Theory for the Sciences}.
+\newblock MIT Press, 2014.
+
+\bibitem[Armstrong(2013)]{armstrong2013erlang}
+J.~Armstrong.
+\newblock \emph{Programming Erlang: Software for a Concurrent World}.
+\newblock Pragmatic Bookshelf, 2nd edition, 2013.
+
+\bibitem[Virding et~al.(1996)]{virding1996erlang}
+R.~Virding, C.~Wikstr\"om, and M.~Williams.
+\newblock \emph{Concurrent Programming in Erlang}.
+\newblock Prentice Hall, 2nd edition, 1996.
+
+\bibitem[Thomas and Hunt(2018)]{thomas2018elixir}
+D.~Thomas and A.~Hunt.
+\newblock \emph{Programming Elixir $\geq$ 1.6}.
+\newblock Pragmatic Bookshelf, 2018.
+
+\bibitem[Mattsson et~al.(1999)]{mattsson1999mnesia}
+H.~Mattsson, H.~Nilsson, and C.~Wikstr\"om.
+\newblock Mnesia --- A distributed robust {DBMS} for telecommunications applications.
+\newblock In \emph{Proc.\ 1st International Workshop on Practical Aspects of Declarative Languages (PADL)}, pages 152--163, 1999.
+
+\bibitem[Shapiro et~al.(2011)]{shapiro2011crdt}
+M.~Shapiro, N.~Pregui\c{c}a, C.~Baquero, and M.~Zawirski.
+\newblock Conflict-free replicated data types.
+\newblock In \emph{Proc.\ 13th International Symposium on Stabilization, Safety, and Security of Distributed Systems (SSS)}, pages 386--400, 2011.
+
+\bibitem[Kleppmann(2017)]{kleppmann2017designing}
+M.~Kleppmann.
+\newblock \emph{Designing Data-Intensive Applications}.
+\newblock O'Reilly Media, 2017.
+
+\bibitem[Leinster(2014)]{leinster2014basic}
+T.~Leinster.
+\newblock \emph{Basic Category Theory}.
+\newblock Cambridge University Press, 2014.
+
+\bibitem[Riehl(2017)]{riehl2017category}
+E.~Riehl.
+\newblock \emph{Category Theory in Context}.
+\newblock Dover Publications, 2017.
+
+\bibitem[Awodey(2010)]{awodey2010category}
+S.~Awodey.
+\newblock \emph{Category Theory}.
+\newblock Oxford University Press, 2nd edition, 2010.
+
+\bibitem[Barr and Wells(1990)]{barr1990category}
+M.~Barr and C.~Wells.
+\newblock \emph{Category Theory for Computing Science}.
+\newblock Prentice Hall, 1990.
+
+\bibitem[Moggi(1991)]{moggi1991notions}
+E.~Moggi.
+\newblock Notions of computation and monads.
+\newblock \emph{Information and Computation}, 93(1):55--92, 1991.
+
+\bibitem[Wadler(1992)]{wadler1992monads}
+P.~Wadler.
+\newblock Monads for functional programming.
+\newblock In \emph{Advanced Functional Programming}, volume 925 of \emph{LNCS}, pages 24--52. Springer, 1992.
+
+\end{thebibliography}
+
+% ══════════════════════════════════════════════════════════════
+% APPENDIX
+% ══════════════════════════════════════════════════════════════
+\appendix
+
+\section{Complete Memory Type Hierarchy}\label{app:type-hierarchy}
+
+The following diagram shows the complete inheritance structure of the 24 memory types, organized as a directed acyclic graph with \texttt{BaseSchema} as the root:
+
+\begin{center}
+\begin{tikzpicture}[
+  node distance=0.8cm and 1.2cm,
+  every node/.style={draw, rounded corners, font=\tiny\ttfamily, minimum width=1.6cm, minimum height=0.5cm},
+  cat/.style={fill=blue!10, font=\tiny\bfseries\sffamily},
+  level 1/.style={sibling distance=3cm},
+]
+  \node[cat] (base) {BaseSchema};
+
+  % Core
+  \node[below left=1cm and 3cm of base] (fact) {FACT};
+  \node[right=0.3cm of fact] (dec) {DECISION};
+  \node[right=0.3cm of dec] (proc) {PROCEDURAL};
+  \node[right=0.3cm of proc] (ep) {EPISODIC};
+
+  % Extended
+  \node[below=0.8cm of fact] (todo) {TODO};
+  \node[right=0.3cm of todo] (issue) {ISSUE};
+  \node[right=0.3cm of issue] (api) {API};
+  \node[right=0.3cm of api] (schm) {SCHEMA};
+
+  % Workflow
+  \node[below right=1cm and 1cm of base] (wf) {WORKFLOW};
+  \node[right=0.3cm of wf] (task) {TASK};
+  \node[right=0.3cm of task] (step) {STEP};
+  \node[right=0.3cm of step] (arun) {AGENT\_RUN};
+
+  \draw[-{Stealth}] (base) -- (fact);
+  \draw[-{Stealth}] (base) -- (dec);
+  \draw[-{Stealth}] (base) -- (proc);
+  \draw[-{Stealth}] (base) -- (ep);
+  \draw[-{Stealth}] (base) -- (wf);
+  \draw[-{Stealth}] (base) -- (task);
+  \draw[-{Stealth}] (base) -- (step);
+  \draw[-{Stealth}] (base) -- (arun);
+  \draw[-{Stealth}] (base) -- (todo);
+  \draw[-{Stealth}] (base) -- (issue);
+  \draw[-{Stealth}] (base) -- (api);
+  \draw[-{Stealth}] (base) -- (schm);
+\end{tikzpicture}
+\end{center}
+
+\section{Commutative Diagrams for Storage Operations}\label{app:diagrams}
+
+The full round-trip diagram for save/recall across the multi-backend router:
+
+\begin{center}
+\begin{tikzcd}[column sep=2.5cm, row sep=2cm]
+  \Mem[S] \arrow[r, "\texttt{save}"] \arrow[d, "\texttt{embed}"'] \arrow[dr, phantom, "\circlearrowleft"]
+    & B_{\mathrm{SQLite}} \arrow[d, "\texttt{replicate}"] \\
+  B_{\mathrm{Chroma}} \arrow[r, "\texttt{sync}"']
+    & B_{\mathrm{Postgres}}
+\end{tikzcd}
+\end{center}
+
+The versioning chain with change reasons:
+
+\begin{center}
+\begin{tikzcd}[column sep=2cm, row sep=1cm]
+  m_0 \arrow[r, "\text{Observation}"] & m_1 \arrow[r, "\text{Inference}"] & m_2 \arrow[r, "\text{Correction}"] & m_3 \\
+  & & m_2' \arrow[ur, "\text{Merge}"', dashed] &
+\end{tikzcd}
+\end{center}
+
+\section{MCP Protocol Messages}\label{app:mcp}
+
+Example MCP tool call for \texttt{contextfs\_save}:
+
+\begin{lstlisting}[style=pythonstyle, caption={MCP tool call example (JSON-RPC).}, label={lst:mcp-example}]
+{
+  "jsonrpc": "2.0",
+  "method": "tools/call",
+  "params": {
+    "name": "contextfs_save",
+    "arguments": {
+      "content": "Login test requires 60s timeout",
+      "memory_type": "fact",
+      "metadata": {
+        "confidence": 0.95,
+        "source": "test_run_2026_03_10"
+      },
+      "tags": ["testing", "timeout", "login"]
+    }
+  },
+  "id": 42
+}
+\end{lstlisting}
+
+\section{Proof: Monad Laws for Memory Operations (Detailed)}\label{app:monad-proof}
+
+We provide the full verification of the monad laws for the memory operations endofunctor $T$.
+
+\textbf{Setup.} Let $\mathcal{M}$ be the category of typed memory instances. Define $T\colon \mathcal{M} \to \mathcal{M}$ by:
+\[
+  T(m) = (m, \bot, \mathtt{pending})
+\]
+where $\bot$ denotes ``no changes yet'' and $\mathtt{pending}$ marks the operation as unevaluated. The unit $\eta_m = (m, \emptyset, \mathtt{noop})$ wraps $m$ in a trivial operation. The multiplication $\mu$ collapses $(T(m), \delta_1, r_1)$ with outer $(-, \delta_2, r_2)$ into $(m, \delta_1 \cup \delta_2, r_1 \sqcup r_2)$ where $\sqcup$ is the join in the reason lattice.
+
+\textbf{Left unit}: $\mu_{m} \circ T(\eta_m) = \mu_m((m, \emptyset, \mathtt{noop}), \bot, \mathtt{pending}) = (m, \emptyset, \mathtt{noop}) = T(m)$ after simplification (pending with no changes reduces to the inner state).
+
+\textbf{Right unit}: $\mu_m \circ \eta_{T(m)} = \mu_m(\eta((m, \delta, r))) = \mu_m(((m,\delta,r), \emptyset, \mathtt{noop})) = (m, \delta, r) = T(m)$.
+
+\textbf{Associativity}: For $T^3(m)$ with changes $\delta_1, \delta_2, \delta_3$ and reasons $r_1, r_2, r_3$:
+\begin{align*}
+  \mu \circ T\mu &: (m, \delta_1 \cup \delta_2 \cup \delta_3, r_1 \sqcup r_2 \sqcup r_3) \\
+  \mu \circ \mu T &: (m, \delta_1 \cup \delta_2 \cup \delta_3, (r_1 \sqcup r_2) \sqcup r_3)
+\end{align*}
+These are equal by associativity of $\cup$ and $\sqcup$. \qed
+
+\end{document}

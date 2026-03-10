@@ -1,0 +1,1312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Part II: Tool Interface Layer — The AI Operating System</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+  onload="renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'\\\\(',right:'\\\\)',display:false},{left:'\\(',right:'\\)',display:false}],throwOnError:false});"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0a0a0f;--surface:#12121a;--surface2:#1a1a26;--surface3:#22223a;--text:#e4e4ef;--text-dim:#9999b0;--accent:#6c5ce7;--accent2:#a29bfe;--accent-dim:rgba(108,92,231,0.15);--border:#2a2a3d;--code-bg:#0d0d18;--success:#00b894;--warning:#fdcb6e;--error:#e17055;--radius:8px;--max-w:860px}
+html{scroll-behavior:smooth;scroll-padding-top:80px}
+body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);line-height:1.75;font-size:17px;-webkit-font-smoothing:antialiased}
+a{color:var(--accent2);text-decoration:none;transition:color .2s}
+a:hover{color:var(--accent)}
+
+/* ── NAV SIDEBAR ── */
+.toc-toggle{display:none;position:fixed;top:16px;left:16px;z-index:1001;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:22px;width:40px;height:40px;cursor:pointer;line-height:1}
+.toc-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:998}
+nav.toc{position:fixed;top:0;left:0;width:270px;height:100vh;background:var(--surface);border-right:1px solid var(--border);overflow-y:auto;padding:24px 16px;z-index:999;transition:transform .3s}
+nav.toc h3{font-size:13px;text-transform:uppercase;letter-spacing:1.5px;color:var(--accent2);margin-bottom:16px}
+nav.toc ol{list-style:none;counter-reset:toc}
+nav.toc>ol>li{counter-increment:toc}
+nav.toc>ol>li>a::before{content:counter(toc) ". ";color:var(--accent);font-weight:600}
+nav.toc a{display:block;padding:5px 0;font-size:13.5px;color:var(--text-dim);border-left:2px solid transparent;padding-left:10px;transition:all .2s}
+nav.toc a:hover,nav.toc a.active{color:var(--accent2);border-left-color:var(--accent)}
+nav.toc ol ol{padding-left:14px}
+nav.toc ol ol a{font-size:12.5px}
+
+/* ── MAIN ── */
+main{margin-left:270px;max-width:var(--max-w);padding:40px 48px 100px}
+
+/* ── HEADER ── */
+.paper-header{margin-bottom:48px;padding-bottom:32px;border-bottom:1px solid var(--border)}
+.paper-meta{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:20px}
+.paper-meta .badge{background:var(--accent-dim);color:var(--accent2);padding:3px 12px;border-radius:20px;font-size:12px;font-weight:600;letter-spacing:.5px}
+.paper-meta .links a{font-size:13px;margin-right:16px}
+.paper-header h1{font-size:2rem;line-height:1.25;margin-bottom:12px;font-weight:700;background:linear-gradient(135deg,var(--text),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.paper-header .authors{color:var(--text-dim);font-size:15px;margin-bottom:4px}
+.paper-header .authors strong{color:var(--text)}
+.paper-header .affiliation{color:var(--text-dim);font-size:13.5px}
+.paper-header .date{color:var(--text-dim);font-size:13px;margin-top:8px}
+
+/* ── ABSTRACT ── */
+.abstract{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:28px 32px;margin-bottom:40px}
+.abstract h2{font-size:14px;text-transform:uppercase;letter-spacing:1.5px;color:var(--accent2);margin-bottom:12px}
+.abstract p{font-size:15.5px;color:var(--text-dim);line-height:1.8}
+.keywords{margin-top:14px;font-size:13px;color:var(--text-dim)}
+.keywords strong{color:var(--text)}
+
+/* ── SECTIONS ── */
+h2{font-size:1.55rem;margin-top:56px;margin-bottom:20px;padding-bottom:10px;border-bottom:1px solid var(--border);color:var(--text)}
+h3{font-size:1.2rem;margin-top:36px;margin-bottom:14px;color:var(--accent2)}
+h4{font-size:1rem;margin-top:24px;margin-bottom:10px;color:var(--text)}
+p{margin-bottom:16px}
+ul,ol{margin-bottom:16px;padding-left:28px}
+li{margin-bottom:6px}
+
+/* ── THEOREM BOXES ── */
+.theorem-box{background:var(--surface);border-left:4px solid var(--accent);border-radius:0 var(--radius) var(--radius) 0;padding:20px 24px;margin:24px 0}
+.theorem-box.definition{border-left-color:var(--accent2)}
+.theorem-box.axiom{border-left-color:var(--warning)}
+.theorem-box.construction{border-left-color:var(--success)}
+.theorem-box .label{font-weight:700;color:var(--accent2);margin-bottom:8px;font-size:15px}
+.theorem-box.axiom .label{color:var(--warning)}
+.theorem-box.construction .label{color:var(--success)}
+.theorem-box p:last-child{margin-bottom:0}
+
+.proof{margin:20px 0;padding:16px 24px;background:var(--surface);border-radius:var(--radius);border:1px solid var(--border)}
+.proof .proof-label{font-style:italic;font-weight:600;color:var(--text-dim);margin-bottom:8px}
+.proof p:last-child{margin-bottom:0}
+.proof-end{text-align:right;color:var(--accent);font-size:18px}
+
+/* ── ALGORITHM ── */
+.algorithm{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px 28px;margin:24px 0;font-family:'SF Mono','Fira Code','Cascadia Code',monospace;font-size:14px;line-height:1.8}
+.algorithm .alg-title{font-family:'Inter',system-ui,sans-serif;font-weight:700;color:var(--accent2);margin-bottom:12px;font-size:14px}
+.algorithm .kw{color:var(--accent2);font-weight:700}
+.algorithm .comment{color:var(--text-dim);font-style:italic}
+.algorithm .indent{padding-left:24px}
+.algorithm .indent2{padding-left:48px}
+
+/* ── CODE ── */
+pre{background:var(--code-bg);border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px;overflow-x:auto;margin:20px 0;font-family:'SF Mono','Fira Code','Cascadia Code',monospace;font-size:13.5px;line-height:1.7}
+pre .kw{color:#c792ea;font-weight:600}
+pre .str{color:#c3e88d}
+pre .cm{color:#676e95;font-style:italic}
+pre .fn{color:#82aaff}
+pre .op{color:#89ddff}
+pre .at{color:#ffcb6b}
+pre .tp{color:#f78c6c}
+pre .num{color:#f78c6c}
+.code-caption{font-size:13px;color:var(--text-dim);margin-top:-12px;margin-bottom:20px;font-style:italic}
+
+/* ── TABLE ── */
+table{width:100%;border-collapse:collapse;margin:20px 0;font-size:15px}
+th,td{padding:10px 16px;text-align:left;border-bottom:1px solid var(--border)}
+th{color:var(--accent2);font-weight:600;font-size:14px;border-bottom:2px solid var(--accent)}
+tr:hover{background:var(--surface)}
+
+/* ── FIGURE / DIAGRAM ── */
+figure{margin:28px 0}
+figure pre{background:var(--surface);border-color:var(--border);text-align:center;font-size:13px;line-height:1.5}
+figcaption{font-size:13.5px;color:var(--text-dim);margin-top:10px;font-style:italic;text-align:center}
+
+/* ── REFERENCES ── */
+.references{margin-top:48px}
+.references h2{border-bottom-color:var(--accent)}
+.ref-list{list-style:none;padding-left:0}
+.ref-list li{font-size:14px;color:var(--text-dim);margin-bottom:12px;padding-left:28px;text-indent:-28px;line-height:1.65}
+.ref-list .ref-key{color:var(--accent2);font-weight:600}
+
+/* ── SERIES NAV ── */
+.series-nav{margin-top:64px;padding-top:32px;border-top:1px solid var(--border)}
+.series-nav h3{margin-top:0;margin-bottom:20px;color:var(--text)}
+.series-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.series-card{display:block;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;transition:all .2s}
+.series-card:hover{border-color:var(--accent);background:var(--surface2)}
+.series-card.current{border-color:var(--accent);background:var(--accent-dim)}
+.series-card .part{font-size:12px;color:var(--accent2);font-weight:600;text-transform:uppercase;letter-spacing:1px}
+.series-card .title{font-size:14px;color:var(--text);margin-top:4px}
+
+/* ── MOBILE ── */
+@media(max-width:900px){
+  nav.toc{transform:translateX(-100%)}
+  nav.toc.open{transform:translateX(0)}
+  .toc-toggle{display:flex;align-items:center;justify-content:center}
+  .toc-overlay.open{display:block}
+  main{margin-left:0;padding:24px 20px 80px}
+  .paper-header h1{font-size:1.5rem}
+  .series-grid{grid-template-columns:1fr}
+  pre{font-size:12px;padding:14px 16px}
+}
+</style>
+</head>
+<body>
+
+<button class="toc-toggle" id="tocToggle" aria-label="Toggle table of contents">&#9776;</button>
+<div class="toc-overlay" id="tocOverlay"></div>
+
+<nav class="toc" id="tocNav">
+  <h3>Contents</h3>
+  <ol>
+    <li><a href="#sec-intro">Introduction</a></li>
+    <li><a href="#sec-background">Background</a>
+      <ol>
+        <li><a href="#sec-bg-drivers">Device Drivers and System Calls</a></li>
+        <li><a href="#sec-bg-caps">Capability-Based Security</a></li>
+        <li><a href="#sec-bg-cat">Category Theory Preliminaries</a></li>
+        <li><a href="#sec-bg-beam">Erlang/OTP and the BEAM</a></li>
+      </ol>
+    </li>
+    <li><a href="#sec-tool-model">Tool Model &mdash; Formal Definition</a>
+      <ol>
+        <li><a href="#sec-tool-cat">The Tool Category</a></li>
+        <li><a href="#sec-tiers">Tool Tiers as Subcategories</a></li>
+        <li><a href="#sec-cap-functors">Capability Tokens as Representable Functors</a></li>
+      </ol>
+    </li>
+    <li><a href="#sec-security">Security Architecture</a>
+      <ol>
+        <li><a href="#sec-cap-access">Capability-Based Access Control</a></li>
+        <li><a href="#sec-sandbox-quotient">Sandboxing as Categorical Quotient</a></li>
+        <li><a href="#sec-frozen">Contract-Locked Configurations</a></li>
+        <li><a href="#sec-url">URL Validation as Morphism Filtering</a></li>
+      </ol>
+    </li>
+    <li><a href="#sec-protocol">Protocol Design: MCP</a>
+      <ol>
+        <li><a href="#sec-mcp-universal-iface">MCP as Universal Tool Interface</a></li>
+        <li><a href="#sec-mcp-universality">Universality of MCP</a></li>
+      </ol>
+    </li>
+    <li><a href="#sec-type-safe">Type-Safe Tool Invocation</a>
+      <ol>
+        <li><a href="#sec-json-alg">JSON Schema to Algebraic Types</a></li>
+        <li><a href="#sec-correctness">Correctness Preservation</a></li>
+        <li><a href="#sec-validation-pipeline">Runtime Validation Pipeline</a></li>
+      </ol>
+    </li>
+    <li><a href="#sec-elixir">Elixir/OTP Implementation</a>
+      <ol>
+        <li><a href="#sec-arch-overview">Architecture Overview</a></li>
+        <li><a href="#sec-registry">Tool Registry GenServer</a></li>
+        <li><a href="#sec-cap-token-impl">Capability Token System</a></li>
+        <li><a href="#sec-sandbox-exec">Sandbox Execution</a></li>
+        <li><a href="#sec-mcp-client">MCP Client</a></li>
+        <li><a href="#sec-audit-logger">Audit Logger</a></li>
+      </ol>
+    </li>
+    <li><a href="#sec-case-studies">Case Studies</a>
+      <ol>
+        <li><a href="#sec-cs-web">Web Scraping Tool Chain</a></li>
+        <li><a href="#sec-cs-sandbox">Code Execution Sandbox</a></li>
+        <li><a href="#sec-cs-multi-mcp">Multi-MCP Server Orchestration</a></li>
+      </ol>
+    </li>
+    <li><a href="#sec-audit">Audit and Observability</a>
+      <ol>
+        <li><a href="#sec-audit-trace">Per-Invocation Trace Logging</a></li>
+        <li><a href="#sec-cost">Cost Attribution</a></li>
+        <li><a href="#sec-obs-stack">Observability Stack</a></li>
+      </ol>
+    </li>
+    <li><a href="#sec-discussion">Discussion</a></li>
+    <li><a href="#sec-conclusion">Conclusion</a></li>
+    <li><a href="#sec-references">References</a></li>
+  </ol>
+</nav>
+
+<main>
+
+<!-- ══════════ HEADER ══════════ -->
+<header class="paper-header">
+  <div class="paper-meta">
+    <span class="badge">Part II of V</span>
+    <span class="badge">cs.AI</span>
+    <span class="badge">GrokRxiv 2026.03</span>
+    <span class="links">
+      <a href="https://github.com/AgentHeroWork/agent-os/blob/main/papers/pdf/tool-interface.pdf">PDF</a>
+      <a href="../">&larr; Back to Index</a>
+    </span>
+  </div>
+  <h1>The AI Operating System, Part II:<br>Tool Interface Layer &mdash; Morphisms, Security, and Capability Abstraction</h1>
+  <div class="authors"><strong>Matthew Long</strong></div>
+  <div class="affiliation">The YonedaAI Collaboration &middot; YonedaAI Research Collective &middot; Chicago, IL<br>
+    <a href="mailto:matthew@yonedaai.com">matthew@yonedaai.com</a> &middot; <a href="https://yonedaai.com">https://yonedaai.com</a></div>
+  <div class="date">March 10, 2026</div>
+</header>
+
+<!-- ══════════ ABSTRACT ══════════ -->
+<section class="abstract">
+  <h2>Abstract</h2>
+  <p>An AI Operating System mediates every interaction between intelligent agents and the external world through a <em>tool interface layer</em> that is analogous to the device-driver subsystem of a classical operating system. In this second paper of a five-part series, we develop a categorical framework in which tools are morphisms in a typed category <strong>Tool</strong>, capability tokens are representable functors \(\mathrm{Hom}_{\mathbf{Tool}}(T,-)\), and sandboxing corresponds to passage to a quotient subcategory. We prove that tool composition inherits the associativity and identity axioms of the underlying category, that type-safe invocation preserves correctness through a functorial mapping from JSON Schema to algebraic types, and that sandbox isolation prevents information leakage under a formal adversarial model. The framework is instantiated concretely through an analysis of the <span style="font-variant:small-caps">Agent-Hero</span> platform's three-tier tool registry&mdash;Builtin, Sandbox, and MCP (Model Context Protocol)&mdash;with its capability-based access control, contract-locked configurations, E2B ephemeral sandboxes, and per-invocation audit logging. We provide a complete implementation in Elixir/OTP that exploits BEAM process isolation as a natural realisation of categorical sandboxing, with GenServer-based registries, capability tokens as process-local state, and supervision trees that mirror the compositional hierarchy. Comparisons are drawn to Unix device models, Plan&nbsp;9's everything-is-a-file philosophy, Capsicum capabilities, and seL4 verified microkernel security. The paper contains over thirty references spanning capability security, distributed systems, category theory, and the Model Context Protocol specification.</p>
+  <p class="keywords"><strong>Keywords:</strong> AI operating system, tool interface, capability-based security, Model Context Protocol, category theory, morphism composition, Elixir/OTP, sandboxing, type safety</p>
+</section>
+
+<!-- ══════════ 1. INTRODUCTION ══════════ -->
+<h2 id="sec-intro">1. Introduction</h2>
+
+<p>The fundamental architectural insight of classical operating systems is that application code must never interact with hardware directly. Instead, a layer of <em>device drivers</em> interposes between user-space programs and peripheral devices, providing abstraction, multiplexing, isolation, and auditability (Tanenbaum &amp; Bos, 2014). An application opens a file descriptor, reads and writes through a well-defined system-call interface, and the kernel routes those operations to the appropriate driver. The application need not know whether the underlying device is a local disk, a network socket, or a USB peripheral.</p>
+
+<p>In an AI Operating System, the same architectural principle applies with even greater force. Agents&mdash;large language models with autonomy over their computational environment&mdash;must interact with external systems: databases, web APIs, file systems, code interpreters, and other agents. These interactions are mediated by <em>tools</em>: typed functions that accept structured input and return structured output, with well-defined security boundaries, execution constraints, and audit trails.</p>
+
+<p>This paper develops a formal theory of the tool interface layer. Our contributions are:</p>
+
+<ol>
+  <li>A <strong>categorical model</strong> in which tools are morphisms in a category \(\mathbf{Tool}\) whose objects are data types, capability tokens are representable functors, and sandboxing is a categorical quotient (Section&nbsp;3).</li>
+  <li>A <strong>formal security architecture</strong> based on capability-based access control, with proofs that sandbox isolation prevents information leakage and that contract-locked configurations form frozen subcategories (Section&nbsp;4).</li>
+  <li>A detailed analysis of the <strong>Model Context Protocol</strong> (MCP) as a universal tool interface satisfying a Yoneda-like universality property (Section&nbsp;5).</li>
+  <li>A <strong>type-theoretic framework</strong> for tool invocation in which JSON Schema to algebraic type conversion is a functor that preserves correctness (Section&nbsp;6).</li>
+  <li>A complete <strong>Elixir/OTP implementation</strong> that realises the categorical abstractions through BEAM process isolation (Section&nbsp;7).</li>
+  <li><strong>Case studies</strong> drawn from the <span style="font-variant:small-caps">Agent-Hero</span> production platform, including web scraping pipelines, sandboxed code execution, and multi-MCP server orchestration (Section&nbsp;8).</li>
+</ol>
+
+<h4>Relation to the series</h4>
+<p>This is Part&nbsp;II of a five-part series on the AI Operating System. Part&nbsp;I (Long, 2026a) established the kernel architecture&mdash;the process model and scheduling layer. The present paper builds on that foundation by defining the interface through which scheduled agent processes access external capabilities. Part&nbsp;III will address memory and persistence, Part&nbsp;IV the agent orchestration layer, and Part&nbsp;V the integration of all components into a unified operating system theory.</p>
+
+<!-- ══════════ 2. BACKGROUND ══════════ -->
+<h2 id="sec-background">2. Background</h2>
+
+<h3 id="sec-bg-drivers">2.1 Device Drivers and System Calls</h3>
+
+<p>The device driver model in Unix-like operating systems provides three critical properties (Love, 2010):</p>
+
+<ol>
+  <li><strong>Abstraction.</strong> Applications interact with a uniform file-descriptor interface regardless of the underlying device.</li>
+  <li><strong>Isolation.</strong> A misbehaving driver cannot (in principle) corrupt unrelated kernel state, especially in microkernel designs.</li>
+  <li><strong>Multiplexing.</strong> Multiple processes can share a single device through the driver's queuing and scheduling logic.</li>
+</ol>
+
+<p>Plan&nbsp;9 from Bell Labs extended this model to its logical conclusion: every resource&mdash;networks, graphics, even per-process name spaces&mdash;is presented as a file system (Pike et al., 1995). This "everything is a file" philosophy provides a universal interface that any program can consume without special-purpose client libraries. We argue that the AI OS tool layer should aspire to the same universality.</p>
+
+<h3 id="sec-bg-caps">2.2 Capability-Based Security</h3>
+
+<p>Traditional access control uses access control lists (ACLs) attached to resources. Capability-based security inverts this: each subject holds unforgeable <em>capability tokens</em> that grant specific permissions on specific objects (Dennis &amp; Van Horn, 1966; Levy, 1984). Modern realisations include:</p>
+
+<ul>
+  <li><strong>Capsicum</strong> (FreeBSD): capability mode restricts a sandboxed process to only the file descriptors it was given at entry (Watson et al., 2010).</li>
+  <li><strong>seL4</strong>: a formally verified microkernel where every system call requires a capability argument (Klein et al., 2009).</li>
+  <li><strong>WASI</strong> (WebAssembly System Interface): capability-based access to host resources from sandboxed WebAssembly modules (WASI Working Group, 2023).</li>
+  <li><strong>Macaroons</strong>: decentralised capability tokens with contextual caveats for distributed systems (Birgisson et al., 2014).</li>
+</ul>
+
+<p>The AI OS adapts capability-based security to the agent setting: each agent holds a set of capability tokens that determine which tools it may invoke, with what parameters, and at what rate.</p>
+
+<h3 id="sec-bg-cat">2.3 Category Theory Preliminaries</h3>
+
+<p>We assume familiarity with basic category theory (Mac Lane, 1998; Awodey, 2010; Leinster, 2014). We recall the essential definitions for self-containment.</p>
+
+<div class="theorem-box definition">
+  <div class="label">Definition 2.1 (Category)</div>
+  <p>A <em>category</em> \(\mathcal{C}\) consists of a collection \(\mathrm{ob}(\mathcal{C})\) of objects, for each pair of objects \(A,B\) a set \(\mathrm{Hom}_{\mathcal{C}}(A,B)\) of morphisms, an identity morphism \(\mathrm{id}_A \in \mathrm{Hom}_{\mathcal{C}}(A,A)\) for each object \(A\), and a composition operation \(\circ : \mathrm{Hom}_{\mathcal{C}}(B,C) \times \mathrm{Hom}_{\mathcal{C}}(A,B) \to \mathrm{Hom}_{\mathcal{C}}(A,C)\) that is associative and unital.</p>
+</div>
+
+<div class="theorem-box definition">
+  <div class="label">Definition 2.2 (Functor)</div>
+  <p>A <em>functor</em> \(F : \mathcal{C} \to \mathcal{D}\) maps objects to objects and morphisms to morphisms, preserving identity and composition: \(F(\mathrm{id}_A) = \mathrm{id}_{F(A)}\) and \(F(g \circ f) = F(g) \circ F(f)\).</p>
+</div>
+
+<div class="theorem-box definition">
+  <div class="label">Definition 2.3 (Representable Functor)</div>
+  <p>For an object \(T\) in a category \(\mathcal{C}\), the <em>representable functor</em> \(\mathrm{Hom}_{\mathcal{C}}(T, -) : \mathcal{C} \to \mathbf{Set}\) maps each object \(A\) to the set \(\mathrm{Hom}_{\mathcal{C}}(T, A)\) and each morphism \(f : A \to B\) to the post-composition function \(f_* : \mathrm{Hom}_{\mathcal{C}}(T, A) \to \mathrm{Hom}_{\mathcal{C}}(T, B)\).</p>
+</div>
+
+<div class="theorem-box definition">
+  <div class="label">Definition 2.4 (Subobject Classifier)</div>
+  <p>In a topos \(\mathcal{E}\), a <em>subobject classifier</em> is an object \(\Omega\) together with a morphism \(\top : 1 \to \Omega\) such that for every mono \(m : S \hookrightarrow X\) there exists a unique characteristic morphism \(\chi_m : X \to \Omega\) making the appropriate pullback square commute (Mac Lane &amp; Moerdijk, 1994).</p>
+</div>
+
+<h3 id="sec-bg-beam">2.4 Erlang/OTP and the BEAM</h3>
+
+<p>The BEAM virtual machine (Erlang/Elixir runtime) provides lightweight processes with the following properties (Armstrong, 2003; Juric, 2019):</p>
+
+<ul>
+  <li><strong>Process isolation</strong>: each process has its own heap; no shared mutable state.</li>
+  <li><strong>Message passing</strong>: processes communicate only through asynchronous messages.</li>
+  <li><strong>Supervision trees</strong>: processes are organised hierarchically; a supervisor restarts failed children according to a declared strategy.</li>
+  <li><strong>Hot code loading</strong>: modules can be upgraded at runtime without stopping the system.</li>
+</ul>
+
+<p>These properties make the BEAM an ideal substrate for implementing categorical sandboxing: each sandboxed tool execution becomes a BEAM process whose capability tokens are stored in process-local state, inaccessible to other processes.</p>
+
+<!-- ══════════ 3. TOOL MODEL ══════════ -->
+<h2 id="sec-tool-model">3. Tool Model &mdash; Formal Definition</h2>
+
+<h3 id="sec-tool-cat">3.1 The Tool Category</h3>
+
+<div class="theorem-box definition">
+  <div class="label">Definition 3.1 (Tool Category <strong>Tool</strong>)</div>
+  <p>The <em>tool category</em> \(\mathbf{Tool}\) is defined as follows:</p>
+  <ul>
+    <li><strong>Objects.</strong> The objects of \(\mathbf{Tool}\) are <em>data types</em>&mdash;structured schemas that describe the input and output of tool operations. Formally, \(\mathrm{ob}(\mathbf{Tool}) = \{ \tau \mid \tau \text{ is a JSON Schema type} \}\).</li>
+    <li><strong>Morphisms.</strong> A morphism \(t : \tau_{\text{in}} \to \tau_{\text{out}}\) is a <em>tool operation</em> that accepts input of type \(\tau_{\text{in}}\) and produces output of type \(\tau_{\text{out}}\).</li>
+    <li><strong>Identity.</strong> For each type \(\tau\), the identity morphism \(\mathrm{id}_\tau : \tau \to \tau\) is the pass-through operation that returns its input unchanged.</li>
+    <li><strong>Composition.</strong> Given \(t_1 : \tau_A \to \tau_B\) and \(t_2 : \tau_B \to \tau_C\), the composite \(t_2 \circ t_1 : \tau_A \to \tau_C\) is the tool pipeline that feeds the output of \(t_1\) into \(t_2\).</li>
+  </ul>
+</div>
+
+<div class="theorem-box">
+  <div class="label">Theorem 3.2 (Tool Composition is Associative)</div>
+  <p>For any composable morphisms \(t_1 : \tau_A \to \tau_B\), \(t_2 : \tau_B \to \tau_C\), and \(t_3 : \tau_C \to \tau_D\) in \(\mathbf{Tool}\), composition is associative:</p>
+  <p>$$t_3 \circ (t_2 \circ t_1) = (t_3 \circ t_2) \circ t_1.$$</p>
+</div>
+
+<div class="proof">
+  <div class="proof-label">Proof.</div>
+  <p>Tool operations are functions on typed data. Function composition is associative: for any input \(x \in \tau_A\),</p>
+  <p>$$\begin{aligned}
+  (t_3 \circ (t_2 \circ t_1))(x) &= t_3((t_2 \circ t_1)(x)) = t_3(t_2(t_1(x))), \\
+  ((t_3 \circ t_2) \circ t_1)(x) &= (t_3 \circ t_2)(t_1(x)) = t_3(t_2(t_1(x))).
+  \end{aligned}$$</p>
+  <p>The two expressions are identical for all \(x\), establishing associativity. Identity morphisms satisfy \(\mathrm{id}_{\tau_B} \circ t_1 = t_1\) and \(t_1 \circ \mathrm{id}_{\tau_A} = t_1\) by the same argument. Thus \(\mathbf{Tool}\) satisfies the category axioms.</p>
+  <p class="proof-end">&#9634;</p>
+</div>
+
+<figure>
+<pre>
+    t&#8321;            t&#8322;            t&#8323;
+&#964;_A ──────────▶ &#964;_B ──────────▶ &#964;_C ──────────▶ &#964;_D
+ │                                               ▲
+ │              t&#8322; &#8728; t&#8321;                           │
+ └────────────────────────────▶ &#964;_C ─────────────┘
+ │                                               │
+ │                t&#8323; &#8728; t&#8322; &#8728; t&#8321;                   │
+ └───────────────────────────────────────────────┘
+</pre>
+<figcaption>Figure 1: Morphism composition in <strong>Tool</strong>. Associativity ensures that the order of bracketing in a pipeline of tool operations is immaterial.</figcaption>
+</figure>
+
+<h3 id="sec-tiers">3.2 Tool Tiers as Subcategories</h3>
+
+<p>The <span style="font-variant:small-caps">Agent-Hero</span> platform organises tools into three tiers, each forming a subcategory of \(\mathbf{Tool}\):</p>
+
+<div class="theorem-box definition">
+  <div class="label">Definition 3.3 (Three-Tier Decomposition)</div>
+  <p>The tool category decomposes as:</p>
+  <p>$$\mathbf{Tool} = \mathbf{Tool}_{\text{Builtin}} \cup \mathbf{Tool}_{\text{Sandbox}} \cup \mathbf{Tool}_{\text{MCP}}$$</p>
+  <p>where:</p>
+  <ol>
+    <li>\(\mathbf{Tool}_{\text{Builtin}}\) contains statically defined, trusted operations: <code>web-search</code>, <code>text-transform</code>, <code>web-scrape</code>, <code>pdf-parse</code>, <code>generate-document</code>, <code>spreadsheet-read</code>.</li>
+    <li>\(\mathbf{Tool}_{\text{Sandbox}}\) contains operations that execute arbitrary code in an isolated environment: <code>git-clone</code>, <code>npm-run</code>, <code>code-exec</code>, <code>file-ops</code>, <code>python-exec</code>, <code>shell-exec</code>.</li>
+    <li>\(\mathbf{Tool}_{\text{MCP}}\) contains runtime-discovered tools provided by external MCP servers, namespaced as <code>${serverName}__${toolName}</code>.</li>
+  </ol>
+</div>
+
+<p>Each tier has a different trust level, which we formalise through capability restrictions in Section&nbsp;4.</p>
+
+<figure>
+<pre>
+┌─────────────────────────────────────────────────────┐
+│  <strong>Builtin</strong>  (highest trust)                           │
+│  web-search  text-transform  web-scrape             │
+│  pdf-parse   generate-document  spreadsheet-read    │
+└──────────────────────┬──────────────────────────────┘
+                       │ trust boundary
+┌──────────────────────▼──────────────────────────────┐
+│  <strong>Sandbox</strong>  (medium trust)                            │
+│  git-clone  npm-run  code-exec                      │
+│  file-ops   python-exec  shell-exec                 │
+└──────────────────────┬──────────────────────────────┘
+                       │ trust boundary
+┌──────────────────────▼──────────────────────────────┐
+│  <strong>MCP</strong>  (lowest trust)                                │
+│  ${server}__${tool}  (runtime-discovered)           │
+│  MCP servers via StreamableHTTPClientTransport       │
+└─────────────────────────────────────────────────────┘
+</pre>
+<figcaption>Figure 2: Three-tier tool registry in <span style="font-variant:small-caps">Agent-Hero</span>. Trust decreases from top to bottom; capability requirements increase correspondingly.</figcaption>
+</figure>
+
+<h3 id="sec-cap-functors">3.3 Capability Tokens as Representable Functors</h3>
+
+<div class="theorem-box definition">
+  <div class="label">Definition 3.4 (Capability Token)</div>
+  <p>Let \(T\) be an object of \(\mathbf{Tool}\) representing a specific tool's input type. A <em>capability token</em> for \(T\) is the representable functor</p>
+  <p>$$\mathbf{Cap}_T := \mathrm{Hom}_{\mathbf{Tool}}(T, -) : \mathbf{Tool} \to \mathbf{Set}.$$</p>
+  <p>For each output type \(\tau\), \(\mathbf{Cap}_T(\tau) = \mathrm{Hom}_{\mathbf{Tool}}(T, \tau)\) is the set of tool operations accessible from \(T\) that produce values of type \(\tau\).</p>
+</div>
+
+<p>The Yoneda lemma (Mac Lane, 1998) guarantees that each capability token faithfully represents the tool:</p>
+
+<div class="theorem-box">
+  <div class="label">Proposition 3.5 (Capability Faithfulness via Yoneda)</div>
+  <p>For any functor \(F : \mathbf{Tool} \to \mathbf{Set}\), there is a natural bijection</p>
+  <p>$$\mathrm{Nat}(\mathrm{Hom}_{\mathbf{Tool}}(T, -), F) \cong F(T).$$</p>
+  <p>In particular, taking \(F = \mathrm{Hom}_{\mathbf{Tool}}(T', -)\), we obtain \(\mathrm{Hom}_{\mathbf{Tool}}(T, T') \cong \mathrm{Nat}(\mathrm{Hom}_{\mathbf{Tool}}(T', -), \mathrm{Hom}_{\mathbf{Tool}}(T, -))\). Two tools are indistinguishable by their capability tokens if and only if they are isomorphic in \(\mathbf{Tool}\).</p>
+</div>
+
+<div class="theorem-box definition">
+  <div class="label">Remark 3.6</div>
+  <p>In the implementation, a capability token is concretised as a signed, scoped data structure:</p>
+  <p>$$\text{token} = (\text{agent\_id}, \text{tool\_id}, \text{permissions}, \text{rate\_limit}, \text{expiry}, \text{signature}).$$</p>
+  <p>The functor interpretation ensures that the bearer of a token can only access morphisms (tool operations) that the token's scope includes.</p>
+</div>
+
+<!-- ══════════ 4. SECURITY ARCHITECTURE ══════════ -->
+<h2 id="sec-security">4. Security Architecture</h2>
+
+<h3 id="sec-cap-access">4.1 Capability-Based Access Control</h3>
+
+<div class="theorem-box definition">
+  <div class="label">Definition 4.1 (Capability System)</div>
+  <p>A <em>capability system</em> for \(\mathbf{Tool}\) is a triple \((\mathcal{A}, \Gamma, \vdash)\) where:</p>
+  <ul>
+    <li>\(\mathcal{A}\) is a set of <em>agents</em>,</li>
+    <li>\(\Gamma : \mathcal{A} \to \mathcal{P}(\mathrm{Mor}(\mathbf{Tool}))\) assigns to each agent a set of permitted morphisms (its capability set),</li>
+    <li>\(\vdash\) is a judgement: \(a \vdash t\) means agent \(a\) is authorised to invoke tool \(t\).</li>
+  </ul>
+  <p>The judgement is defined by: \(a \vdash t \iff t \in \Gamma(a)\).</p>
+</div>
+
+<div class="theorem-box axiom">
+  <div class="label">Axiom 4.2 (Principle of Least Authority)</div>
+  <p>For each agent \(a \in \mathcal{A}\) and task \(\phi\), the capability set \(\Gamma(a)\) contains only those morphisms necessary to complete \(\phi\):</p>
+  <p>$$\Gamma(a) = \{ t \in \mathrm{Mor}(\mathbf{Tool}) \mid \phi \text{ requires } t \}.$$</p>
+</div>
+
+<p>In the <span style="font-variant:small-caps">Agent-Hero</span> system, the Principle of Least Authority is enforced through <em>contract-locked tool configurations</em>: when an agent execution begins, the set of available tools is frozen and cannot be modified during the run. This prevents privilege escalation through dynamic tool discovery.</p>
+
+<h3 id="sec-sandbox-quotient">4.2 Sandboxing as Categorical Quotient</h3>
+
+<div class="theorem-box definition">
+  <div class="label">Definition 4.3 (Sandbox Subcategory)</div>
+  <p>Given a capability set \(\Gamma(a)\) for agent \(a\), the <em>sandbox</em> of \(a\) is the subcategory</p>
+  <p>$$\mathbf{Sand}_a := \mathbf{Tool}|_{\Gamma(a)}$$</p>
+  <p>where \(\mathrm{ob}(\mathbf{Sand}_a) = \{ \tau \in \mathrm{ob}(\mathbf{Tool}) \mid \exists\, t \in \Gamma(a).\; \mathrm{src}(t) = \tau \text{ or } \mathrm{tgt}(t) = \tau \}\) and \(\mathrm{Mor}(\mathbf{Sand}_a) = \Gamma(a) \cup \{ \mathrm{id}_\tau \mid \tau \in \mathrm{ob}(\mathbf{Sand}_a) \}\).</p>
+</div>
+
+<div class="theorem-box definition">
+  <div class="label">Definition 4.4 (Information Leakage)</div>
+  <p>Let \(\mathbf{Sand}_a\) and \(\mathbf{Sand}_b\) be sandboxes for agents \(a\) and \(b\). An <em>information leak</em> from \(a\) to \(b\) is a morphism \(\ell : \tau_a \to \tau_b\) where \(\tau_a \in \mathrm{ob}(\mathbf{Sand}_a) \setminus \mathrm{ob}(\mathbf{Sand}_b)\) and \(\tau_b \in \mathrm{ob}(\mathbf{Sand}_b)\), and \(\ell \notin \Gamma(a) \cup \Gamma(b)\).</p>
+</div>
+
+<div class="theorem-box">
+  <div class="label">Theorem 4.5 (Sandbox Isolation)</div>
+  <p>If \(\mathbf{Sand}_a\) and \(\mathbf{Sand}_b\) are sandboxes with disjoint capability sets, \(\Gamma(a) \cap \Gamma(b) = \emptyset\), and the only morphisms available to each agent are those in their respective sandboxes, then no information leak exists from \(a\) to \(b\).</p>
+</div>
+
+<div class="proof">
+  <div class="proof-label">Proof.</div>
+  <p>Suppose for contradiction that a leak \(\ell : \tau_a \to \tau_b\) exists. By Definition&nbsp;4.4, \(\ell \notin \Gamma(a)\) and \(\ell \notin \Gamma(b)\). Since agent \(a\) can only invoke morphisms in \(\Gamma(a)\) and agent \(b\) can only invoke morphisms in \(\Gamma(b)\), neither agent can invoke \(\ell\). Therefore \(\ell\) cannot be executed, contradicting the assumption that it constitutes a leak. More generally, any composite path \(\tau_a \to \cdots \to \tau_b\) must traverse at least one morphism outside both \(\Gamma(a)\) and \(\Gamma(b)\), which neither agent can invoke.</p>
+  <p>In the BEAM implementation, this corresponds to the fact that BEAM processes have isolated heaps: process \(P_a\) implementing \(\mathbf{Sand}_a\) cannot read the memory of process \(P_b\) implementing \(\mathbf{Sand}_b\), and all communication must go through explicit message passing mediated by the capability system.</p>
+  <p class="proof-end">&#9634;</p>
+</div>
+
+<h3 id="sec-frozen">4.3 Contract-Locked Configurations as Frozen Subcategories</h3>
+
+<div class="theorem-box definition">
+  <div class="label">Definition 4.6 (Frozen Subcategory)</div>
+  <p>A subcategory \(\mathcal{F} \hookrightarrow \mathbf{Tool}\) is <em>frozen</em> if no new morphisms or objects can be added to \(\mathcal{F}\) after its creation. Formally, \(\mathcal{F}\) is equipped with a timestamp \(t_0\) such that for all \(t > t_0\), \(\mathrm{ob}(\mathcal{F}_t) = \mathrm{ob}(\mathcal{F}_{t_0})\) and \(\mathrm{Mor}(\mathcal{F}_t) = \mathrm{Mor}(\mathcal{F}_{t_0})\).</p>
+</div>
+
+<p>This corresponds directly to the <span style="font-variant:small-caps">Agent-Hero</span> implementation, where tool configurations are locked at execution start:</p>
+
+<pre><span class="cm">// Tool set is frozen at execution start</span>
+<span class="kw">const</span> frozenTools = Object.<span class="fn">freeze</span>(
+  <span class="fn">resolveToolsForAgent</span>(agent, contract)
+);
+
+<span class="cm">// Subsequent attempts to modify tools throw</span>
+<span class="cm">// Cannot add properties to a frozen object</span>
+<span class="kw">async function</span> <span class="fn">executeAgent</span>(agent, task) {
+  <span class="kw">const</span> tools = frozenTools; <span class="cm">// immutable reference</span>
+  <span class="cm">// tools cannot be modified during execution</span>
+  <span class="kw">return await</span> <span class="fn">runAgentLoop</span>(agent, task, tools);
+}</pre>
+<p class="code-caption">Listing 1: Contract-locked tool configuration (simplified from Agent-Hero).</p>
+
+<h3 id="sec-url">4.4 URL Validation as Morphism Filtering</h3>
+
+<p>A critical security concern is preventing agents from accessing internal resources. The <span style="font-variant:small-caps">Agent-Hero</span> platform implements URL validation that blocks access to localhost and internal IP ranges:</p>
+
+<div class="theorem-box definition">
+  <div class="label">Definition 4.7 (Safe Morphism Filter)</div>
+  <p>Let \(\mathbf{Tool}_{\text{web}}\) be the subcategory of web-accessing tools. The <em>safe morphism filter</em> \(\sigma\) is an endofunctor \(\sigma : \mathbf{Tool}_{\text{web}} \to \mathbf{Tool}_{\text{web}}\) defined by:</p>
+  <p>$$\sigma(t)(x) = \begin{cases} t(x) & \text{if } \mathrm{url}(x) \notin \text{BLOCKED} \\ \bot & \text{otherwise} \end{cases}$$</p>
+  <p>where \(\text{BLOCKED} = \{ \texttt{localhost}, \texttt{127.0.0.0/8}, \texttt{169.254.0.0/16}, \texttt{10.0.0.0/8}, \texttt{172.16.0.0/12}, \texttt{192.168.0.0/16} \}\).</p>
+</div>
+
+<figure>
+<pre>
+                    t_fetch
+       &#964;_URL ─────────────────▶ &#964;_HTML
+        │                         ▲
+     &#963; │                         │ &#8838;
+        ▼                         │
+       &#964;_URL ─────────────────▶ &#964;_HTML &#8746; {&#8869;}
+                 t_safe-fetch
+</pre>
+<figcaption>Figure 3: URL validation as a morphism filter. The safe-fetch tool either produces valid HTML or rejects the request (&perp;) for blocked addresses.</figcaption>
+</figure>
+
+<!-- ══════════ 5. PROTOCOL DESIGN ══════════ -->
+<h2 id="sec-protocol">5. Protocol Design: The Model Context Protocol</h2>
+
+<h3 id="sec-mcp-universal-iface">5.1 MCP as a Universal Tool Interface</h3>
+
+<p>The Model Context Protocol (<span style="font-variant:small-caps">MCP</span>) (MCP Specification, 2024) defines a standard interface for language models to discover and invoke tools provided by external servers. In the <span style="font-variant:small-caps">Agent-Hero</span> platform, MCP integration uses the <code>@modelcontextprotocol/sdk</code> library with <code>StreamableHTTPClientTransport</code> for efficient HTTP-based communication and Bearer token authentication.</p>
+
+<div class="theorem-box definition">
+  <div class="label">Definition 5.1 (MCP Interface)</div>
+  <p>An <em>MCP server</em> \(S\) exposes:</p>
+  <ol>
+    <li>A <em>tool listing</em> endpoint returning \(\{(n_i, \sigma_i)\}_{i \in I}\) where \(n_i\) is a tool name and \(\sigma_i\) is its JSON Schema.</li>
+    <li>An <em>invocation</em> endpoint that, given a tool name \(n_i\) and input conforming to \(\sigma_i\), returns a structured result.</li>
+    <li>A <em>resource listing</em> endpoint for data resources the server provides.</li>
+  </ol>
+</div>
+
+<div class="theorem-box definition">
+  <div class="label">Definition 5.2 (MCP Namespacing)</div>
+  <p>Given an MCP server with name \(s\) providing tools \(\{t_1, \ldots, t_k\}\), the namespaced tool identifiers are \(\{ s\_\_t_1, \ldots, s\_\_t_k \}\). This prevents naming collisions when multiple MCP servers are connected simultaneously.</p>
+</div>
+
+<div class="theorem-box construction">
+  <div class="label">Construction 5.3 (Parallel MCP Discovery)</div>
+  <p>The <span style="font-variant:small-caps">Agent-Hero</span> platform connects to multiple MCP servers in parallel using <code>Promise.allSettled()</code>, ensuring that a slow or failing server does not block discovery from other servers:</p>
+</div>
+
+<pre><span class="kw">const</span> connections = <span class="kw">await</span> Promise.<span class="fn">allSettled</span>(
+  mcpServers.<span class="fn">map</span>(<span class="kw">async</span> (server) <span class="op">=&gt;</span> {
+    <span class="kw">const</span> transport = <span class="kw">new</span> <span class="fn">StreamableHTTPClientTransport</span>(
+      <span class="kw">new</span> <span class="fn">URL</span>(server.url),
+      { headers: { Authorization: <span class="str">`Bearer ${server.token}`</span> } }
+    );
+    <span class="kw">const</span> client = <span class="kw">new</span> <span class="fn">Client</span>({ name: <span class="str">"agent-hero"</span>, version: <span class="str">"1.0"</span> });
+    <span class="kw">await</span> client.<span class="fn">connect</span>(transport);
+    <span class="kw">const</span> { tools } = <span class="kw">await</span> client.<span class="fn">listTools</span>();
+    <span class="kw">return</span> tools.<span class="fn">map</span>(t <span class="op">=&gt;</span> ({
+      name: <span class="str">`${server.name}__${t.name}`</span>,
+      description: t.description,
+      schema: t.inputSchema,
+    }));
+  })
+);</pre>
+<p class="code-caption">Listing 2: Parallel MCP server connection (from Agent-Hero).</p>
+
+<h3 id="sec-mcp-universality">5.2 Universality of MCP</h3>
+
+<p>We now establish that MCP satisfies a universality property analogous to the Yoneda lemma.</p>
+
+<div class="theorem-box definition">
+  <div class="label">Definition 5.4 (Tool Interface Functor)</div>
+  <p>A <em>tool interface</em> is a functor \(I : \mathbf{Tool} \to \mathbf{Set}\) that maps each tool to its observable behaviour: for a morphism \(t : \tau_A \to \tau_B\), \(I(t)\) is the function from inputs of type \(\tau_A\) to outputs of type \(\tau_B\), as observed through the interface.</p>
+</div>
+
+<div class="theorem-box">
+  <div class="label">Proposition 5.5 (MCP Universality)</div>
+  <p>The MCP interface \(I_{\text{MCP}}\) is universal among tool interfaces in the following sense: for any tool interface \(I : \mathbf{Tool} \to \mathbf{Set}\), there exists a unique natural transformation \(\eta : I_{\text{MCP}} \Rightarrow I\) such that the following diagram commutes for every tool \(t\):</p>
+  <p>$$\mathbf{Tool} \xrightarrow{I_{\text{MCP}}} \mathbf{Set} \xrightarrow{\eta} \mathbf{Set}$$</p>
+  <p>This follows from the fact that MCP's JSON Schema-based tool description is sufficient to reconstruct any type-safe invocation pattern: the schema determines the input type, the invocation protocol determines the function, and the response format determines the output type. Any tool interface that respects typing must factor through MCP's schema-driven description.</p>
+</div>
+
+<div class="proof">
+  <div class="proof-label">Proof sketch.</div>
+  <p>The key observation is that MCP's tool description is <em>schema-complete</em>: every tool operation can be described by a triple (name, input JSON Schema, output JSON Schema). Given any alternative interface \(I\), we construct \(\eta\) componentwise: for each type \(\tau\), \(\eta_\tau : I_{\text{MCP}}(\tau) \to I(\tau)\) maps an MCP-described operation to its \(I\)-representation. Uniqueness follows from the determinism of JSON Schema interpretation&mdash;two descriptions that agree on schema must agree on their type-level behaviour. Naturality is verified by checking that schema-preserving tool composition in MCP commutes with the corresponding composition in \(I\).</p>
+  <p class="proof-end">&#9634;</p>
+</div>
+
+<!-- ══════════ 6. TYPE-SAFE TOOL INVOCATION ══════════ -->
+<h2 id="sec-type-safe">6. Type-Safe Tool Invocation</h2>
+
+<h3 id="sec-json-alg">6.1 JSON Schema to Algebraic Types</h3>
+
+<p>The <span style="font-variant:small-caps">Agent-Hero</span> platform converts JSON Schema definitions to Zod validators for runtime type safety. This conversion is a functor:</p>
+
+<div class="theorem-box definition">
+  <div class="label">Definition 6.1 (Schema Functor)</div>
+  <p>The <em>schema functor</em> \(\Sigma : \mathbf{JSONSchema} \to \mathbf{Zod}\) maps:</p>
+  <ul>
+    <li>JSON Schema type objects to Zod schema objects.</li>
+    <li>Schema refinements (subtyping relations) to Zod refinement compositions.</li>
+  </ul>
+  <p>where \(\mathbf{JSONSchema}\) is the category of JSON Schema types with subtyping as morphisms and \(\mathbf{Zod}\) is the category of Zod validators with validator composition as morphisms.</p>
+</div>
+
+<p>The conversion process is exemplified in the Vercel AI SDK v6 integration:</p>
+
+<pre><span class="kw">import</span> { tool } <span class="kw">from</span> <span class="str">'ai'</span>;
+<span class="kw">import</span> { zodSchema } <span class="kw">from</span> <span class="str">'ai/schema'</span>;
+<span class="kw">import</span> { z } <span class="kw">from</span> <span class="str">'zod'</span>;
+
+<span class="cm">// Static tool definition with Zod schema</span>
+<span class="kw">const</span> webSearchTool = <span class="fn">tool</span>({
+  description: <span class="str">'Search the web for information'</span>,
+  parameters: <span class="fn">zodSchema</span>(z.<span class="fn">object</span>({
+    query: z.<span class="fn">string</span>().<span class="fn">describe</span>(<span class="str">'Search query'</span>),
+    maxResults: z.<span class="fn">number</span>().<span class="fn">int</span>().<span class="fn">min</span>(<span class="num">1</span>).<span class="fn">max</span>(<span class="num">20</span>).<span class="fn">default</span>(<span class="num">10</span>),
+  })),
+  execute: <span class="kw">async</span> ({ query, maxResults }) <span class="op">=&gt;</span> {
+    <span class="cm">// Type-safe: query is string, maxResults is number</span>
+    <span class="kw">return await</span> <span class="fn">performWebSearch</span>(query, maxResults);
+  },
+});
+
+<span class="cm">// MCP-discovered tool: JSON Schema -&gt; Zod conversion</span>
+<span class="kw">function</span> <span class="fn">mcpToolToVercelTool</span>(mcpTool: MCPTool) {
+  <span class="kw">return</span> <span class="fn">tool</span>({
+    description: mcpTool.description,
+    parameters: <span class="fn">zodSchema</span>(
+      <span class="fn">jsonSchemaToZod</span>(mcpTool.inputSchema) <span class="cm">// functor application</span>
+    ),
+    execute: <span class="kw">async</span> (input) <span class="op">=&gt;</span> {
+      <span class="kw">return await</span> mcpClient.<span class="fn">callTool</span>(mcpTool.name, input);
+    },
+  });
+}</pre>
+<p class="code-caption">Listing 3: JSON Schema to Zod conversion for tool inputs (Agent-Hero pattern).</p>
+
+<h3 id="sec-correctness">6.2 Correctness Preservation</h3>
+
+<div class="theorem-box">
+  <div class="label">Theorem 6.2 (Type-Safe Composition Preserves Correctness)</div>
+  <p>Let \(t_1 : \tau_A \to \tau_B\) and \(t_2 : \tau_B \to \tau_C\) be tool morphisms with associated Zod validators \(v_A = \Sigma(\tau_A)\), \(v_B = \Sigma(\tau_B)\), and \(v_C = \Sigma(\tau_C)\). If \(t_1\) and \(t_2\) individually preserve type correctness (i.e., valid inputs produce valid outputs), then the composite \(t_2 \circ t_1\) preserves type correctness.</p>
+</div>
+
+<div class="proof">
+  <div class="proof-label">Proof.</div>
+  <p>Assume \(x \in v_A\) (i.e., \(x\) passes validation by \(v_A\)). Since \(t_1\) preserves correctness, \(t_1(x) \in v_B\). Since \(t_2\) preserves correctness and \(t_1(x) \in v_B\), \(t_2(t_1(x)) \in v_C\). Therefore \((t_2 \circ t_1)(x) \in v_C\) for all \(x \in v_A\).</p>
+  <p>More formally, the schema functor \(\Sigma\) preserves composition: \(\Sigma(t_2 \circ t_1) = \Sigma(t_2) \circ \Sigma(t_1)\). The correctness predicate \(\mathrm{Correct}(t) \equiv \forall x.\; x \in \Sigma(\mathrm{src}(t)) \implies t(x) \in \Sigma(\mathrm{tgt}(t))\) is preserved under composition by transitivity.</p>
+  <p class="proof-end">&#9634;</p>
+</div>
+
+<figure>
+<pre>
+                      &#931;
+  <strong>JSONSchema</strong> ────────────────▶ <strong>Zod</strong>
+       │                          │
+  t&#8321; &#8728; t&#8322; │                          │ &#931;(t&#8321;) &#8728; &#931;(t&#8322;)
+       ▼                          ▼
+  <strong>JSONSchema</strong> ────────────────▶ <strong>Zod</strong>
+                      &#931;
+</pre>
+<figcaption>Figure 4: The schema functor &Sigma; commutes with tool composition, ensuring that type safety is preserved through pipelines.</figcaption>
+</figure>
+
+<h3 id="sec-validation-pipeline">6.3 Runtime Validation Pipeline</h3>
+
+<p>The complete validation pipeline for a tool invocation proceeds as follows:</p>
+
+<div class="algorithm">
+  <div class="alg-title">Algorithm 1: Type-safe tool invocation with capability checking and audit</div>
+  <p><strong>Input:</strong> Agent \(a\), tool morphism \(t : \tau_A \to \tau_B\), input value \(x\)</p>
+  <p><strong>Output:</strong> Result \(y \in \tau_B\) or error \(\epsilon\)</p>
+  <br>
+  <p><span class="kw">if</span> \(t \notin \Gamma(a)\) <span class="kw">then</span></p>
+  <p class="indent"><span class="kw">return</span> \(\epsilon_{\text{unauthorized}}\)</p>
+  <p>\(v_A \leftarrow \Sigma(\tau_A)\)</p>
+  <p><span class="kw">if</span> \(x \notin v_A\) <span class="kw">then</span></p>
+  <p class="indent"><span class="kw">return</span> \(\epsilon_{\text{validation}}\)</p>
+  <p>\(y \leftarrow \mathrm{execute}(t, x)\) <span class="comment">// in sandbox if \(t \in \mathbf{Tool}_{\text{Sandbox}}\)</span></p>
+  <p>\(v_B \leftarrow \Sigma(\tau_B)\)</p>
+  <p><span class="kw">if</span> \(y \notin v_B\) <span class="kw">then</span></p>
+  <p class="indent"><span class="kw">return</span> \(\epsilon_{\text{output\_validation}}\)</p>
+  <p>\(\mathrm{audit\_log}(a, t, x, y, \text{timestamp})\)</p>
+  <p><span class="kw">return</span> \(y\)</p>
+</div>
+
+<!-- ══════════ 7. ELIXIR/OTP IMPLEMENTATION ══════════ -->
+<h2 id="sec-elixir">7. Elixir/OTP Implementation</h2>
+
+<p>The categorical abstractions of Sections&nbsp;3&ndash;6 map naturally onto Elixir/OTP primitives. We describe the key components of a production implementation.</p>
+
+<h3 id="sec-arch-overview">7.1 Architecture Overview</h3>
+
+<figure>
+<pre>
+             ┌──────────────────────────┐
+             │    Application           │
+             │    Supervisor            │
+             └─────┬──────┬──────┬─────┘
+                   │      │      │
+          ┌────────┘      │      └────────┐
+          ▼               ▼               ▼
+  ┌──────────────┐ ┌────────────┐ ┌──────────────┐
+  │   Registry   │ │ Capability │ │    Audit     │
+  │  GenServer   │ │  Manager   │ │   Logger     │
+  └──────┬───────┘ └─────┬──────┘ └──────────────┘
+         │               :              ▲    ▲
+    ┌────┴────┐          :              :    :
+    ▼         ▼          :              :    :
+┌────────┐ ┌──────┐     :              :    :
+│Sandbox │ │ MCP  │ ····:··············:····┘
+│Executor│ │Client│ ····················
+└────────┘ └──────┘
+
+─── supervision    ···· inter-process communication
+</pre>
+<figcaption>Figure 5: OTP supervision tree for the tool interface layer. Solid arrows represent supervision; dotted lines represent inter-process communication.</figcaption>
+</figure>
+
+<h3 id="sec-registry">7.2 Tool Registry GenServer</h3>
+
+<p>The tool registry maintains the three-tier tool database as a GenServer with the following state:</p>
+
+<pre><span class="kw">defmodule</span> ToolInterface.Registry <span class="kw">do</span>
+  <span class="kw">use</span> GenServer
+  <span class="kw">require</span> Logger
+
+  <span class="at">@type</span> tool_tier :: <span class="op">:</span>builtin | <span class="op">:</span>sandbox | <span class="op">:</span>mcp
+  <span class="at">@type</span> tool_spec :: %{
+    name: String.t(),
+    tier: tool_tier(),
+    description: String.t(),
+    input_schema: map(),
+    output_schema: map(),
+    execute: (map() <span class="op">-&gt;</span> {<span class="op">:</span>ok, any()} | {<span class="op">:</span>error, term()})
+  }
+
+  <span class="kw">defstruct</span> builtin: %{}, sandbox: %{}, mcp: %{}, frozen: <span class="num">false</span>
+
+  <span class="kw">def</span> <span class="fn">start_link</span>(opts) <span class="kw">do</span>
+    GenServer.start_link(__MODULE__, opts, name: __MODULE__)
+  <span class="kw">end</span>
+
+  <span class="kw">def</span> <span class="fn">init</span>(_opts) <span class="kw">do</span>
+    state = %__MODULE__{
+      builtin: <span class="fn">load_builtin_tools</span>(),
+      sandbox: <span class="fn">load_sandbox_tools</span>(),
+      mcp: %{}
+    }
+    {<span class="op">:</span>ok, state}
+  <span class="kw">end</span>
+
+  <span class="kw">def</span> <span class="fn">handle_call</span>({<span class="op">:</span>register_mcp, server, tools}, _from, state) <span class="kw">do</span>
+    <span class="kw">if</span> state.frozen <span class="kw">do</span>
+      {<span class="op">:</span>reply, {<span class="op">:</span>error, <span class="op">:</span>frozen}, state}
+    <span class="kw">else</span>
+      namespaced = <span class="kw">for</span> t <span class="op">&lt;-</span> tools, into: %{} <span class="kw">do</span>
+        {<span class="str">"#{server}__#{t.name}"</span>, t}
+      <span class="kw">end</span>
+      {<span class="op">:</span>reply, <span class="op">:</span>ok, %{state | mcp: Map.merge(state.mcp, namespaced)}}
+    <span class="kw">end</span>
+  <span class="kw">end</span>
+
+  <span class="kw">def</span> <span class="fn">handle_call</span>(<span class="op">:</span>freeze, _from, state) <span class="kw">do</span>
+    {<span class="op">:</span>reply, <span class="op">:</span>ok, %{state | frozen: <span class="num">true</span>}}
+  <span class="kw">end</span>
+<span class="kw">end</span></pre>
+<p class="code-caption">Listing 4: Tool registry GenServer (excerpt). The <code>:freeze</code> operation implements contract-locked configurations (Definition 4.6).</p>
+
+<h3 id="sec-cap-token-impl">7.3 Capability Token System</h3>
+
+<p>Capability tokens are implemented as signed, scoped structures stored in process-local state:</p>
+
+<pre><span class="kw">defmodule</span> ToolInterface.Capability <span class="kw">do</span>
+  <span class="at">@type</span> t :: %__MODULE__{
+    agent_id: String.t(),
+    tool_id: String.t(),
+    permissions: [<span class="op">:</span>invoke | <span class="op">:</span>inspect | <span class="op">:</span>compose],
+    rate_limit: pos_integer(),
+    expires_at: DateTime.t(),
+    signature: binary()
+  }
+
+  <span class="kw">defstruct</span> [<span class="op">:</span>agent_id, <span class="op">:</span>tool_id, <span class="op">:</span>permissions,
+             <span class="op">:</span>rate_limit, <span class="op">:</span>expires_at, <span class="op">:</span>signature]
+
+  <span class="at">@spec</span> authorize(t(), String.t()) ::
+    {<span class="op">:</span>ok, t()} | {<span class="op">:</span>error, <span class="op">:</span>unauthorized | <span class="op">:</span>expired | <span class="op">:</span>rate_limited}
+  <span class="kw">def</span> <span class="fn">authorize</span>(token, tool_id) <span class="kw">do</span>
+    <span class="kw">cond do</span>
+      token.tool_id != tool_id <span class="op">-&gt;</span> {<span class="op">:</span>error, <span class="op">:</span>unauthorized}
+      DateTime.compare(DateTime.utc_now(), token.expires_at) == <span class="op">:</span>gt <span class="op">-&gt;</span>
+        {<span class="op">:</span>error, <span class="op">:</span>expired}
+      <span class="kw">not</span> <span class="fn">valid_signature?</span>(token) <span class="op">-&gt;</span> {<span class="op">:</span>error, <span class="op">:</span>unauthorized}
+      <span class="num">true</span> <span class="op">-&gt;</span> {<span class="op">:</span>ok, token}
+    <span class="kw">end</span>
+  <span class="kw">end</span>
+<span class="kw">end</span></pre>
+<p class="code-caption">Listing 5: Capability token module (excerpt).</p>
+
+<h3 id="sec-sandbox-exec">7.4 Sandbox Execution</h3>
+
+<p>Sandbox tools execute in isolated BEAM processes with restricted capabilities, mirroring the E2B sandbox model with ephemeral, time-bounded execution:</p>
+
+<pre><span class="kw">defmodule</span> ToolInterface.Sandbox <span class="kw">do</span>
+  <span class="at">@timeout</span> <span class="num">600_000</span>  <span class="cm"># 10 minutes, matching E2B</span>
+
+  <span class="at">@spec</span> execute(map(), map(), keyword()) ::
+    {<span class="op">:</span>ok, any()} | {<span class="op">:</span>error, term()}
+  <span class="kw">def</span> <span class="fn">execute</span>(tool_spec, input, opts \\ []) <span class="kw">do</span>
+    timeout = Keyword.get(opts, <span class="op">:</span>timeout, <span class="at">@timeout</span>)
+    parent = self()
+
+    {pid, ref} = <span class="fn">spawn_monitor</span>(<span class="kw">fn</span> <span class="op">-&gt;</span>
+      <span class="cm"># Process runs in isolation - separate heap</span>
+      result = <span class="kw">try do</span>
+        tool_spec.execute.(input)
+      <span class="kw">rescue</span>
+        e <span class="op">-&gt;</span> {<span class="op">:</span>error, Exception.message(e)}
+      <span class="kw">end</span>
+      send(parent, {<span class="op">:</span>sandbox_result, self(), result})
+    <span class="kw">end</span>)
+
+    <span class="kw">receive do</span>
+      {<span class="op">:</span>sandbox_result, ^pid, result} <span class="op">-&gt;</span>
+        Process.demonitor(ref, [<span class="op">:</span>flush])
+        result
+      {<span class="op">:</span>DOWN, ^ref, <span class="op">:</span>process, ^pid, reason} <span class="op">-&gt;</span>
+        {<span class="op">:</span>error, {<span class="op">:</span>sandbox_crashed, reason}}
+    <span class="kw">after</span>
+      timeout <span class="op">-&gt;</span>
+        Process.exit(pid, <span class="op">:</span>kill)
+        <span class="kw">receive do</span>
+          {<span class="op">:</span>DOWN, ^ref, <span class="op">:</span>process, ^pid, _} <span class="op">-&gt;</span> <span class="op">:</span>ok
+        <span class="kw">end</span>
+        {<span class="op">:</span>error, <span class="op">:</span>timeout}
+    <span class="kw">end</span>
+  <span class="kw">end</span>
+<span class="kw">end</span></pre>
+<p class="code-caption">Listing 6: Sandbox executor (excerpt). This pattern directly implements sandbox isolation (Theorem 4.5).</p>
+
+<h3 id="sec-mcp-client">7.5 MCP Client</h3>
+
+<p>The MCP client handles tool discovery and invocation through HTTP transport:</p>
+
+<pre><span class="kw">defmodule</span> ToolInterface.MCPClient <span class="kw">do</span>
+  <span class="kw">use</span> GenServer
+
+  <span class="kw">defstruct</span> [<span class="op">:</span>server_name, <span class="op">:</span>url, <span class="op">:</span>token, <span class="op">:</span>tools]
+
+  <span class="kw">def</span> <span class="fn">start_link</span>(opts) <span class="kw">do</span>
+    GenServer.start_link(__MODULE__, opts)
+  <span class="kw">end</span>
+
+  <span class="kw">def</span> <span class="fn">init</span>(opts) <span class="kw">do</span>
+    state = %__MODULE__{
+      server_name: opts[<span class="op">:</span>name],
+      url: opts[<span class="op">:</span>url],
+      token: opts[<span class="op">:</span>token],
+      tools: %{}
+    }
+    {<span class="op">:</span>ok, state, {<span class="op">:</span>continue, <span class="op">:</span>discover}}
+  <span class="kw">end</span>
+
+  <span class="kw">def</span> <span class="fn">handle_continue</span>(<span class="op">:</span>discover, state) <span class="kw">do</span>
+    <span class="kw">case</span> <span class="fn">discover_tools</span>(state.url, state.token) <span class="kw">do</span>
+      {<span class="op">:</span>ok, tools} <span class="op">-&gt;</span>
+        namespaced = <span class="kw">for</span> t <span class="op">&lt;-</span> tools, into: %{} <span class="kw">do</span>
+          {<span class="str">"#{state.server_name}__#{t["name"]}"</span>, t}
+        <span class="kw">end</span>
+        ToolInterface.Registry.register_mcp(
+          state.server_name, tools
+        )
+        {<span class="op">:</span>noreply, %{state | tools: namespaced}}
+      {<span class="op">:</span>error, reason} <span class="op">-&gt;</span>
+        Logger.warning(<span class="str">"MCP discovery failed: #{reason}"</span>)
+        {<span class="op">:</span>noreply, state}
+    <span class="kw">end</span>
+  <span class="kw">end</span>
+<span class="kw">end</span></pre>
+<p class="code-caption">Listing 7: MCP client (excerpt).</p>
+
+<h3 id="sec-audit-logger">7.6 Audit Logger</h3>
+
+<p>Per-invocation audit logging captures timestamp, agent identity, tool identity, input, output, and execution duration:</p>
+
+<pre><span class="kw">defmodule</span> ToolInterface.Audit <span class="kw">do</span>
+  <span class="kw">use</span> GenServer
+
+  <span class="at">@type</span> entry :: %{
+    timestamp: DateTime.t(),
+    agent_id: String.t(),
+    tool_id: String.t(),
+    input: map(),
+    output: any(),
+    duration_ms: non_neg_integer(),
+    status: <span class="op">:</span>ok | <span class="op">:</span>error
+  }
+
+  <span class="kw">def</span> <span class="fn">log_invocation</span>(agent_id, tool_id, input, output,
+                     duration_ms, status) <span class="kw">do</span>
+    GenServer.cast(__MODULE__, {
+      <span class="op">:</span>log,
+      %{
+        timestamp: DateTime.utc_now(),
+        agent_id: agent_id,
+        tool_id: tool_id,
+        input: input,
+        output: output,
+        duration_ms: duration_ms,
+        status: status
+      }
+    })
+  <span class="kw">end</span>
+
+  <span class="kw">def</span> <span class="fn">handle_cast</span>({<span class="op">:</span>log, entry}, state) <span class="kw">do</span>
+    Logger.info(<span class="str">"AUDIT: #{entry.agent_id} -&gt; #{entry.tool_id} "</span> <span class="op">&lt;&gt;</span>
+                <span class="str">"[#{entry.status}] #{entry.duration_ms}ms"</span>)
+    {<span class="op">:</span>noreply, %{state | entries: [entry | state.entries]}}
+  <span class="kw">end</span>
+<span class="kw">end</span></pre>
+<p class="code-caption">Listing 8: Audit logger (excerpt).</p>
+
+<!-- ══════════ 8. CASE STUDIES ══════════ -->
+<h2 id="sec-case-studies">8. Case Studies</h2>
+
+<h3 id="sec-cs-web">8.1 Web Scraping Tool Chain</h3>
+
+<p>Consider an agent tasked with extracting structured data from a web page. The tool chain composes three morphisms in \(\mathbf{Tool}_{\text{Builtin}}\):</p>
+
+<ol>
+  <li>\(t_{\text{search}} : \tau_{\text{Query}} \to \tau_{\text{URLs}}\) &mdash; <code>web-search</code> finds relevant URLs.</li>
+  <li>\(t_{\text{scrape}} : \tau_{\text{URL}} \to \tau_{\text{HTML}}\) &mdash; <code>web-scrape</code> retrieves page content.</li>
+  <li>\(t_{\text{transform}} : \tau_{\text{HTML}} \to \tau_{\text{Structured}}\) &mdash; <code>text-transform</code> extracts structured data.</li>
+</ol>
+
+<p>The composite \(t_{\text{transform}} \circ t_{\text{scrape}} \circ t_{\text{search}}\) is a morphism \(\tau_{\text{Query}} \to \tau_{\text{Structured}}\). By Theorem&nbsp;3.2, the order of composition bracketing is immaterial. By Theorem&nbsp;6.2, type safety propagates through the chain.</p>
+
+<p>The URL validation filter (Definition&nbsp;4.7) ensures that \(t_{\text{scrape}}\) cannot access internal resources. In the <span style="font-variant:small-caps">Agent-Hero</span> system, this is enforced at the tool level: before any HTTP request, the URL is checked against the blocked list (no <code>localhost</code> in production, no <code>169.254.x.x</code> link-local addresses).</p>
+
+<figure>
+<pre>
+                t_search          t_scrape         t_transform
+  &#964;_Query ──────────────▶ &#964;_URLs ──────────────▶ &#964;_HTML ──────────────▶ &#964;_Structured
+                           │                       ▲
+                        &#963; │                       │
+                           ▼                       │
+                         &#964;_URLs^safe ─────────────┘
+                                   t_scrape^safe
+</pre>
+<figcaption>Figure 6: Web scraping pipeline with URL validation filter &sigma;. Only safe URLs proceed to the scrape step.</figcaption>
+</figure>
+
+<h3 id="sec-cs-sandbox">8.2 Code Execution Sandbox</h3>
+
+<p>The code execution sandbox tools (<code>code-exec</code>, <code>python-exec</code>, <code>shell-exec</code>) operate in \(\mathbf{Tool}_{\text{Sandbox}}\) with the strictest isolation requirements. In the <span style="font-variant:small-caps">Agent-Hero</span> system, these tools are executed in E2B sandboxes&mdash;ephemeral virtual environments with a 10-minute timeout:</p>
+
+<ol>
+  <li>The agent requests code execution with a capability token authorising <code>code-exec</code>.</li>
+  <li>The capability system validates the token (Algorithm&nbsp;1, lines 1&ndash;2).</li>
+  <li>A fresh E2B sandbox is provisioned&mdash;an ephemeral environment with no access to the host file system or network (beyond whitelisted endpoints).</li>
+  <li>The code is executed inside the sandbox. If the execution exceeds 10 minutes, the sandbox is terminated.</li>
+  <li>The result (stdout, stderr, exit code) is captured, validated against the output schema, and returned to the agent.</li>
+  <li>An audit entry is logged with the full execution trace.</li>
+</ol>
+
+<p>Categorically, the E2B sandbox instantiates \(\mathbf{Sand}_a\) (Definition&nbsp;4.3). The ephemeral nature ensures that no state leaks between executions: each sandbox is a fresh instance of the restricted subcategory.</p>
+
+<pre><span class="kw">import</span> { Sandbox } <span class="kw">from</span> <span class="str">'@e2b/code-interpreter'</span>;
+
+<span class="kw">async function</span> <span class="fn">executeSandboxed</span>(code: <span class="tp">string</span>, language: <span class="tp">string</span>) {
+  <span class="kw">const</span> sandbox = <span class="kw">await</span> Sandbox.<span class="fn">create</span>({
+    timeoutMs: <span class="num">10</span> * <span class="num">60</span> * <span class="num">1000</span>, <span class="cm">// 10 minutes</span>
+  });
+  <span class="kw">try</span> {
+    <span class="kw">const</span> result = <span class="kw">await</span> sandbox.<span class="fn">runCode</span>(code, { language });
+    <span class="kw">return</span> {
+      stdout: result.logs.stdout,
+      stderr: result.logs.stderr,
+      exitCode: result.exitCode,
+    };
+  } <span class="kw">finally</span> {
+    <span class="kw">await</span> sandbox.<span class="fn">close</span>(); <span class="cm">// ephemeral: always clean up</span>
+  }
+}</pre>
+<p class="code-caption">Listing 9: E2B sandbox execution pattern (from Agent-Hero).</p>
+
+<h3 id="sec-cs-multi-mcp">8.3 Multi-MCP Server Orchestration</h3>
+
+<p>A production deployment may connect to multiple MCP servers simultaneously. The <span style="font-variant:small-caps">Agent-Hero</span> platform handles this through parallel connection with fault isolation:</p>
+
+<ol>
+  <li>The platform maintains a list of configured MCP servers, each with a URL and Bearer token.</li>
+  <li>At agent execution start, <code>Promise.allSettled()</code> connects to all servers in parallel (Construction&nbsp;5.3).</li>
+  <li>Each successful connection contributes its tools to \(\mathbf{Tool}_{\text{MCP}}\), namespaced to prevent collisions.</li>
+  <li>Failed connections are logged but do not block execution&mdash;the agent proceeds with whatever tools were successfully discovered.</li>
+  <li>The combined tool set is frozen (Definition&nbsp;4.6), establishing the contract for the execution run.</li>
+</ol>
+
+<figure>
+<pre>
+              ┌──────────────────┐
+              │  Agent Process   │
+              └────────┬─────────┘
+                       │ invoke
+              ┌────────▼─────────┐
+              │  Frozen Registry │
+              └──┬───────┬───┬───┘
+                 │       │   │
+  ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─  trust boundary
+                 │       │   │
+          ┌──────┘       │   └──────┐
+          ▼              ▼          ▼
+  ┌──────────────┐ ┌──────────┐ ┌──────────────┐
+  │ MCP Server 1 │ │ MCP      │ │ MCP Server 3 │
+  │  s1__tool    │ │ Server 2 │ │  s3__tool     │
+  └──────────────┘ └──────────┘ └──────────────┘
+</pre>
+<figcaption>Figure 7: Multi-MCP server orchestration. The frozen registry mediates between the agent and multiple external MCP servers, with namespaced tool identifiers.</figcaption>
+</figure>
+
+<p>In the Elixir implementation, each MCP server connection is a separate GenServer process. Parallel discovery is achieved via <code>Task.async_stream/3</code>:</p>
+
+<pre><span class="kw">def</span> <span class="fn">discover_all</span>(servers) <span class="kw">do</span>
+  servers
+  <span class="op">|&gt;</span> Task.async_stream(
+    <span class="kw">fn</span> server <span class="op">-&gt;</span>
+      <span class="kw">case</span> MCPClient.discover(server.url, server.token) <span class="kw">do</span>
+        {<span class="op">:</span>ok, tools} <span class="op">-&gt;</span> {<span class="op">:</span>ok, server.name, tools}
+        error <span class="op">-&gt;</span> error
+      <span class="kw">end</span>
+    <span class="kw">end</span>,
+    max_concurrency: <span class="num">10</span>,
+    timeout: <span class="num">30_000</span>
+  )
+  <span class="op">|&gt;</span> Enum.reduce([], <span class="kw">fn</span>
+    {<span class="op">:</span>ok, {<span class="op">:</span>ok, name, tools}}, acc <span class="op">-&gt;</span> [{name, tools} | acc]
+    {<span class="op">:</span>ok, {<span class="op">:</span>error, _}}, acc <span class="op">-&gt;</span> acc
+    {<span class="op">:</span>exit, _}, acc <span class="op">-&gt;</span> acc
+  <span class="kw">end</span>)
+<span class="kw">end</span></pre>
+<p class="code-caption">Listing 10: Parallel MCP discovery in Elixir.</p>
+
+<!-- ══════════ 9. AUDIT AND OBSERVABILITY ══════════ -->
+<h2 id="sec-audit">9. Audit and Observability</h2>
+
+<h3 id="sec-audit-trace">9.1 Per-Invocation Trace Logging</h3>
+
+<p>Every tool invocation in the AI OS produces an audit record. Formally:</p>
+
+<div class="theorem-box definition">
+  <div class="label">Definition 9.1 (Audit Functor)</div>
+  <p>The <em>audit functor</em> \(\mathbf{Aud} : \mathbf{Tool} \to \mathbf{Log}\) maps each tool invocation to a log entry:</p>
+  <p>$$\mathbf{Aud}(t, x) = (\text{timestamp}, \text{agent\_id}, t, x, t(x), \Delta t, \text{status})$$</p>
+  <p>where \(\Delta t\) is the execution duration and \(\text{status} \in \{\text{ok}, \text{error}\}\). The functor preserves composition: \(\mathbf{Aud}(t_2 \circ t_1, x) = \mathbf{Aud}(t_2, t_1(x)) \cdot \mathbf{Aud}(t_1, x)\) where \(\cdot\) is log concatenation.</p>
+</div>
+
+<div class="theorem-box">
+  <div class="label">Proposition 9.2 (Audit Completeness)</div>
+  <p>If every tool morphism \(t \in \mathrm{Mor}(\mathbf{Tool})\) passes through Algorithm&nbsp;1, then \(\mathbf{Aud}\) captures every externally-observable action of every agent.</p>
+</div>
+
+<div class="proof">
+  <div class="proof-label">Proof.</div>
+  <p>By construction, Algorithm&nbsp;1 is the sole invocation path for tool morphisms. The algorithm's final step invokes \(\mathrm{audit\_log}\), which applies \(\mathbf{Aud}\). Since no tool invocation bypasses this algorithm (enforced by the capability system's mediation of all tool access), every invocation produces an audit record.</p>
+  <p class="proof-end">&#9634;</p>
+</div>
+
+<h3 id="sec-cost">9.2 Cost Attribution</h3>
+
+<p>Each audit record can be extended with cost information, enabling per-tool, per-agent cost tracking:</p>
+
+<div class="theorem-box definition">
+  <div class="label">Definition 9.3 (Cost Extension)</div>
+  <p>The <em>cost-extended audit functor</em> \(\mathbf{Aud}^{\$} : \mathbf{Tool} \to \mathbf{Log}^{\$}\) augments each record with:</p>
+  <p>$$\text{cost}(t, x) = \text{base\_cost}(t) + \text{compute\_cost}(\Delta t) + \text{api\_cost}(t, x)$$</p>
+  <p>where \(\text{base\_cost}\) is the per-invocation charge, \(\text{compute\_cost}\) is proportional to execution time, and \(\text{api\_cost}\) accounts for third-party API charges (e.g., web search API costs).</p>
+</div>
+
+<p>This directly supports the credit-based billing model in <span style="font-variant:small-caps">Agent-Hero</span>, where agents consume credits proportional to their tool usage, and operators are compensated based on the tools their agents provide.</p>
+
+<h3 id="sec-obs-stack">9.3 Observability Stack</h3>
+
+<p>The audit system integrates with standard observability tools:</p>
+
+<ul>
+  <li><strong>Structured logging</strong>: Each audit entry is a JSON object, indexed by agent ID, tool ID, and timestamp.</li>
+  <li><strong>Metrics</strong>: Prometheus-compatible metrics on invocation count, latency percentiles, and error rates per tool tier.</li>
+  <li><strong>Tracing</strong>: OpenTelemetry spans for each tool invocation, with parent-child relationships reflecting tool composition.</li>
+  <li><strong>Alerting</strong>: Threshold-based alerts on error rates, latency spikes, and capability violation attempts.</li>
+</ul>
+
+<p>In the Elixir implementation, the audit GenServer handles logging asynchronously via <code>GenServer.cast/2</code>, ensuring that audit overhead does not impact tool invocation latency. Periodic flushing to persistent storage (database or object storage) ensures durability.</p>
+
+<!-- ══════════ 10. DISCUSSION ══════════ -->
+<h2 id="sec-discussion">10. Discussion</h2>
+
+<h3>10.1 Comparison to Unix Device Model</h3>
+
+<p>The Unix device model (Ritchie &amp; Thompson, 1978) provides a useful comparison framework:</p>
+
+<table>
+  <thead>
+    <tr><th>Unix</th><th>AI OS</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>File descriptor</td><td>Capability token</td></tr>
+    <tr><td>Device driver</td><td>Tool implementation</td></tr>
+    <tr><td>System call</td><td>Tool invocation</td></tr>
+    <tr><td><code>/dev</code> directory</td><td>Tool registry</td></tr>
+    <tr><td>Major/minor numbers</td><td>Tool tier + tool ID</td></tr>
+    <tr><td><code>ioctl</code> parameters</td><td>Tool input schema</td></tr>
+    <tr><td>Kernel isolation</td><td>Sandbox subcategory</td></tr>
+    <tr><td><code>open</code> permission check</td><td>Capability authorisation</td></tr>
+  </tbody>
+</table>
+
+<p>The key difference is that the AI OS must handle <em>dynamic</em> tool discovery (through MCP) whereas Unix device discovery is largely static (though hot-plugging adds some dynamism). The contract-locking mechanism bridges this gap: tools are discovered dynamically but frozen at execution time, providing the stability guarantees of static configuration.</p>
+
+<h3>10.2 Comparison to Plan 9</h3>
+
+<p>Plan&nbsp;9's "everything is a file" philosophy (Pike et al., 1995) suggests that the AI OS should present all tools through a uniform interface. MCP achieves this to a significant degree: every tool, regardless of its implementation, is invoked through the same protocol with the same schema-based input/output contract. The MCP universality proposition (Proposition&nbsp;5.5) formalises this uniformity.</p>
+
+<p>However, Plan&nbsp;9 goes further by allowing <em>per-process name spaces</em>: each process sees a different file system tree. The AI OS analogue is per-agent sandboxing: each agent's sandbox (\(\mathbf{Sand}_a\)) presents a different view of the tool category, restricted to the agent's capabilities. This is a richer model than Plan&nbsp;9's flat file namespace, as it supports typed, composable operations rather than byte streams.</p>
+
+<h3>10.3 Comparison to seL4 and Capsicum</h3>
+
+<p>The seL4 microkernel (Klein et al., 2009) provides formally verified capability-based security. Our capability token model (Definition&nbsp;3.4) is inspired by seL4's capability system, but differs in several ways:</p>
+
+<ol>
+  <li><strong>Scope</strong>: seL4 capabilities grant access to kernel objects (endpoints, pages, CNodes). Our capabilities grant access to tool morphisms.</li>
+  <li><strong>Delegation</strong>: seL4 supports capability delegation and derivation. Our model supports time-bounded tokens but does not currently support agent-to-agent delegation (a direction for future work).</li>
+  <li><strong>Verification</strong>: seL4's properties are machine-verified in Isabelle/HOL. Our theorems are proved mathematically; formal machine verification is future work.</li>
+</ol>
+
+<p>Capsicum (Watson et al., 2010) provides a more pragmatic model: once a process enters capability mode, it can only access resources through file descriptors it already holds. Our contract-locked configuration (Definition&nbsp;4.6) is directly analogous: once execution begins, the tool set is frozen, and no new capabilities can be acquired.</p>
+
+<h3>10.4 Security Limitations</h3>
+
+<p>Our formal model has several limitations that must be acknowledged:</p>
+
+<ol>
+  <li><strong>Side channels</strong>: The information leakage theorem (Theorem&nbsp;4.5) prevents <em>direct</em> data flow between sandboxes but does not address timing side channels or resource-usage side channels.</li>
+  <li><strong>Tool implementation trust</strong>: We assume tool implementations are correct with respect to their schemas. A malicious tool implementation that ignores its type contract could violate type-safety guarantees.</li>
+  <li><strong>MCP server trust</strong>: MCP-discovered tools rely on the security of external MCP servers. A compromised server could provide tools with misleading descriptions or malicious implementations.</li>
+  <li><strong>Prompt injection</strong>: Tools that process external content (e.g., <code>web-scrape</code>) may return data containing prompt injection attacks. The type system validates structure but not semantic content.</li>
+</ol>
+
+<h3>10.5 Scalability Considerations</h3>
+
+<p>The BEAM virtual machine provides excellent scalability properties for the tool interface layer:</p>
+
+<ul>
+  <li><strong>Concurrent tool invocations</strong>: The BEAM scheduler can handle millions of lightweight processes, allowing massive concurrent tool execution.</li>
+  <li><strong>Fault isolation</strong>: A crashing tool execution affects only its own process; the registry and other tool executions are unaffected.</li>
+  <li><strong>Back-pressure</strong>: GenServer-based registries naturally provide back-pressure through message queue depth monitoring.</li>
+  <li><strong>Distribution</strong>: OTP distribution allows the tool registry to span multiple nodes, with capability tokens validated locally.</li>
+</ul>
+
+<h3>10.6 Future Directions</h3>
+
+<ol>
+  <li><strong>Capability delegation</strong>: Allowing agents to delegate subsets of their capabilities to sub-agents, with formal guarantees that delegated capabilities cannot exceed the delegator's authority.</li>
+  <li><strong>Dependent type integration</strong>: Moving beyond JSON Schema to dependent types (Xi &amp; Pfenning, 1999), enabling schemas where the output type depends on the input value.</li>
+  <li><strong>Differential privacy</strong>: Extending the audit functor with differential privacy guarantees on aggregated tool usage statistics.</li>
+  <li><strong>Formal verification</strong>: Machine-checking the security theorems in Lean&nbsp;4 or Coq, aiming for guarantees comparable to seL4.</li>
+</ol>
+
+<!-- ══════════ 11. CONCLUSION ══════════ -->
+<h2 id="sec-conclusion">11. Conclusion</h2>
+
+<p>We have presented a comprehensive theory of the tool interface layer for an AI Operating System. The key contributions are:</p>
+
+<ol>
+  <li>A <strong>categorical model</strong> (\(\mathbf{Tool}\)) where tools are morphisms, composition is associative (Theorem&nbsp;3.2), capability tokens are representable functors (Definition&nbsp;3.4), and security properties derive from categorical structure.</li>
+  <li>A <strong>formal security architecture</strong> with capability-based access control, sandbox isolation that provably prevents information leakage (Theorem&nbsp;4.5), and contract-locked configurations that freeze the tool set at execution time.</li>
+  <li>A <strong>protocol design</strong> for MCP that achieves universality among tool interfaces (Proposition&nbsp;5.5), with namespacing, parallel discovery, and Bearer token authentication.</li>
+  <li>A <strong>type safety framework</strong> where JSON Schema to Zod conversion is functorial (Definition&nbsp;6.1) and type-safe composition preserves correctness (Theorem&nbsp;6.2).</li>
+  <li>A <strong>production-quality Elixir/OTP implementation</strong> that exploits BEAM process isolation as a natural realisation of categorical sandboxing.</li>
+  <li><strong>Audit and observability</strong> through a functorial logging system that captures every tool invocation with cost attribution.</li>
+</ol>
+
+<p>The tool interface layer is the bridge between intelligence and action. Just as Unix's device driver model enabled a rich ecosystem of applications by abstracting hardware complexity, the AI OS tool layer enables a rich ecosystem of agents by abstracting the complexity of external system interaction. The categorical framework ensures that this abstraction is principled: composition works, types are preserved, security is enforced, and every action is auditable.</p>
+
+<p>In Part&nbsp;III of this series, we turn to the memory and persistence layer&mdash;the mechanism by which agents maintain state across interactions, formalised through the lens of sheaf theory and persistent homology.</p>
+
+<!-- ══════════ REFERENCES ══════════ -->
+<section class="references" id="sec-references">
+<h2>References</h2>
+<ol class="ref-list">
+  <li><span class="ref-key">[Anderson, 1972]</span> Anderson, J. P. (1972). Computer security technology planning study. Technical Report ESD-TR-73-51, US Air Force Electronic Systems Division.</li>
+  <li><span class="ref-key">[Armstrong, 2003]</span> Armstrong, J. (2003). <em>Making Reliable Distributed Systems in the Presence of Software Errors</em>. PhD thesis, Royal Institute of Technology, Stockholm.</li>
+  <li><span class="ref-key">[Awodey, 2010]</span> Awodey, S. (2010). <em>Category Theory</em>. Oxford University Press, 2nd edition.</li>
+  <li><span class="ref-key">[Birgisson et al., 2014]</span> Birgisson, A., Politz, J. G., Erlingsson, U., Taly, A., Vrable, M., and Lentczner, M. (2014). Macaroons: Cookies with contextual caveats for decentralized authorization in the cloud. In <em>NDSS 2014</em>.</li>
+  <li><span class="ref-key">[Brown et al., 2020]</span> Brown, T. B., Mann, B., Ryder, N., et al. (2020). Language models are few-shot learners. In <em>NeurIPS 2020</em>.</li>
+  <li><span class="ref-key">[Cesarini &amp; Thompson, 2009]</span> Cesarini, F. and Thompson, S. (2009). <em>Erlang Programming</em>. O'Reilly Media.</li>
+  <li><span class="ref-key">[Dennis &amp; Van Horn, 1966]</span> Dennis, J. B. and Van Horn, E. C. (1966). Programming semantics for multiprogrammed computations. <em>Communications of the ACM</em>, 9(3):143&ndash;155.</li>
+  <li><span class="ref-key">[E2B, 2024]</span> E2B (2024). E2B Code Interpreter documentation. <a href="https://e2b.dev/docs">https://e2b.dev/docs</a>.</li>
+  <li><span class="ref-key">[Fong &amp; Spivak, 2019]</span> Fong, B. and Spivak, D. I. (2019). <em>An Invitation to Applied Category Theory: Seven Sketches in Compositionality</em>. Cambridge University Press.</li>
+  <li><span class="ref-key">[Hardy, 1988]</span> Hardy, N. (1988). The KeyKOS architecture. <em>ACM SIGOPS Operating Systems Review</em>, 19(4):8&ndash;25.</li>
+  <li><span class="ref-key">[Hewitt et al., 1973]</span> Hewitt, C., Bishop, P., and Steiger, R. (1973). A universal modular ACTOR formalism for artificial intelligence. In <em>IJCAI 1973</em>, pages 235&ndash;245.</li>
+  <li><span class="ref-key">[Juric, 2019]</span> Juric, S. (2019). <em>Elixir in Action</em>. Manning Publications, 2nd edition.</li>
+  <li><span class="ref-key">[Klein et al., 2009]</span> Klein, G., Elphinstone, K., Heiser, G., et al. (2009). seL4: Formal verification of an OS kernel. In <em>SOSP 2009</em>, pages 207&ndash;220.</li>
+  <li><span class="ref-key">[Leinster, 2014]</span> Leinster, T. (2014). <em>Basic Category Theory</em>. Cambridge University Press.</li>
+  <li><span class="ref-key">[Levy, 1984]</span> Levy, H. M. (1984). <em>Capability-Based Computer Systems</em>. Digital Press.</li>
+  <li><span class="ref-key">[Long, 2026a]</span> Long, M. (2026a). The AI Operating System, Part I: Kernel architecture&mdash;process model, scheduling, and categorical foundations. <em>GrokRxiv preprint</em>, 2026.03.</li>
+  <li><span class="ref-key">[Love, 2010]</span> Love, R. (2010). <em>Linux Kernel Development</em>. Addison-Wesley, 3rd edition.</li>
+  <li><span class="ref-key">[Mac Lane, 1998]</span> Mac Lane, S. (1998). <em>Categories for the Working Mathematician</em>. Springer, 2nd edition.</li>
+  <li><span class="ref-key">[Mac Lane &amp; Moerdijk, 1994]</span> Mac Lane, S. and Moerdijk, I. (1994). <em>Sheaves in Geometry and Logic: A First Introduction to Topos Theory</em>. Springer.</li>
+  <li><span class="ref-key">[Meyerovich &amp; Rabkin, 2013]</span> Meyerovich, L. A. and Rabkin, A. S. (2013). Empirical analysis of programming language adoption. In <em>OOPSLA 2013</em>, pages 1&ndash;18.</li>
+  <li><span class="ref-key">[Miller et al., 2003]</span> Miller, M. S., Yee, K.-P., and Shapiro, J. (2003). Capability myths demolished. Technical report, HP Laboratories.</li>
+  <li><span class="ref-key">[MCP Specification, 2024]</span> Model Context Protocol Working Group (2024). Model Context Protocol specification, version 1.0. <a href="https://modelcontextprotocol.io/specification">https://modelcontextprotocol.io/specification</a>.</li>
+  <li><span class="ref-key">[Moggi, 1991]</span> Moggi, E. (1991). Notions of computation and monads. <em>Information and Computation</em>, 93(1):55&ndash;92.</li>
+  <li><span class="ref-key">[OpenAI, 2024]</span> OpenAI (2024). Function calling &mdash; OpenAI API documentation. <a href="https://platform.openai.com/docs/guides/function-calling">https://platform.openai.com/docs/guides/function-calling</a>.</li>
+  <li><span class="ref-key">[Pike et al., 1995]</span> Pike, R., Presotto, D., Dorward, S., Flandrena, B., Thompson, K., Trickey, H., and Winterbottom, P. (1995). Plan 9 from Bell Labs. <em>Computing Systems</em>, 8(3):221&ndash;254.</li>
+  <li><span class="ref-key">[Ritchie &amp; Thompson, 1978]</span> Ritchie, D. M. and Thompson, K. (1978). The UNIX time-sharing system. <em>Bell System Technical Journal</em>, 57(6):1905&ndash;1929.</li>
+  <li><span class="ref-key">[Schick et al., 2024]</span> Schick, T., Dwivedi-Yu, J., Dessi, R., et al. (2024). Toolformer: Language models can teach themselves to use tools. In <em>NeurIPS 2023</em>.</li>
+  <li><span class="ref-key">[Shapiro &amp; Miller, 2023]</span> Shapiro, J. S. and Miller, M. S. (2023). Object-capability security: A retrospective. <em>IEEE Security &amp; Privacy</em>, 21(2):63&ndash;71.</li>
+  <li><span class="ref-key">[Spivak, 2014]</span> Spivak, D. I. (2014). <em>Category Theory for the Sciences</em>. MIT Press.</li>
+  <li><span class="ref-key">[Tanenbaum &amp; Bos, 2014]</span> Tanenbaum, A. S. and Bos, H. (2014). <em>Modern Operating Systems</em>. Pearson, 4th edition.</li>
+  <li><span class="ref-key">[Thomas, 2018]</span> Thomas, D. (2018). <em>Programming Elixir 1.6</em>. Pragmatic Bookshelf.</li>
+  <li><span class="ref-key">[Vercel, 2024]</span> Vercel (2024). Vercel AI SDK documentation, v6. <a href="https://sdk.vercel.ai/docs">https://sdk.vercel.ai/docs</a>.</li>
+  <li><span class="ref-key">[Wadler, 1995]</span> Wadler, P. (1995). Monads for functional programming. In <em>Advanced Functional Programming</em>, LNCS 925, pages 24&ndash;52. Springer.</li>
+  <li><span class="ref-key">[WASI Working Group, 2023]</span> WASI Working Group (2023). WebAssembly System Interface specification. <a href="https://wasi.dev">https://wasi.dev</a>.</li>
+  <li><span class="ref-key">[Watson et al., 2010]</span> Watson, R. N. M., Anderson, J., Laurie, B., and Kennaway, K. (2010). Capsicum: Practical capabilities for UNIX. In <em>USENIX Security 2010</em>, pages 29&ndash;46.</li>
+  <li><span class="ref-key">[Xi &amp; Pfenning, 1999]</span> Xi, H. and Pfenning, F. (1999). Dependent types in practical programming. In <em>POPL 1999</em>, pages 214&ndash;227.</li>
+  <li><span class="ref-key">[Yee, 2003]</span> Yee, K.-P. (2003). Aligning security and usability. <em>IEEE Security &amp; Privacy</em>, 2(5):48&ndash;55.</li>
+</ol>
+</section>
+
+<!-- ══════════ SERIES NAV ══════════ -->
+<div class="series-nav">
+  <h3>The AI Operating System &mdash; Paper Series</h3>
+  <div class="series-grid">
+    <a class="series-card" href="agent-scheduler.html">
+      <div class="part">Part I</div>
+      <div class="title">Kernel Architecture &mdash; Process Model, Scheduling, and Categorical Foundations</div>
+    </a>
+    <a class="series-card current" href="tool-interface.html">
+      <div class="part">Part II (this paper)</div>
+      <div class="title">Tool Interface Layer &mdash; Morphisms, Security, and Capability Abstraction</div>
+    </a>
+    <a class="series-card" href="memory-layer.html">
+      <div class="part">Part III</div>
+      <div class="title">Memory Layer &mdash; Typed Filesystem for Persistent Agent Cognition</div>
+    </a>
+    <a class="series-card" href="planner-engine.html">
+      <div class="part">Part IV</div>
+      <div class="title">Planner Engine &mdash; Order Book Dynamics and Natural Transformation</div>
+    </a>
+    <a class="series-card" href="unified-theory.html">
+      <div class="part">Part V</div>
+      <div class="title">Unified Theory &mdash; Integration of the AI Operating System</div>
+    </a>
+  </div>
+</div>
+
+</main>
+
+<script>
+// TOC toggle for mobile
+const toggle = document.getElementById('tocToggle');
+const nav = document.getElementById('tocNav');
+const overlay = document.getElementById('tocOverlay');
+toggle.addEventListener('click', () => {
+  nav.classList.toggle('open');
+  overlay.classList.toggle('open');
+});
+overlay.addEventListener('click', () => {
+  nav.classList.remove('open');
+  overlay.classList.remove('open');
+});
+// Close TOC on link click (mobile)
+nav.querySelectorAll('a').forEach(a => {
+  a.addEventListener('click', () => {
+    if (window.innerWidth <= 900) {
+      nav.classList.remove('open');
+      overlay.classList.remove('open');
+    }
+  });
+});
+// Active TOC highlight on scroll
+const sections = document.querySelectorAll('h2[id], h3[id]');
+const tocLinks = nav.querySelectorAll('a[href^="#"]');
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      tocLinks.forEach(l => l.classList.remove('active'));
+      const active = nav.querySelector(`a[href="#${entry.target.id}"]`);
+      if (active) active.classList.add('active');
+    }
+  });
+}, { rootMargin: '-80px 0px -70% 0px' });
+sections.forEach(s => observer.observe(s));
+</script>
+
+</body>
+</html>

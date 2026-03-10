@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The AI Operating System — YonedaAI Research</title>
+  <meta name="description" content="A five-part research series formalizing the AI Operating System through category theory, with Erlang/Elixir prototypes. By YonedaAI Research Collective.">
+  <meta property="og:title" content="The AI Operating System — YonedaAI Research">
+  <meta property="og:description" content="Agents, Tools, Memory, and Planning as categorical abstractions for intelligent systems.">
+  <meta property="og:type" content="website">
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --surface: #12121a;
+      --surface-2: #1a1a26;
+      --border: #2a2a3a;
+      --text: #e4e4ef;
+      --text-dim: #8888a0;
+      --accent: #6c5ce7;
+      --accent-glow: rgba(108, 92, 231, 0.15);
+      --accent-2: #a29bfe;
+      --tag-bg: rgba(108, 92, 231, 0.12);
+      --success: #00b894;
+      --warning: #fdcb6e;
+      --radius: 12px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .noise {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .glow-orb {
+      position: fixed;
+      width: 600px;
+      height: 600px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(108, 92, 231, 0.08) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+    .glow-orb-1 { top: -200px; right: -100px; }
+    .glow-orb-2 { bottom: -200px; left: -100px; background: radial-gradient(circle, rgba(0, 184, 148, 0.06) 0%, transparent 70%); }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 24px;
+      position: relative;
+      z-index: 1;
+    }
+
+    header {
+      padding: 80px 0 40px;
+      text-align: center;
+    }
+
+    .logo-mark {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 72px;
+      height: 72px;
+      border-radius: 18px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      margin-bottom: 24px;
+      font-size: 32px;
+      font-weight: 700;
+      color: white;
+      letter-spacing: -1px;
+    }
+
+    h1 {
+      font-size: clamp(2rem, 5vw, 3rem);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, var(--text), var(--accent-2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .subtitle {
+      font-size: 1.15rem;
+      color: var(--text-dim);
+      max-width: 680px;
+      margin: 0 auto 16px;
+    }
+
+    .authors {
+      font-size: 0.95rem;
+      color: var(--accent-2);
+      margin-bottom: 8px;
+    }
+
+    .authors a {
+      color: var(--accent-2);
+      text-decoration: none;
+      border-bottom: 1px solid rgba(162, 155, 254, 0.3);
+    }
+
+    .authors a:hover {
+      border-bottom-color: var(--accent-2);
+    }
+
+    .institution {
+      font-size: 0.85rem;
+      color: var(--text-dim);
+    }
+
+    .architecture-section {
+      padding: 40px 0;
+    }
+
+    .arch-diagram {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 32px;
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+      font-size: 0.8rem;
+      line-height: 1.5;
+      color: var(--accent-2);
+      overflow-x: auto;
+      margin: 24px 0;
+      white-space: pre;
+    }
+
+    .section-label {
+      display: inline-block;
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--accent);
+      background: var(--tag-bg);
+      padding: 4px 12px;
+      border-radius: 100px;
+      margin-bottom: 16px;
+    }
+
+    h2 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 12px;
+    }
+
+    .papers-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 20px;
+      padding: 40px 0;
+    }
+
+    .paper-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+
+    .paper-card:hover {
+      border-color: var(--accent);
+      transform: translateY(-2px);
+    }
+
+    .paper-number {
+      display: inline-block;
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: var(--accent);
+      background: var(--tag-bg);
+      padding: 3px 10px;
+      border-radius: 100px;
+      margin-bottom: 12px;
+    }
+
+    .paper-card h3 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      letter-spacing: -0.01em;
+    }
+
+    .paper-card p {
+      color: var(--text-dim);
+      font-size: 0.9rem;
+      margin-bottom: 16px;
+    }
+
+    .paper-meta {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .tag {
+      display: inline-block;
+      font-size: 0.72rem;
+      font-weight: 500;
+      color: var(--accent-2);
+      background: var(--tag-bg);
+      padding: 3px 10px;
+      border-radius: 100px;
+    }
+
+    .tag.green {
+      color: var(--success);
+      background: rgba(0, 184, 148, 0.12);
+    }
+
+    .tag.yellow {
+      color: var(--warning);
+      background: rgba(253, 203, 110, 0.12);
+    }
+
+    .paper-links {
+      margin-left: auto;
+      display: flex;
+      gap: 10px;
+    }
+
+    .paper-links a {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--accent-2);
+      text-decoration: none;
+      padding: 4px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      transition: all 0.2s;
+    }
+
+    .paper-links a:hover {
+      background: var(--tag-bg);
+      border-color: var(--accent);
+    }
+
+    .synthesis-card {
+      border-color: var(--accent);
+      background: linear-gradient(135deg, var(--surface) 0%, rgba(108, 92, 231, 0.05) 100%);
+    }
+
+    .tech-section {
+      padding: 40px 0;
+    }
+
+    .tech-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+      margin-top: 20px;
+    }
+
+    .tech-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+    }
+
+    .tech-item h4 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .tech-item p {
+      font-size: 0.82rem;
+      color: var(--text-dim);
+    }
+
+    .mapping-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+      font-size: 0.85rem;
+    }
+
+    .mapping-table th {
+      text-align: left;
+      padding: 10px 16px;
+      background: var(--surface-2);
+      color: var(--accent-2);
+      font-weight: 600;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .mapping-table td {
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-dim);
+    }
+
+    .mapping-table tr:hover td {
+      color: var(--text);
+      background: rgba(108, 92, 231, 0.03);
+    }
+
+    footer {
+      padding: 40px 0;
+      text-align: center;
+      border-top: 1px solid var(--border);
+      margin-top: 40px;
+    }
+
+    footer p {
+      font-size: 0.82rem;
+      color: var(--text-dim);
+    }
+
+    footer a {
+      color: var(--accent-2);
+      text-decoration: none;
+    }
+
+    @media (max-width: 768px) {
+      header { padding: 48px 0 32px; }
+      .paper-meta { flex-direction: column; align-items: flex-start; }
+      .paper-links { margin-left: 0; margin-top: 8px; }
+      .arch-diagram { font-size: 0.65rem; padding: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="noise"></div>
+  <div class="glow-orb glow-orb-1"></div>
+  <div class="glow-orb glow-orb-2"></div>
+
+  <div class="container">
+    <header>
+      <div class="logo-mark">OS</div>
+      <h1>The AI Operating System</h1>
+      <p class="subtitle">A five-part research series formalizing agent scheduling, tool interfaces, typed memory, and market-based planning through category theory &mdash; with Erlang/Elixir prototypes.</p>
+      <p class="authors">Matthew Long &middot; <a href="https://yonedaai.com">YonedaAI Research Collective</a></p>
+      <p class="institution">Chicago, IL &middot; matthew@yonedaai.com</p>
+    </header>
+
+    <section class="architecture-section">
+      <div class="section-label">Architecture</div>
+      <h2>System Design</h2>
+      <p style="color: var(--text-dim); font-size: 0.9rem; margin-bottom: 8px;">An AI OS manages models, agents, knowledge, and tasks &mdash; the same way Linux manages processes, memory, files, and hardware.</p>
+      <div class="arch-diagram">                         AI Operating System
+
+              ┌─────────────────────────────────────────┐
+              │          IV. Planner Engine              │
+              │   Natural Transformation: F ⇒ G         │
+              │   Order Book · Escrow · Decomposition   │
+              └───────────────────┬─────────────────────┘
+                                  │
+              ┌───────────────────┴─────────────────────┐
+              │          I. Agent Scheduler              │
+              │   Objects in Category A                  │
+              │   Supervision · Priority · Streaming     │
+              └───────────────────┬─────────────────────┘
+                                  │
+        ┌─────────────────────────┼─────────────────────────┐
+        │                         │                         │
+┌───────┴────────┐    ┌──────────┴──────────┐    ┌─────────┴────────┐
+│ II. Tools      │    │ III. Memory Layer   │    │  Model Runtime   │
+│ Morphisms      │    │ Functors            │    │  (LLM Inference) │
+│ Capability     │    │ Mem[S] Typed        │    │  GPU Orchestrate │
+│ MCP Protocol   │    │ Versioned · Graph   │    │                  │
+└────────────────┘    └─────────────────────┘    └──────────────────┘
+        │                         │                         │
+        └─────────────────────────┼─────────────────────────┘
+                                  │
+              ┌───────────────────┴─────────────────────┐
+              │         Observability · Security         │
+              │   Audit Logging · Alignment · Telemetry  │
+              └─────────────────────────────────────────┘</div>
+    </section>
+
+    <section>
+      <div class="section-label">Papers</div>
+      <h2>Research Series</h2>
+
+      <div class="papers-grid">
+        <div class="paper-card">
+          <span class="paper-number">Part I</span>
+          <h3>Agent Scheduler: Complex Orchestration as Process Management</h3>
+          <p>Agents are complex orchestrations &mdash; web testing, legal analysis, security auditing, dashboard generation. They all require workflow and validation patterns. We formalize agent scheduling as objects in a category with OTP supervision trees providing fault-tolerant execution.</p>
+          <div class="paper-meta">
+            <span class="tag">Agents = Objects</span>
+            <span class="tag green">Elixir/OTP</span>
+            <span class="tag">cs.AI</span>
+            <div class="paper-links">
+              <a href="papers/agent-scheduler.html">Read</a>
+              <a href="https://github.com/AgentHeroWork/agent-os/blob/main/papers/pdf/agent-scheduler.pdf">PDF</a>
+              <a href="https://github.com/AgentHeroWork/agent-os/tree/main/src/agent_scheduler">Code</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="paper-card">
+          <span class="paper-number">Part II</span>
+          <h3>Tool Interface Layer: Morphisms, Security, and Capability Abstraction</h3>
+          <p>Tools mediate between agents and external systems &mdash; analogous to device drivers. We formalize tools as morphisms with capability-based security, drawing on MCP protocol design and E2B sandbox isolation from production systems.</p>
+          <div class="paper-meta">
+            <span class="tag">Tools = Morphisms</span>
+            <span class="tag green">Elixir/OTP</span>
+            <span class="tag">cs.AI</span>
+            <div class="paper-links">
+              <a href="papers/tool-interface.html">Read</a>
+              <a href="https://github.com/AgentHeroWork/agent-os/blob/main/papers/pdf/tool-interface.pdf">PDF</a>
+              <a href="https://github.com/AgentHeroWork/agent-os/tree/main/src/tool_interface">Code</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="paper-card">
+          <span class="paper-number">Part III</span>
+          <h3>Memory Layer: Typed Filesystem for Persistent Agent Cognition</h3>
+          <p>Agent memory requires typed schemas, versioning with causal tracking, semantic search, and graph relationships. We formalize memory as a functor from schema categories to storage categories, with ContextFS as reference implementation.</p>
+          <div class="paper-meta">
+            <span class="tag">Memory = Functor</span>
+            <span class="tag green">Elixir/OTP</span>
+            <span class="tag">cs.AI</span>
+            <div class="paper-links">
+              <a href="papers/memory-layer.html">Read</a>
+              <a href="https://github.com/AgentHeroWork/agent-os/blob/main/papers/pdf/memory-layer.pdf">PDF</a>
+              <a href="https://github.com/AgentHeroWork/agent-os/tree/main/src/memory_layer">Code</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="paper-card">
+          <span class="paper-number">Part IV</span>
+          <h3>Planner Engine: Order Book Dynamics and Natural Transformation</h3>
+          <p>The planner orchestrates everything through a marketplace mechanism &mdash; a bidding/order book where agents offer capabilities and clients request work. We formalize planning as a natural transformation with escrow as a monad.</p>
+          <div class="paper-meta">
+            <span class="tag">Planner = Nat. Trans.</span>
+            <span class="tag green">Elixir/OTP</span>
+            <span class="tag">cs.AI</span>
+            <div class="paper-links">
+              <a href="papers/planner-engine.html">Read</a>
+              <a href="https://github.com/AgentHeroWork/agent-os/blob/main/papers/pdf/planner-engine.pdf">PDF</a>
+              <a href="https://github.com/AgentHeroWork/agent-os/tree/main/src/planner_engine">Code</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="paper-card synthesis-card">
+          <span class="paper-number">Part V &mdash; Synthesis</span>
+          <h3>The AI Operating System as Categorical Framework</h3>
+          <p>The synthesis paper unifies all four abstractions into a coherent operating system architecture. We prove that the composition of agent scheduling, tool interfaces, typed memory, and market-based planning forms a well-defined categorical structure with emergent properties.</p>
+          <div class="paper-meta">
+            <span class="tag yellow">Unified Theory</span>
+            <span class="tag green">Elixir/OTP</span>
+            <span class="tag">cs.AI</span>
+            <div class="paper-links">
+              <a href="papers/synthesis.html">Read</a>
+              <a href="https://github.com/AgentHeroWork/agent-os/blob/main/papers/pdf/synthesis.pdf">PDF</a>
+              <a href="https://github.com/AgentHeroWork/agent-os/tree/main/src/agent_os">Code</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="tech-section">
+      <div class="section-label">Categorical Mapping</div>
+      <h2>From Linux to AI OS</h2>
+
+      <table class="mapping-table">
+        <thead>
+          <tr>
+            <th>Resource</th>
+            <th>Traditional OS</th>
+            <th>AI OS</th>
+            <th>Category Theory</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Compute</td>
+            <td>CPU processes</td>
+            <td>Agents (companies, freelancers)</td>
+            <td>Objects in category <strong>A</strong></td>
+          </tr>
+          <tr>
+            <td>Operations</td>
+            <td>System calls / drivers</td>
+            <td>Tools (MCP, sandboxed APIs)</td>
+            <td>Morphisms between objects</td>
+          </tr>
+          <tr>
+            <td>State</td>
+            <td>RAM + filesystem</td>
+            <td>Typed memory (Mem[S], versioned)</td>
+            <td>Functors S &rarr; St</td>
+          </tr>
+          <tr>
+            <td>Coordination</td>
+            <td>Scheduler / init</td>
+            <td>Planner (order book, escrow)</td>
+            <td>Natural transformations</td>
+          </tr>
+          <tr>
+            <td>Composition</td>
+            <td>Pipes / IPC</td>
+            <td>Agent streaming bus</td>
+            <td>Functor composition</td>
+          </tr>
+          <tr>
+            <td>Fault tolerance</td>
+            <td>Process restart</td>
+            <td>OTP supervision trees</td>
+            <td>Limit preservation</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="tech-section">
+      <div class="section-label">Implementation</div>
+      <h2>Why Erlang/Elixir</h2>
+      <p style="color: var(--text-dim); font-size: 0.9rem; margin-bottom: 16px;">The BEAM VM was designed as a telecom operating system. Its primitives map directly to AI OS requirements.</p>
+
+      <div class="tech-grid">
+        <div class="tech-item">
+          <h4>Supervision Trees</h4>
+          <p>OTP supervisors restart failed agents automatically. "Let it crash" maps perfectly to agent fault tolerance.</p>
+        </div>
+        <div class="tech-item">
+          <h4>Lightweight Processes</h4>
+          <p>Millions of concurrent processes on a single node. Each agent is its own isolated process with its own mailbox.</p>
+        </div>
+        <div class="tech-item">
+          <h4>ETS + Mnesia</h4>
+          <p>In-memory tables for working memory (ETS) and distributed persistent storage for knowledge (Mnesia).</p>
+        </div>
+        <div class="tech-item">
+          <h4>Hot Code Reload</h4>
+          <p>Update agent behavior without stopping the system. Deploy new agent versions with zero downtime.</p>
+        </div>
+        <div class="tech-item">
+          <h4>Distribution</h4>
+          <p>Native multi-node clustering. Agents can migrate between nodes for load balancing and fault tolerance.</p>
+        </div>
+        <div class="tech-item">
+          <h4>Message Passing</h4>
+          <p>No shared state. Agents communicate via typed messages, preventing race conditions by design.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="tech-section">
+      <div class="section-label">Production Systems</div>
+      <h2>Built on Real Architecture</h2>
+      <p style="color: var(--text-dim); font-size: 0.9rem; margin-bottom: 16px;">This research is grounded in production systems, not theory alone.</p>
+
+      <div class="tech-grid">
+        <div class="tech-item">
+          <h4>Agent-Hero Marketplace</h4>
+          <p>Production AI agent marketplace with job bidding, escrow, multi-provider LLM execution, and 6-dimensional quality evaluation.</p>
+        </div>
+        <div class="tech-item">
+          <h4>Agent Testing Framework</h4>
+          <p>5-phase streaming pipeline for web application testing: Recon, Behavior, Load, Observer, Synthesis.</p>
+        </div>
+        <div class="tech-item">
+          <h4>ContextFS</h4>
+          <p>Typed memory filesystem with Mem[S] schemas, versioning, graph lineage, multi-backend storage, and MCP integration.</p>
+        </div>
+        <div class="tech-item">
+          <h4>MCP Protocol</h4>
+          <p>Model Context Protocol for universal tool discovery and invocation across AI agents and platforms.</p>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <p>&copy; 2026 YonedaAI Research Collective &middot; <a href="https://yonedaai.com">yonedaai.com</a> &middot; <a href="https://github.com/AgentHeroWork/agent-os">GitHub</a></p>
+      <p style="margin-top: 8px;">GrokRxiv:2026.03 &middot; Chicago, IL</p>
+    </footer>
+  </div>
+</body>
+</html>

@@ -1,0 +1,162 @@
+defmodule AgentScheduler do
+  @moduledoc """
+  AI Agent Scheduler — OTP-based process management for AI agent orchestration.
+
+  This is the top-level application module that starts the supervision tree for
+  the entire agent scheduling system. The architecture mirrors OS process management:
+
+  - **AgentScheduler.Scheduler** — Priority-based, credit-weighted scheduling (analogous to Linux CFS)
+  - **AgentScheduler.Supervisor** — DynamicSupervisor for agent pools (analogous to OTP supervision trees)
+  - **AgentScheduler.Agent** — Individual agent lifecycle management (analogous to OS processes)
+  - **AgentScheduler.Pipeline** — Streaming pipeline with EventEmitter-style pub/sub
+  - **AgentScheduler.Evaluator** — 6-dimensional quality evaluation and reputation computation
+
+  ## Supervision Tree
+
+      AgentScheduler (Application)
+      ├── Registry (unique, :agent_registry)
+      ├── AgentScheduler.Evaluator
+      ├── AgentScheduler.Scheduler
+      ├── AgentScheduler.Pipeline
+      └── AgentScheduler.Supervisor (DynamicSupervisor)
+          ├── Agent_1
+          ├── Agent_2
+          └── Agent_n
+
+  The tree uses `:rest_for_one` strategy at the top level: if the Registry crashes,
+  all downstream components that depend on it are restarted in order. The
+  DynamicSupervisor uses `:one_for_one` so individual agent failures are isolated.
+
+  ## Execution Pipeline
+
+  Follows the Agent-Hero model:
+  Job → Proposal → Contract → Decomposition → Execution → Evaluation
+
+  Each transition is a morphism in the execution category, with durable execution
+  (Inngest-style memoization) ensuring idempotent replay on crash recovery.
+  """
+
+  use Application
+
+  @impl true
+  @spec start(Application.start_type(), term()) :: {:ok, pid()} | {:error, term()}
+  def start(_type, _args) do
+    children = [
+      {Registry, keys: :unique, name: AgentScheduler.Registry},
+      {AgentScheduler.Evaluator, []},
+      {AgentScheduler.Scheduler, []},
+      {AgentScheduler.Pipeline, []},
+      {AgentScheduler.Supervisor, []}
+    ]
+
+    opts = [
+      strategy: :rest_for_one,
+      name: AgentScheduler.AppSupervisor,
+      max_restarts: 10,
+      max_seconds: 60
+    ]
+
+    Supervisor.start_link(children, opts)
+  end
+
+  @doc """
+  Submits a job to the agent scheduling system.
+
+  This is the primary entry point for clients. The job flows through the
+  full execution pipeline: scheduling → agent assignment → execution → evaluation.
+
+  ## Parameters
+
+    - `client_id` — The client submitting the job
+    - `job` — A map containing `:task`, `:input`, `:oversight`, and optional `:priority`
+    - `opts` — Additional options (`:timeout`, `:max_retries`)
+
+  ## Returns
+
+    - `{:ok, job_id}` on successful submission
+    - `{:error, reason}` on failure
+
+  ## Examples
+
+      iex> AgentScheduler.submit_job("client_1", %{
+      ...>   task: :web_testing,
+      ...>   input: %{url: "https://example.com"},
+      ...>   oversight: :autonomous_escalation
+      ...> })
+      {:ok, "job_abc123"}
+  """
+  @spec submit_job(String.t(), map(), keyword()) :: {:ok, String.t()} | {:error, term()}
+  def submit_job(client_id, job, opts \\ []) do
+    job_id = generate_job_id()
+
+    job_spec = %{
+      id: job_id,
+      client_id: client_id,
+      task: Map.fetch!(job, :task),
+      input: Map.fetch!(job, :input),
+      oversight: Map.get(job, :oversight, :autonomous_escalation),
+      priority: Map.get(job, :priority, :marketplace),
+      max_retries: Keyword.get(opts, :max_retries, 3),
+      timeout: Keyword.get(opts, :timeout, :timer.minutes(30)),
+      submitted_at: System.monotonic_time(:millisecond)
+    }
+
+    case AgentScheduler.Scheduler.enqueue(client_id, job_spec) do
+      :ok -> {:ok, job_id}
+      {:error, _} = error -> error
+    end
+  end
+
+  @doc """
+  Starts an agent in the supervised pool.
+
+  The agent is registered under the DynamicSupervisor and can be looked up
+  by ID through the Registry.
+  """
+  @spec start_agent(String.t(), map(), keyword()) :: {:ok, pid()} | {:error, term()}
+  def start_agent(agent_id, profile, opts \\ []) do
+    AgentScheduler.Supervisor.start_agent(
+      id: agent_id,
+      profile: profile,
+      credits: Keyword.get(opts, :credits, 0),
+      oversight: Keyword.get(opts, :oversight, :autonomous_escalation)
+    )
+  end
+
+  @doc """
+  Returns the evaluation scores for an agent.
+  """
+  @spec get_evaluation(String.t()) :: {:ok, map()} | {:error, :not_found}
+  def get_evaluation(agent_id) do
+    AgentScheduler.Evaluator.get_scores(agent_id)
+  end
+
+  @doc """
+  Creates a streaming pipeline with the given stages and subscriptions.
+
+  ## Example: Web Testing Pipeline
+
+      AgentScheduler.create_pipeline(:web_testing, [
+        {:recon, publishes: [:page_discovered, :api_found, :sitemap_built]},
+        {:behavior, subscribes: [:page_discovered, :sitemap_built],
+                    publishes: [:test_generated, :flow_mapped]},
+        {:load, subscribes: [:api_found, :flow_mapped],
+                publishes: [:load_result, :perf_metric]},
+        {:observer, subscribes: [:test_generated, :load_result, :perf_metric],
+                    publishes: [:anomaly_detected, :observation_complete]},
+        {:synthesis, subscribes: [:test_generated, :load_result,
+                                  :anomaly_detected, :observation_complete],
+                     publishes: [:final_report]}
+      ])
+  """
+  @spec create_pipeline(atom(), keyword()) :: {:ok, String.t()} | {:error, term()}
+  def create_pipeline(name, stages) do
+    AgentScheduler.Pipeline.create(name, stages)
+  end
+
+  # -- Private --
+
+  defp generate_job_id do
+    "job_" <> Base.encode16(:crypto.strong_rand_bytes(8), case: :lower)
+  end
+end
