@@ -16,6 +16,9 @@
   <meta name="twitter:title" content="The AI Operating System — YonedaAI Research">
   <meta name="twitter:description" content="Functional design patterns for intelligent agent infrastructure. 5 papers + Elixir/OTP reference implementation.">
   <meta name="twitter:image" content="https://agentherowork.github.io/agent-os/og-image.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     :root {
       --bg: #0a0a0f;
@@ -138,14 +141,156 @@
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      padding: 32px;
-      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
-      font-size: 0.8rem;
-      line-height: 1.5;
-      color: var(--accent-2);
-      overflow-x: auto;
+      padding: 40px 32px;
       margin: 24px 0;
-      white-space: pre;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+    }
+
+    .arch-title {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--accent-2);
+      letter-spacing: 0.05em;
+      margin-bottom: 24px;
+    }
+
+    .arch-box {
+      border: 1.5px solid var(--accent);
+      border-radius: 10px;
+      padding: 16px 24px;
+      text-align: center;
+      background: rgba(108, 92, 231, 0.04);
+      width: fit-content;
+      min-width: 280px;
+    }
+
+    .arch-box h4 {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .arch-box p {
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      line-height: 1.4;
+    }
+
+    .arch-connector {
+      width: 1.5px;
+      height: 28px;
+      background: var(--border);
+      flex-shrink: 0;
+    }
+
+    .arch-connector-h {
+      height: 1.5px;
+      background: var(--border);
+      flex: 1;
+    }
+
+    .arch-row {
+      display: flex;
+      gap: 16px;
+      align-items: stretch;
+      justify-content: center;
+      width: 100%;
+      max-width: 780px;
+    }
+
+    .arch-row .arch-box {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .arch-branch {
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      width: 100%;
+      max-width: 780px;
+      height: 28px;
+      position: relative;
+    }
+
+    .arch-branch::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 1.5px;
+      height: 14px;
+      background: var(--border);
+    }
+
+    .arch-branch::after {
+      content: '';
+      position: absolute;
+      top: 14px;
+      height: 1.5px;
+      background: var(--border);
+      /* 3 equal boxes with 16px gaps: center of box 1 to center of box 3 */
+      left: calc((100% - 32px) / 6);
+      right: calc((100% - 32px) / 6);
+    }
+
+    .arch-branch-legs,
+    .arch-merge-legs {
+      display: flex;
+      gap: 16px;
+      width: 100%;
+      max-width: 780px;
+    }
+
+    .arch-branch-leg,
+    .arch-merge-leg {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+    }
+
+    .arch-branch-leg::after,
+    .arch-merge-leg::after {
+      content: '';
+      width: 1.5px;
+      height: 14px;
+      background: var(--border);
+    }
+
+    .arch-merge {
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      width: 100%;
+      max-width: 780px;
+      height: 28px;
+      position: relative;
+    }
+
+    .arch-merge::before {
+      content: '';
+      position: absolute;
+      top: 14px;
+      height: 1.5px;
+      background: var(--border);
+      left: calc((100% - 32px) / 6);
+      right: calc((100% - 32px) / 6);
+    }
+
+    .arch-merge::after {
+      content: '';
+      position: absolute;
+      top: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 1.5px;
+      height: 14px;
+      background: var(--border);
     }
 
     .section-label {
@@ -295,10 +440,26 @@
       color: var(--text-dim);
     }
 
+    a.tech-item {
+      transition: border-color 0.2s, transform 0.2s;
+    }
+
+    a.tech-item:hover {
+      border-color: var(--accent);
+      transform: translateY(-2px);
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      margin: 20px 0;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+    }
+
     .mapping-table {
       width: 100%;
       border-collapse: collapse;
-      margin: 20px 0;
       font-size: 0.85rem;
     }
 
@@ -318,6 +479,10 @@
       padding: 10px 16px;
       border-bottom: 1px solid var(--border);
       color: var(--text-dim);
+    }
+
+    .mapping-table tbody tr:last-child td {
+      border-bottom: none;
     }
 
     .mapping-table tr:hover td {
@@ -346,7 +511,26 @@
       header { padding: 48px 0 32px; }
       .paper-meta { flex-direction: column; align-items: flex-start; }
       .paper-links { margin-left: 0; margin-top: 8px; }
-      .arch-diagram { font-size: 0.65rem; padding: 16px; }
+      .arch-diagram { padding: 24px 16px; }
+      .arch-box { min-width: 0; padding: 10px 14px; }
+      .arch-box h4 { font-size: 0.78rem; }
+      .arch-box p { font-size: 0.68rem; }
+      .arch-row { gap: 8px; }
+      .arch-branch-legs,
+      .arch-merge-legs { gap: 8px; }
+      .arch-branch::after { left: calc((100% - 16px) / 6); right: calc((100% - 16px) / 6); }
+      .arch-merge::before { left: calc((100% - 16px) / 6); right: calc((100% - 16px) / 6); }
+      .mapping-table { font-size: 0.75rem; }
+      .mapping-table th, .mapping-table td { padding: 8px 10px; }
+    }
+
+    @media (max-width: 480px) {
+      .arch-row { flex-direction: column; gap: 12px; align-items: center; }
+      .arch-branch, .arch-merge,
+      .arch-branch-legs, .arch-merge-legs { display: none; }
+      .arch-connector { height: 16px; }
+      .arch-box { width: 100%; min-width: 0; }
+      .arch-row .arch-box { flex: none; }
     }
   </style>
 </head>
@@ -368,35 +552,55 @@
       <div class="section-label">Architecture</div>
       <h2>System Design</h2>
       <p style="color: var(--text-dim); font-size: 0.9rem; margin-bottom: 8px;">An AI OS manages models, agents, knowledge, and tasks &mdash; the same way Linux manages processes, memory, files, and hardware.</p>
-      <div class="arch-diagram">                         AI Operating System
+      <div class="arch-diagram">
+        <div class="arch-title">AI Operating System</div>
 
-              ┌─────────────────────────────────────────┐
-              │          IV. Planner Engine              │
-              │   Market Clearing · Escrow · Reputation  │
-              │   Order Book · DAG Decomposition         │
-              └───────────────────┬─────────────────────┘
-                                  │
-              ┌───────────────────┴─────────────────────┐
-              │          I. Agent Scheduler              │
-              │   GenServer Lifecycle · Pipeline |>      │
-              │   Supervision · Priority · Streaming     │
-              └───────────────────┬─────────────────────┘
-                                  │
-        ┌─────────────────────────┼─────────────────────────┐
-        │                         │                         │
-┌───────┴────────┐    ┌──────────┴──────────┐    ┌─────────┴────────┐
-│ II. Tools      │    │ III. Memory Layer   │    │  Model Runtime   │
-│ 3-Tier Registry│    │ Typed Schemas       │    │  (LLM Inference) │
-│ Capabilities   │    │ Mem[S] Versioned    │    │  GPU Orchestrate │
-│ MCP Protocol   │    │ ETS · Mnesia · Graph│    │                  │
-└────────────────┘    └─────────────────────┘    └──────────────────┘
-        │                         │                         │
-        └─────────────────────────┼─────────────────────────┘
-                                  │
-              ┌───────────────────┴─────────────────────┐
-              │         Observability · Security         │
-              │   Audit Logging · Alignment · Telemetry  │
-              └─────────────────────────────────────────┘</div>
+        <div class="arch-box">
+          <h4>IV. Planner Engine</h4>
+          <p>Market Clearing · Escrow · Reputation · Order Book · DAG Decomposition</p>
+        </div>
+
+        <div class="arch-connector"></div>
+
+        <div class="arch-box">
+          <h4>I. Agent Scheduler</h4>
+          <p>GenServer Lifecycle · Pipeline |&gt; · Supervision · Priority · Streaming</p>
+        </div>
+
+        <div class="arch-branch"></div>
+        <div class="arch-branch-legs">
+          <div class="arch-branch-leg"></div>
+          <div class="arch-branch-leg"></div>
+          <div class="arch-branch-leg"></div>
+        </div>
+
+        <div class="arch-row">
+          <div class="arch-box">
+            <h4>II. Tools</h4>
+            <p>3-Tier Registry · Capabilities · MCP Protocol</p>
+          </div>
+          <div class="arch-box">
+            <h4>III. Memory Layer</h4>
+            <p>Typed Schemas · Mem[S] Versioned · ETS · Mnesia · Graph</p>
+          </div>
+          <div class="arch-box">
+            <h4>Model Runtime</h4>
+            <p>LLM Inference · GPU Orchestration</p>
+          </div>
+        </div>
+
+        <div class="arch-merge-legs">
+          <div class="arch-merge-leg"></div>
+          <div class="arch-merge-leg"></div>
+          <div class="arch-merge-leg"></div>
+        </div>
+        <div class="arch-merge"></div>
+
+        <div class="arch-box">
+          <h4>Observability · Security</h4>
+          <p>Audit Logging · Alignment · Telemetry</p>
+        </div>
+      </div>
     </section>
 
     <section>
@@ -490,6 +694,7 @@
       <div class="section-label">Design Mapping</div>
       <h2>From Linux to AI OS</h2>
 
+      <div class="table-wrap">
       <table class="mapping-table">
         <thead>
           <tr>
@@ -538,6 +743,7 @@
           </tr>
         </tbody>
       </table>
+      </div>
     </section>
 
     <section class="tech-section">
@@ -579,22 +785,22 @@
       <p style="color: var(--text-dim); font-size: 0.9rem; margin-bottom: 16px;">This research is grounded in production systems, not theory alone.</p>
 
       <div class="tech-grid">
-        <div class="tech-item">
+        <a href="https://agenthero.work" class="tech-item" style="text-decoration:none;color:inherit;">
           <h4>Agent-Hero Marketplace</h4>
           <p>Production AI agent marketplace with job bidding, escrow, multi-provider LLM execution, and 6-dimensional quality evaluation.</p>
-        </div>
-        <div class="tech-item">
+        </a>
+        <a href="https://github.com/AgentHeroWork/agent-testing-framework" class="tech-item" style="text-decoration:none;color:inherit;">
           <h4>Agent Testing Framework</h4>
           <p>5-phase streaming pipeline for web application testing: Recon, Behavior, Load, Observer, Synthesis.</p>
-        </div>
-        <div class="tech-item">
+        </a>
+        <a href="https://contextfs.ai" class="tech-item" style="text-decoration:none;color:inherit;">
           <h4>ContextFS</h4>
           <p>Typed memory filesystem with Mem[S] schemas, versioning, graph lineage, multi-backend storage, and MCP integration.</p>
-        </div>
-        <div class="tech-item">
+        </a>
+        <a href="https://modelcontextprotocol.io" class="tech-item" style="text-decoration:none;color:inherit;">
           <h4>MCP Protocol</h4>
           <p>Model Context Protocol for universal tool discovery and invocation across AI agents and platforms.</p>
-        </div>
+        </a>
       </div>
     </section>
 
