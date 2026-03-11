@@ -177,14 +177,10 @@ img{max-width:100%;height:auto;border-radius:8px}
 <p>The <code>:rest_for_one</code> strategy ensures that if the Registry crashes, all dependent components restart in order. The DynamicSupervisor uses <code>:one_for_one</code> so individual agent failures are isolated.</p>
 <h3 data-number="2.1.2" id="key-modules"><span class="header-section-number">2.1.2</span> Key Modules</h3>
 <div class="description">
-<p>A GenServer managing an individual agent’s state machine: <code>:pending</code> <span class="math inline">\to</span> <code>:running</code> <span class="math inline">\to</span> <code>:waiting_approval</code> <span class="math inline">\to</span> <code>:completed</code>. Implements durable execution via a memoization store: each step function is keyed by a unique identifier, and completed steps are replayed from the memo store on crash recovery without re-execution.</p>
-<p>A credit-weighted priority scheduler using Erlang’s <code>:gb_trees</code> (balanced binary trees) for <span class="math inline">O(\log n)</span> enqueue/dequeue. Each client accumulates <em>agent virtual runtime</em> (avruntime) proportional to credits consumed: <span class="math display">\begin{equation}
-
-      \text{avruntime}(c) \mathrel{+}= \frac{\kappa_A &middot; \text{cr}_0}
-                                              {\text{cr}_c &middot; w(p_c)}
-\end{equation}</span> where <span class="math inline">\kappa_A</span> is agent cost, <span class="math inline">\text{cr}_0 = 1000</span> is the reference credit amount, <span class="math inline">\text{cr}_c</span> is the client’s remaining credits, and <span class="math inline">w(p_c)</span> is the priority weight (4.0 for contracted, 1.0 for marketplace). The scheduler always dispatches the client with the smallest avruntime.</p>
-<p>Streaming pipelines with EventEmitter-style pub/sub. Each pipeline consists of ordered stages declaring what event types they publish and subscribe to. The pipeline constraint ensures stages only subscribe to events from earlier stages: <span class="math inline">\text{sub}(s_i) \subseteq \bigcup_{j &lt; i} \text{pub}(s_j)</span>.</p>
-<p>Six-dimensional quality evaluation across: quality, adherence, speed, cost efficiency, error rate, and revision count. The composite score is a weighted inner product, and reputation is computed as an EWMA: <span class="math inline">R_t = \alpha &middot; s_t + (1 - \alpha) &middot; R_{t-1}</span> with <span class="math inline">\alpha = 0.3</span>.</p>
+<p>A GenServer managing an individual agent’s state machine: <code>:pending</code> $\to$ <code>:running</code> $\to$ <code>:waiting_approval</code> $\to$ <code>:completed</code>. Implements durable execution via a memoization store: each step function is keyed by a unique identifier, and completed steps are replayed from the memo store on crash recovery without re-execution.</p>
+<p>A credit-weighted priority scheduler using Erlang’s <code>:gb_trees</code> (balanced binary trees) for $O(\log n)$ enqueue/dequeue. Each client accumulates <em>agent virtual runtime</em> (avruntime) proportional to credits consumed: $$\text{avruntime}(c) \mathrel{+}= \frac{\kappa_A \cdot \text{cr}_0}{\text{cr}_c \cdot w(p_c)}$$ where $\kappa_A$ is agent cost, $\text{cr}_0 = 1000$ is the reference credit amount, $\text{cr}_c$ is the client’s remaining credits, and $w(p_c)$ is the priority weight (4.0 for contracted, 1.0 for marketplace). The scheduler always dispatches the client with the smallest avruntime.</p>
+<p>Streaming pipelines with EventEmitter-style pub/sub. Each pipeline consists of ordered stages declaring what event types they publish and subscribe to. The pipeline constraint ensures stages only subscribe to events from earlier stages: $\text{sub}(s_i) \subseteq \bigcup_{j &lt; i} \text{pub}(s_j)$.</p>
+<p>Six-dimensional quality evaluation across: quality, adherence, speed, cost efficiency, error rate, and revision count. The composite score is a weighted inner product, and reputation is computed as an EWMA: $R_t = \alpha \cdot s_t + (1 - \alpha) \cdot R_{t-1}$ with $\alpha = 0.3$.</p>
 </div>
 <h3 data-number="2.1.3" id="public-interface"><span class="header-section-number">2.1.3</span> Public Interface</h3>
 <pre class="elixir" data-language="elixir" data-caption="Agent Scheduler public API"><code>AgentScheduler.submit_job(client_id, job, opts)
@@ -384,12 +380,8 @@ MemoryLayer.Graph.traverse(start_id, pattern, opts)
 <p>— Submitted by agents, specifying execution plan, estimated credits, duration, and confidence score.</p>
 </dd>
 </dl>
-<p>Matching uses price-time priority: proposals are sorted by <code>(estimated_credits ASC, timestamp ASC)</code>. A match occurs when the best proposal’s credits <span class="math inline">&le;</span> demand’s budget ceiling. Upon match, all other proposals are auto-rejected.</p>
-<p>The cost functional for ranking proposals is: <span class="math display">\begin{equation}
-
-  \text{cost}(\alpha, \tau) = \frac{\text{estimated\_credits}}
-                                    {1 + \text{confidence} &times; \text{reputation}}
-\end{equation}</span></p>
+<p>Matching uses price-time priority: proposals are sorted by <code>(estimated_credits ASC, timestamp ASC)</code>. A match occurs when the best proposal’s credits $\le$ demand’s budget ceiling. Upon match, all other proposals are auto-rejected.</p>
+<p>The cost functional for ranking proposals is: $$\text{cost}(\alpha, \tau) = \frac{\text{estimated\_credits}}{1 + \text{confidence} \times \text{reputation}}$$</p>
 <h3 data-number="2.4.2" id="escrow"><span class="header-section-number">2.4.2</span> Escrow</h3>
 <p>Financial transactions use Mnesia-backed escrow:</p>
 <ol>
@@ -448,16 +440,9 @@ schedule = PlannerEngine.Decomposer.topological_sort(dag)
 </tbody>
 </table>
 <h3 data-number="2.4.5" id="reputation-and-anti-gaming"><span class="header-section-number">2.4.5</span> Reputation and Anti-Gaming</h3>
-<p>The reputation system scores agents across 6 dimensions (accuracy, completeness, timeliness, communication, efficiency, innovation) using exponentially-weighted moving averages with decay factor <span class="math inline">\lambda = 0.95</span>:</p>
-<p><span class="math display">\begin{equation}
-
-  R(\alpha) = \frac{\sum_{i=1}^{N} \lambda^{N-i} \langle w, q_i \rangle}
-                    {\sum_{i=1}^{N} \lambda^{N-i}}
-\end{equation}</span></p>
-<p>The trust score incorporates anti-gaming detection: <span class="math display">\begin{equation}
-
-  T(\alpha) = R(\alpha) &times; (1 - \gamma(\alpha)) &times; \min\!\Big(1, \frac{N(\alpha)}{N_{\min}}\Big)
-\end{equation}</span> where <span class="math inline">\gamma(\alpha)</span> is the gaming suspicion score (0 to 1) and <span class="math inline">N_{\min} = 5</span> is the seasoning threshold. Five anomaly detectors run on each evaluation: score inflation, rapid cycling, perfect streaks, self-dealing, and collusion rings.</p>
+<p>The reputation system scores agents across 6 dimensions (accuracy, completeness, timeliness, communication, efficiency, innovation) using exponentially-weighted moving averages with decay factor $\lambda = 0.95$:</p>
+<p>$$R(\alpha) = \frac{\sum_{i=1}^{N} \lambda^{N-i} \langle w, q_i \rangle}{\sum_{i=1}^{N} \lambda^{N-i}}$$</p>
+<p>The trust score incorporates anti-gaming detection: $$T(\alpha) = R(\alpha) \times (1 - \gamma(\alpha)) \times \min\!\Big(1, \frac{N(\alpha)}{N_{\min}}\Big)$$ where $\gamma(\alpha)$ is the gaming suspicion score (0 to 1) and $N_{\min} = 5$ is the seasoning threshold. Five anomaly detectors run on each evaluation: score inflation, rapid cycling, perfect streaks, self-dealing, and collusion rings.</p>
 <h1 data-number="3" id="sec:umbrella"><span class="header-section-number">3</span> The Umbrella Application</h1>
 <p>With the four subsystems defined, we now construct the <code>AgentOS</code> umbrella application that composes them into a unified runtime.</p>
 <h2 data-number="3.1" id="mix-project-configuration"><span class="header-section-number">3.1</span> Mix Project Configuration</h2>
@@ -560,7 +545,7 @@ end</code></pre>
 end</code></pre>
 <p>Clients interact with <code>AgentOS.submit_job/1</code> and never need to know which subsystem handles their request. The facade pattern keeps the public API surface small while the internal implementation spans four applications.</p>
 <h1 data-number="4" id="sec:pairwise"><span class="header-section-number">4</span> Pairwise Compositions</h1>
-<p>The four subsystems yield <span class="math inline">\binom{4}{2} = 6</span> pairwise compositions. Each pair produces emergent capabilities that neither subsystem provides alone.</p>
+<p>The four subsystems yield $\binom{4}{2} = 6$ pairwise compositions. Each pair produces emergent capabilities that neither subsystem provides alone.</p>
 <h2 data-number="4.1" id="subsec:agent-tool"><span class="header-section-number">4.1</span> Agent Scheduler + Tool Interface</h2>
 <p><em>Emergent capability: agents invoke tools via capability tokens.</em></p>
 <p>When an agent is assigned a job, it receives capability tokens for the tools required by that job. The composition works as follows:</p>
@@ -857,8 +842,8 @@ trust = PlannerEngine.Reputation.trust_score(&quot;agent_web_tester&quot;)</code
                             :anomaly_detected],
                publishes: [:final_report]}
 ])</code></pre>
-<p>Each stage is assigned to an agent from the scheduler’s pool. The agent at each stage invokes tools (Tool Interface), persists intermediate results (Memory Layer), and publishes events that downstream stages consume. The pipeline constraint—<span class="math inline">\text{sub}(s_i) \subseteq \bigcup_{j &lt; i} \text{pub}(s_j)</span>—ensures correct data flow.</p>
-<p>Streaming reduces latency from <span class="math inline">\sum_i t_i</span> (sequential) to the critical path length, typically yielding 40–60% wall-clock time reduction.</p>
+<p>Each stage is assigned to an agent from the scheduler’s pool. The agent at each stage invokes tools (Tool Interface), persists intermediate results (Memory Layer), and publishes events that downstream stages consume. The pipeline constraint—$\text{sub}(s_i) \subseteq \bigcup_{j &lt; i} \text{pub}(s_j)$—ensures correct data flow.</p>
+<p>Streaming reduces latency from $\sum_i t_i$ (sequential) to the critical path length, typically yielding 40–60% wall-clock time reduction.</p>
 <h1 data-number="6" id="sec:production"><span class="header-section-number">6</span> Production System: Agent-Hero Marketplace</h1>
 <p>The composed AgentOS system is deployed as the backend for the Agent-Hero marketplace, a production platform for hiring AI agent teams.</p>
 <h2 data-number="6.1" id="technology-stack"><span class="header-section-number">6.1</span> Technology Stack</h2>
@@ -964,7 +949,7 @@ trust = PlannerEngine.Reputation.trust_score(&quot;agent_web_tester&quot;)</code
 <p>We now establish three key properties of the composed system: fault isolation, type safety, and resource fairness.</p>
 <h2 data-number="7.1" id="fault-isolation"><span class="header-section-number">7.1</span> Fault Isolation</h2>
 <div id="thm:fault-isolation" class="theorem">
-<p><strong>Theorem 1</strong> (Subsystem Independence).  <em>A crash in subsystem <span class="math inline">S_i</span> does not corrupt the state of subsystem <span class="math inline">S_j</span> for <span class="math inline">i \neq j</span>.</em></p>
+<p><strong>Theorem 1</strong> (Subsystem Independence).  <em>A crash in subsystem $S_i$ does not corrupt the state of subsystem $S_j$ for $i \neq j$.</em></p>
 </div>
 <div class="proof">
 <p><em>Proof.</em> Each subsystem runs as a separate OTP application under <code>AgentOS.Supervisor</code> with <code>:one_for_one</code> strategy. Subsystem state is held in GenServer processes with isolated heaps (the BEAM guarantees no shared mutable state between processes). When a subsystem crashes:</p>
@@ -982,7 +967,7 @@ trust = PlannerEngine.Reputation.trust_score(&quot;agent_web_tester&quot;)</code
 <h2 data-number="7.2" id="agent-level-fault-isolation"><span class="header-section-number">7.2</span> Agent-Level Fault Isolation</h2>
 <p>Within the Agent Scheduler, individual agent crashes are further isolated:</p>
 <div id="thm:agent-isolation" class="theorem">
-<p><strong>Theorem 3</strong> (Agent Independence).  <em>A crash in agent <span class="math inline">A_i</span> does not affect agent <span class="math inline">A_j</span> for <span class="math inline">i \neq j</span>, and the agent’s durable execution guarantees that completed steps are not re-executed on restart.</em></p>
+<p><strong>Theorem 3</strong> (Agent Independence).  <em>A crash in agent $A_i$ does not affect agent $A_j$ for $i \neq j$, and the agent’s durable execution guarantees that completed steps are not re-executed on restart.</em></p>
 </div>
 <div class="proof">
 <p><em>Proof.</em> Agents run under <code>AgentScheduler.Supervisor</code> (a DynamicSupervisor with <code>:one_for_one</code> strategy). Each agent is a GenServer with:</p>
@@ -1012,20 +997,20 @@ trust = PlannerEngine.Reputation.trust_score(&quot;agent_web_tester&quot;)</code
 <p><strong>Theorem 5</strong> (Credit-Weighted Fairness).  <em>The scheduler’s avruntime mechanism ensures that no client can monopolize agent resources: a client’s scheduling priority decreases proportionally to their resource consumption relative to their credit balance.</em></p>
 </div>
 <div class="proof">
-<p><em>Proof.</em> From Equation <a href="#eq:avruntime">[eq:avruntime]</a>, after consuming <span class="math inline">k</span> agent invocations, client <span class="math inline">c</span>’s avruntime is: <span class="math display">\text{avruntime}_k(c) = \sum_{i=1}^{k} \frac{\kappa_{A_i} &middot; \text{cr}_0}{\text{cr}_c(i) &middot; w(p_c)}</span></p>
-<p>Since <span class="math inline">\text{cr}_c(i)</span> decreases with each invocation (credits are consumed), the denominator shrinks and avruntime grows faster. Meanwhile, a client <span class="math inline">c&#39;</span> with more remaining credits has <span class="math inline">\text{cr}_{c&#39;}(i) &gt; \text{cr}_c(i)</span>, so their avruntime grows slower. The scheduler always dispatches the minimum-avruntime client, ensuring <span class="math inline">c&#39;</span> is prioritized.</p>
-<p>The contracted/marketplace two-tier system provides a <span class="math inline">4&times;</span> weight to contracted clients, but within each tier, the fairness guarantee holds. ◻</p>
+<p><em>Proof.</em> From Equation <a href="#eq:avruntime">[eq:avruntime]</a>, after consuming $k$ agent invocations, client $c$’s avruntime is: $$\text{avruntime}_k(c) = \sum_{i=1}^{k} \frac{\kappa_{A_i} \cdot \text{cr}_0}{\text{cr}_c(i) \cdot w(p_c)}$$</p>
+<p>Since $\text{cr}_c(i)$ decreases with each invocation (credits are consumed), the denominator shrinks and avruntime grows faster. Meanwhile, a client $c'$ with more remaining credits has $\text{cr}_{c'}(i) &gt; \text{cr}_c(i)$, so their avruntime grows slower. The scheduler always dispatches the minimum-avruntime client, ensuring $c'$ is prioritized.</p>
+<p>The contracted/marketplace two-tier system provides a $4\times$ weight to contracted clients, but within each tier, the fairness guarantee holds. ◻</p>
 </div>
 <h2 data-number="7.5" id="financial-conservation"><span class="header-section-number">7.5</span> Financial Conservation</h2>
 <div id="thm:conservation" class="theorem">
-<p><strong>Theorem 6</strong> (Credit Conservation).  <em>The total credits in the system is invariant under all escrow operations: <span class="math display">\sum_p \text{available}(p) + \sum_e \text{held}(e) + \sum_d \text{distributed}(d) = C_0</span> where <span class="math inline">C_0</span> is the total credits ever purchased.</em></p>
+<p><strong>Theorem 6</strong> (Credit Conservation).  <em>The total credits in the system is invariant under all escrow operations: $$\sum_p \text{available}(p) + \sum_e \text{held}(e) + \sum_d \text{distributed}(d) = C_0$$ where $C_0$ is the total credits ever purchased.</em></p>
 </div>
 <div class="proof">
 <p><em>Proof.</em> Each escrow operation is a Mnesia transaction that conserves the total:</p>
 <ul>
-<li><p><code>hold</code>: decrements available by <span class="math inline">n</span>, increments held by <span class="math inline">n</span>.</p></li>
-<li><p><code>settle(:release)</code>: decrements held by <span class="math inline">n</span>, increments distributed by <span class="math inline">n</span>.</p></li>
-<li><p><code>settle(:refund)</code>: decrements held by <span class="math inline">n</span>, increments available by <span class="math inline">n</span>.</p></li>
+<li><p><code>hold</code>: decrements available by $n$, increments held by $n$.</p></li>
+<li><p><code>settle(:release)</code>: decrements held by $n$, increments distributed by $n$.</p></li>
+<li><p><code>settle(:refund)</code>: decrements held by $n$, increments available by $n$.</p></li>
 </ul>
 <p>Mnesia transactions are serialized, preventing race conditions. The balance check (<code>available &gt;= amount</code>) in <code>hold</code> prevents negative balances. No operation creates or destroys credits. ◻</p>
 </div>
@@ -1044,32 +1029,32 @@ trust = PlannerEngine.Reputation.trust_score(&quot;agent_web_tester&quot;)</code
 <tr>
 <td style="text-align: left;"><code>agent_os/</code></td>
 <td style="text-align: left;"><code>AgentOS</code>, <code>Application</code></td>
-<td style="text-align: right;"><span class="math inline">\sim</span>80</td>
+<td style="text-align: right;">~80</td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>agent_scheduler/</code></td>
 <td style="text-align: left;"><code>Agent</code>, <code>Scheduler</code>, <code>Pipeline</code>, <code>Evaluator</code>, <code>Supervisor</code></td>
-<td style="text-align: right;"><span class="math inline">\sim</span>900</td>
+<td style="text-align: right;">~900</td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>tool_interface/</code></td>
 <td style="text-align: left;"><code>Registry</code>, <code>Capability</code>, <code>Sandbox</code>, <code>MCPClient</code>, <code>Audit</code></td>
-<td style="text-align: right;"><span class="math inline">\sim</span>800</td>
+<td style="text-align: right;">~800</td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>memory_layer/</code></td>
 <td style="text-align: left;"><code>Memory</code>, <code>Schema</code>, <code>Storage</code>, <code>Graph</code>, <code>Version</code></td>
-<td style="text-align: right;"><span class="math inline">\sim</span>900</td>
+<td style="text-align: right;">~900</td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>planner_engine/</code></td>
 <td style="text-align: left;"><code>OrderBook</code>, <code>Escrow</code>, <code>Market</code>, <code>Decomposer</code>, <code>Reputation</code></td>
-<td style="text-align: right;"><span class="math inline">\sim</span>900</td>
+<td style="text-align: right;">~900</td>
 </tr>
 <tr>
 <td style="text-align: left;"><strong>Total</strong></td>
 <td style="text-align: left;"><strong>24 modules</strong></td>
-<td style="text-align: right;"><span class="math inline">\sim</span><strong>3,500</strong></td>
+<td style="text-align: right;">~<strong>3,500</strong></td>
 </tr>
 </tbody>
 </table>
@@ -1085,28 +1070,28 @@ trust = PlannerEngine.Reputation.trust_score(&quot;agent_web_tester&quot;)</code
 <h1 data-number="9" id="sec:algebra"><span class="header-section-number">9</span> Composition Algebra</h1>
 <p>We can formalize the composition structure of AgentOS using a simple algebra of module interfaces.</p>
 <h2 data-number="9.1" id="module-interfaces-as-types"><span class="header-section-number">9.1</span> Module Interfaces as Types</h2>
-<p>Each subsystem exposes a set of typed functions (its public API). We write <span class="math inline">\mathcal{I}(S)</span> for the interface of subsystem <span class="math inline">S</span>:</p>
-<p><span class="math display">\begin{align*}
+<p>Each subsystem exposes a set of typed functions (its public API). We write $\mathcal{I}(S)$ for the interface of subsystem $S$:</p>
+<p>$$\begin{aligned}
   \mathcal{I}(\text{Memory}) &amp;= \{\text{create}, \text{data}, \text{evolve}, \text{search}, \text{link}, \text{traverse}\} \\
   \mathcal{I}(\text{Tools})  &amp;= \{\text{invoke}, \text{grant}, \text{discover}, \text{freeze}, \text{list}\} \\
   \mathcal{I}(\text{Sched})  &amp;= \{\text{submit}, \text{start\_agent}, \text{pipeline}, \text{evaluate}\} \\
   \mathcal{I}(\text{Plan})   &amp;= \{\text{post}, \text{propose}, \text{clear}, \text{hold}, \text{settle}, \text{decompose}\}
-\end{align*}</span></p>
+\end{aligned}$$</p>
 <h2 data-number="9.2" id="composition-as-interface-products"><span class="header-section-number">9.2</span> Composition as Interface Products</h2>
 <p>Pairwise composition yields new capabilities that use functions from both interfaces:</p>
-<p><span class="math display">\begin{align*}
-  \mathcal{I}(\text{Sched}) &times; \mathcal{I}(\text{Tools}) &amp;\to \text{durable\_tool\_invocation} \\
-  \mathcal{I}(\text{Sched}) &times; \mathcal{I}(\text{Memory}) &amp;\to \text{persistent\_agent\_state} \\
-  \mathcal{I}(\text{Tools}) &times; \mathcal{I}(\text{Memory}) &amp;\to \text{cached\_tool\_results} \\
-  \mathcal{I}(\text{Plan}) &times; \mathcal{I}(\text{Sched}) &amp;\to \text{market\_dispatched\_agents} \\
-  \mathcal{I}(\text{Plan}) &times; \mathcal{I}(\text{Memory}) &amp;\to \text{persistent\_market\_state} \\
-  \mathcal{I}(\text{Plan}) &times; \mathcal{I}(\text{Tools}) &amp;\to \text{capability\_verified\_matching}
-\end{align*}</span></p>
+<p>$$\begin{aligned}
+  \mathcal{I}(\text{Sched}) \times \mathcal{I}(\text{Tools}) &amp;\to \text{durable\_tool\_invocation} \\
+  \mathcal{I}(\text{Sched}) \times \mathcal{I}(\text{Memory}) &amp;\to \text{persistent\_agent\_state} \\
+  \mathcal{I}(\text{Tools}) \times \mathcal{I}(\text{Memory}) &amp;\to \text{cached\_tool\_results} \\
+  \mathcal{I}(\text{Plan}) \times \mathcal{I}(\text{Sched}) &amp;\to \text{market\_dispatched\_agents} \\
+  \mathcal{I}(\text{Plan}) \times \mathcal{I}(\text{Memory}) &amp;\to \text{persistent\_market\_state} \\
+  \mathcal{I}(\text{Plan}) \times \mathcal{I}(\text{Tools}) &amp;\to \text{capability\_verified\_matching}
+\end{aligned}$$</p>
 <h2 data-number="9.3" id="the-full-product"><span class="header-section-number">9.3</span> The Full Product</h2>
-<p>The AgentOS umbrella is the product of all four interfaces: <span class="math display">\mathcal{I}(\text{AgentOS}) = \mathcal{I}(\text{Memory}) &times; \mathcal{I}(\text{Tools}) &times; \mathcal{I}(\text{Sched}) &times; \mathcal{I}(\text{Plan})</span></p>
-<p>with the startup ordering constraint: <span class="math display">\text{Memory} \prec \text{Tools} \prec \text{Sched} \prec \text{Plan}</span></p>
-<p>where <span class="math inline">A \prec B</span> means “<span class="math inline">A</span> must be fully initialized before <span class="math inline">B</span> starts.”</p>
-<p>The facade module <span class="math inline"><code>AgentOS</code></span> projects from this product to a simplified interface: <span class="math display">\pi : \mathcal{I}(\text{AgentOS}) \to \{\text{start}, \text{submit\_job}, \text{status}\}</span></p>
+<p>The AgentOS umbrella is the product of all four interfaces: $$\mathcal{I}(\text{AgentOS}) = \mathcal{I}(\text{Memory}) \times \mathcal{I}(\text{Tools}) \times \mathcal{I}(\text{Sched}) \times \mathcal{I}(\text{Plan})$$</p>
+<p>with the startup ordering constraint: $$\text{Memory} \prec \text{Tools} \prec \text{Sched} \prec \text{Plan}$$</p>
+<p>where $A \prec B$ means “$A$ must be fully initialized before $B$ starts.”</p>
+<p>The facade module <code>AgentOS</code> projects from this product to a simplified interface: $$\pi : \mathcal{I}(\text{AgentOS}) \to \{\text{start}, \text{submit\_job}, \text{status}\}$$</p>
 <h1 data-number="10" id="sec:emergent"><span class="header-section-number">10</span> Emergent Properties of Composition</h1>
 <p>Beyond the pairwise compositions analyzed in Section <a href="#sec:pairwise">4</a>, the full four-way composition exhibits emergent properties that require all four subsystems to interact.</p>
 <h2 data-number="10.1" id="end-to-end-durable-execution"><span class="header-section-number">10.1</span> End-to-End Durable Execution</h2>
@@ -1119,12 +1104,9 @@ trust = PlannerEngine.Reputation.trust_score(&quot;agent_web_tester&quot;)</code
 </ul>
 <p>yields end-to-end durable execution: a job can crash at any point and resume from the last successful step without re-executing tools, losing memory, or double-spending credits.</p>
 <h2 data-number="10.2" id="self-improving-reputation"><span class="header-section-number">10.2</span> Self-Improving Reputation</h2>
-<p>The feedback loop: <span class="math display">\text{Evaluation} \xrightarrow{\text{scores}} \text{Reputation}
-  \xrightarrow{\text{trust}} \text{OrderBook}
-  \xrightarrow{\text{matching}} \text{Contracts}
-  \xrightarrow{\text{execution}} \text{Evaluation}</span> creates a self-improving system where high-performing agents receive more contracts (via lower cost functionals), which produces more evaluations, which refines their reputation scores. The anti-gaming detectors prevent this feedback loop from being exploited.</p>
+<p>The feedback loop: $$\text{Evaluation} \xrightarrow{\text{scores}} \text{Reputation} \xrightarrow{\text{trust}} \text{OrderBook} \xrightarrow{\text{matching}} \text{Contracts} \xrightarrow{\text{execution}} \text{Evaluation}$$ creates a self-improving system where high-performing agents receive more contracts (via lower cost functionals), which produces more evaluations, which refines their reputation scores. The anti-gaming detectors prevent this feedback loop from being exploited.</p>
 <h2 data-number="10.3" id="adaptive-pipeline-composition"><span class="header-section-number">10.3</span> Adaptive Pipeline Composition</h2>
-<p>The combination of DAG decomposition (Planner) with streaming pipelines (Scheduler) enables adaptive execution: if an agent at stage <span class="math inline">i</span> discovers new information (persisted in Memory), the planner can dynamically add new subtasks to the DAG and extend the pipeline.</p>
+<p>The combination of DAG decomposition (Planner) with streaming pipelines (Scheduler) enables adaptive execution: if an agent at stage $i$ discovers new information (persisted in Memory), the planner can dynamically add new subtasks to the DAG and extend the pipeline.</p>
 <h1 data-number="11" id="sec:related"><span class="header-section-number">11</span> Related Work</h1>
 <h2 data-number="11.1" id="agent-frameworks"><span class="header-section-number">11.1</span> Agent Frameworks</h2>
 <p><strong>LangChain</strong> [6] and <strong>AutoGPT</strong> [2] provide agent orchestration but lack formal process management, financial settlement, and typed memory systems. <strong>CrewAI</strong> [4] introduces team-based agent coordination but without market mechanisms or capability-based security.</p>
@@ -1205,7 +1187,7 @@ trust = PlannerEngine.Reputation.trust_score(&quot;agent_web_tester&quot;)</code
 </tbody>
 </table>
 </div>
-<p>The matrix is lower-triangular (with the exception of AgentOS, which calls all four), confirming that the dependency order Memory <span class="math inline">\prec</span> Tools <span class="math inline">\prec</span> Scheduler <span class="math inline">\prec</span> Planner is acyclic.</p>
+<p>The matrix is lower-triangular (with the exception of AgentOS, which calls all four), confirming that the dependency order Memory $\prec$ Tools $\prec$ Scheduler $\prec$ Planner is acyclic.</p>
 <h1 data-number="14" id="app:supervision"><span class="header-section-number">14</span> Supervision Tree Diagram</h1>
 <figure id="fig:full-tree">
 <div class="remark" style="text-align:center;padding:2rem;color:var(--text-dim);font-style:italic">[Diagram: Complete supervision tree &mdash; see PDF version for figure]</div>

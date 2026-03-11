@@ -126,11 +126,11 @@ img{max-width:100%;height:auto;border-radius:8px}
 <p>The emergence of large language model (LLM) agents as autonomous computational entities has created an urgent need for systems that manage their lifecycle, scheduling, fault tolerance, and evaluation with the same rigor that traditional operating systems bring to process management <span class="citation" data-cites="wang2024survey xi2023rise"></span>. Unlike simple API calls, modern AI agents are <em>complex orchestrations</em>: multi-phase workflows that involve planning, tool use, streaming data pipelines, human oversight, and quality evaluation. Companies deploy agents for web testing, legal document analysis, security auditing, dashboard generation, and dozens of other domains—each requiring workflow decomposition, dependency resolution, retry logic, and compositional validation <span class="citation" data-cites="wu2023autogen hong2024metagpt"></span>.</p>
 <p>This paper argues that <strong>agent scheduling is the core primitive of an AI Operating System</strong>, just as process scheduling is the core primitive of Unix/Linux. We develop this analogy through a concrete implementation, mapping:</p>
 <ul>
-<li><p><strong>Processes</strong> <span class="math inline">&#8614;</span> <strong>Agents</strong>: autonomous units of computation with lifecycle states, modeled as GenServer processes (<code>AgentScheduler.Agent</code>)</p></li>
-<li><p><strong>The Linux scheduler (CFS)</strong> <span class="math inline">&#8614;</span> <strong>The Agent Scheduler</strong>: priority-based, credit-weighted allocation implemented with balanced trees (<code>AgentScheduler.Scheduler</code>)</p></li>
-<li><p><strong>Process groups and sessions</strong> <span class="math inline">&#8614;</span> <strong>Agent teams and contracts</strong>: hierarchical groupings managed by a DynamicSupervisor (<code>AgentScheduler.Supervisor</code>)</p></li>
-<li><p><strong>Signals and IPC</strong> <span class="math inline">&#8614;</span> <strong>Event streams and message passing</strong>: the pub/sub streaming bus where downstream agents consume upstream events (<code>AgentScheduler.Pipeline</code>)</p></li>
-<li><p><strong>Supervision (systemd, init)</strong> <span class="math inline">&#8614;</span> <strong>OTP supervision trees</strong>: Erlang/Elixir’s “let it crash” philosophy applied to agent fault tolerance</p></li>
+<li><p><strong>Processes</strong> $\mapsto$ <strong>Agents</strong>: autonomous units of computation with lifecycle states, modeled as GenServer processes (<code>AgentScheduler.Agent</code>)</p></li>
+<li><p><strong>The Linux scheduler (CFS)</strong> $\mapsto$ <strong>The Agent Scheduler</strong>: priority-based, credit-weighted allocation implemented with balanced trees (<code>AgentScheduler.Scheduler</code>)</p></li>
+<li><p><strong>Process groups and sessions</strong> $\mapsto$ <strong>Agent teams and contracts</strong>: hierarchical groupings managed by a DynamicSupervisor (<code>AgentScheduler.Supervisor</code>)</p></li>
+<li><p><strong>Signals and IPC</strong> $\mapsto$ <strong>Event streams and message passing</strong>: the pub/sub streaming bus where downstream agents consume upstream events (<code>AgentScheduler.Pipeline</code>)</p></li>
+<li><p><strong>Supervision (systemd, init)</strong> $\mapsto$ <strong>OTP supervision trees</strong>: Erlang/Elixir’s “let it crash” philosophy applied to agent fault tolerance</p></li>
 </ul>
 <h2 data-number="1.1" id="functional-programming-as-design-language"><span class="header-section-number">1.1</span> Functional Programming as Design Language</h2>
 <p>The design principles of this system are rooted in functional programming:</p>
@@ -158,11 +158,8 @@ img{max-width:100%;height:auto;border-radius:8px}
 <p>We note that the compositional structure described throughout this paper admits a clean formalization in category theory: agents form a category whose morphisms encode data flow, supervision strategies are structure-preserving maps between failure and recovery hierarchies, and pipeline composition corresponds to functorial mapping. We mention this connection where relevant but keep the primary exposition in the language of functional programming and systems design. A full categorical treatment is deferred to Part III of this series.</p>
 <h1 data-number="2" id="sec:background"><span class="header-section-number">2</span> Background: From Process Scheduling to Agent Scheduling</h1>
 <h2 data-number="2.1" id="the-linux-completely-fair-scheduler"><span class="header-section-number">2.1</span> The Linux Completely Fair Scheduler</h2>
-<p>The Linux Completely Fair Scheduler (CFS), introduced in kernel 2.6.23 <span class="citation" data-cites="pabla2009completely"></span>, replaced the O(1) scheduler with a design based on <em>virtual runtime</em> (vruntime). Each process accumulates vruntime proportional to its actual CPU time, weighted inversely by its nice value. The scheduler always selects the process with the smallest vruntime, maintained in a red-black tree for <span class="math inline">O(\log n)</span> access <span class="citation" data-cites="love2010linux"></span>.</p>
-<p>For a process <span class="math inline">p</span> with nice value <span class="math inline">n_p</span>, the virtual runtime update after executing for real time <span class="math inline">\Delta t</span> is: <span class="math display">\begin{equation}
-
-  \text{vruntime}(p) \mathrel{+}= \Delta t &middot; \frac{w_0}{w(n_p)}
-\end{equation}</span> where <span class="math inline">w(n_p) = 1024 / 1.25^{n_p}</span> is the weight corresponding to nice value <span class="math inline">n_p</span>, and <span class="math inline">w_0 = w(0) = 1024</span> is the default weight.</p>
+<p>The Linux Completely Fair Scheduler (CFS), introduced in kernel 2.6.23 <span class="citation" data-cites="pabla2009completely"></span>, replaced the O(1) scheduler with a design based on <em>virtual runtime</em> (vruntime). Each process accumulates vruntime proportional to its actual CPU time, weighted inversely by its nice value. The scheduler always selects the process with the smallest vruntime, maintained in a red-black tree for $O(\log n)$ access <span class="citation" data-cites="love2010linux"></span>.</p>
+<p>For a process $p$ with nice value $n_p$, the virtual runtime update after executing for real time $\Delta t$ is: $$\text{vruntime}(p) \mathrel{+}= \Delta t \cdot \frac{w_0}{w(n_p)}$$ where $w(n_p) = 1024 / 1.25^{n_p}$ is the weight corresponding to nice value $n_p$, and $w_0 = w(0) = 1024$ is the default weight.</p>
 <p>The key insight is that <em>fairness is defined relative to weight</em>: a process with twice the weight accumulates vruntime at half the rate, effectively receiving twice the CPU time. This weighted fairness model directly inspires our credit-weighted agent scheduling (Section <a href="#sec:scheduling" data-reference-type="ref" data-reference="sec:scheduling">4</a>).</p>
 <h2 data-number="2.2" id="priority-queues-and-preemption"><span class="header-section-number">2.2</span> Priority Queues and Preemption</h2>
 <p>Real-time scheduling in Linux uses two policies: <code>SCHED_FIFO</code> and <code>SCHED_RR</code>, both with 99 priority levels <span class="citation" data-cites="bovet2005understanding"></span>. Real-time processes always preempt CFS processes. This two-tier structure—real-time above fair-share—maps to our distinction between <em>contracted agents</em> (guaranteed SLA) and <em>marketplace agents</em> (best-effort scheduling).</p>
@@ -279,7 +276,7 @@ end</code></pre>
 <p><strong>Definition 3</strong> (Oversight Modes).  The oversight type is:</p>
 <pre><code>  @type oversight :: :supervised | :spot_check
                    | :autonomous_escalation</code></pre>
-<p>These form an ordering by control level: <span class="math display"><code>autonomous\_escalation</code> &le; <code>spot\_check</code> &le; <code>supervised</code></span> where <span class="math inline">\sigma_1 &le; \sigma_2</span> means “<span class="math inline">\sigma_2</span> provides at least as much human oversight as <span class="math inline">\sigma_1</span>.”</p>
+<p>These form an ordering by control level: $$\texttt{autonomous\_escalation} \le \texttt{spot\_check} \le \texttt{supervised}$$ where $\sigma_1 \le \sigma_2$ means “$\sigma_2$ provides at least as much human oversight as $\sigma_1$.”</p>
 </div>
 <p>The implementation uses pattern matching to dispatch oversight behavior:</p>
 <pre id="lst:oversight" class="elixir" data-language="elixir" data-caption="Oversight mode dispatch via pattern matching (from <code>agent.ex</code>)" data-label="lst:oversight"><code>def handle_call({:request_approval, artifact}, _from,
@@ -310,19 +307,16 @@ end</code></pre>
 end</code></pre>
 <p>In <code>:supervised</code> mode, every approval request transitions to <code>:waiting_approval</code>. In <code>:spot_check</code> mode, a probabilistic gate (30%) determines whether human review is required. In <code>:autonomous_escalation</code> mode, the agent only calls <code>request_approval</code> when it detects low confidence, so the handler always transitions.</p>
 <h2 data-number="3.5" id="agent-composition-through-data-flow"><span class="header-section-number">3.5</span> Agent Composition Through Data Flow</h2>
-<p>Agents compose by connecting outputs to inputs. A <em>data flow specification</em> between agents <span class="math inline">A</span> and <span class="math inline">B</span> consists of:</p>
+<p>Agents compose by connecting outputs to inputs. A <em>data flow specification</em> between agents $A$ and $B$ consists of:</p>
 <ul>
-<li><p>A <strong>mapping function</strong> <span class="math inline">f_{\text{map}}: O_A \to I_B</span> that transforms <span class="math inline">A</span>’s outputs into <span class="math inline">B</span>’s inputs</p></li>
-<li><p>A <strong>validation predicate</strong> <span class="math inline">f_{\text{val}}: O_A \to \{\text{true}, \text{false}\}</span> that gates data flow</p></li>
+<li><p>A <strong>mapping function</strong> $f_{\text{map}}: O_A \to I_B$ that transforms $A$’s outputs into $B$’s inputs</p></li>
+<li><p>A <strong>validation predicate</strong> $f_{\text{val}}: O_A \to \{\text{true}, \text{false}\}$ that gates data flow</p></li>
 <li><p>A <strong>metadata propagation</strong> function that carries execution metrics forward</p></li>
 </ul>
-<p>Composition is associative: given <span class="math inline">A \xrightarrow{f} B \xrightarrow{g} C</span>, the composite <span class="math inline">g \circ f</span> maps <span class="math inline">A</span>’s outputs through <span class="math inline">f</span> then <span class="math inline">g</span>, and the composite validation requires both <span class="math inline">f_{\text{val}}</span> and <span class="math inline">g_{\text{val}} \circ f_{\text{map}}</span> to hold. Identity is the trivial pass-through. This associative, unital composition is what makes agent pipelines work—and is the same structure that underlies function composition in any functional programming language.</p>
+<p>Composition is associative: given $A \xrightarrow{f} B \xrightarrow{g} C$, the composite $g \circ f$ maps $A$’s outputs through $f$ then $g$, and the composite validation requires both $f_{\text{val}}$ and $g_{\text{val}} \circ f_{\text{map}}$ to hold. Identity is the trivial pass-through. This associative, unital composition is what makes agent pipelines work—and is the same structure that underlies function composition in any functional programming language.</p>
 <h2 data-number="3.6" id="the-agent-hero-execution-pipeline"><span class="header-section-number">3.6</span> The Agent-Hero Execution Pipeline</h2>
 <p>The Agent-Hero marketplace defines a fixed execution pipeline through which every job flows:</p>
-<p><span class="math display">\begin{equation}
-
-  <code>Job</code> \xrightarrow{\alpha} <code>Proposal</code> \xrightarrow{\beta} <code>Contract</code> \xrightarrow{\gamma} <code>Decomposition</code> \xrightarrow{\delta} <code>Execution</code> \xrightarrow{\epsilon} <code>Evaluation</code>
-\end{equation}</span></p>
+<p>$$\texttt{Job} \xrightarrow{\alpha} \texttt{Proposal} \xrightarrow{\beta} \texttt{Contract} \xrightarrow{\gamma} \texttt{Decomposition} \xrightarrow{\delta} \texttt{Execution} \xrightarrow{\epsilon} \texttt{Evaluation}$$</p>
 <p>Each stage has a well-defined input and output type. The pipeline is a chain of composed transformations, where each transition function maps one stage’s output to the next stage’s input. In Elixir terms, this is a sequence of functions composed with the pipe operator:</p>
 <pre id="lst:pipeline-composition" class="elixir" data-language="elixir" data-caption="Pipeline as function composition" data-label="lst:pipeline-composition"><code>job
 |&gt; generate_proposal(agent_pool)
@@ -333,16 +327,13 @@ end</code></pre>
 <p>The pipeline is not just a conceptual model—it maps directly to the <code>AgentScheduler.Pipeline</code> module, which enforces ordering constraints and provides streaming event delivery between stages.</p>
 <h1 data-number="4" id="sec:scheduling"><span class="header-section-number">4</span> Credit-Weighted Scheduling</h1>
 <h2 data-number="4.1" id="design-generalizing-cfs-for-agents"><span class="header-section-number">4.1</span> Design: Generalizing CFS for Agents</h2>
-<p>In the Agent-Hero system, clients purchase credits that are consumed by agent executions. Each agent has a per-invocation cost <span class="math inline">\kappa_A</span>. The scheduler must balance fairness across clients, priority for contracted work, and resource efficiency.</p>
-<p>By analogy with CFS (Equation <a href="#eq:vruntime" data-reference-type="ref" data-reference="eq:vruntime">[eq:vruntime]</a>), we define the <em>agent virtual runtime</em> for client <span class="math inline">c</span> with remaining credits <span class="math inline">\text{cr}_c</span> and priority level <span class="math inline">p_c</span>: <span class="math display">\begin{equation}
-
-  \text{avruntime}(c) \mathrel{+}= \kappa_A &middot; \frac{\text{cr}_0}{\text{cr}_c &middot; w(p_c)}
-\end{equation}</span> where <span class="math inline">\text{cr}_0 = 1000</span> is a reference credit amount and <span class="math inline">w(p_c)</span> is the priority weight (4.0 for contracted, 1.0 for marketplace). The scheduler always selects the client-agent pair with the smallest avruntime.</p>
+<p>In the Agent-Hero system, clients purchase credits that are consumed by agent executions. Each agent has a per-invocation cost $\kappa_A$. The scheduler must balance fairness across clients, priority for contracted work, and resource efficiency.</p>
+<p>By analogy with CFS (Equation <a href="#eq:vruntime" data-reference-type="ref" data-reference="eq:vruntime">[eq:vruntime]</a>), we define the <em>agent virtual runtime</em> for client $c$ with remaining credits $\text{cr}_c$ and priority level $p_c$: $$\text{avruntime}(c) \mathrel{+}= \kappa_A \cdot \frac{\text{cr}_0}{\text{cr}_c \cdot w(p_c)}$$ where $\text{cr}_0 = 1000$ is a reference credit amount and $w(p_c)$ is the priority weight (4.0 for contracted, 1.0 for marketplace). The scheduler always selects the client-agent pair with the smallest avruntime.</p>
 <p>This ensures that:</p>
 <ul>
 <li><p>Clients with <strong>more credits</strong> accumulate avruntime more slowly, receiving proportionally more scheduling time</p></li>
 <li><p><strong>Contracted clients</strong> accumulate avruntime 4x slower than marketplace clients, providing preemption priority</p></li>
-<li><p><strong>Expensive agents</strong> (<span class="math inline">\kappa_A</span> large) produce larger avruntime increments, naturally rate-limiting heavy workloads</p></li>
+<li><p><strong>Expensive agents</strong> ($\kappa_A$ large) produce larger avruntime increments, naturally rate-limiting heavy workloads</p></li>
 </ul>
 <h2 data-number="4.2" id="algorithm-two-tier-priority-scheduling"><span class="header-section-number">4.2</span> Algorithm: Two-Tier Priority Scheduling</h2>
 <div class="algorithm" style="background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:0 8px 8px 0;padding:1.2rem 1.5rem;margin:1.5rem 0;">
@@ -364,7 +355,7 @@ function DEQUEUE():
 </div>
 <p>The two-tier structure is implemented by encoding the priority tier in the sort key: contracted jobs use tier 0, marketplace jobs use tier 1. Since the balanced tree is sorted by key, all contracted jobs sort before all marketplace jobs, providing automatic preemption.</p>
 <h2 data-number="4.3" id="implementation-balanced-tree-priority-queue"><span class="header-section-number">4.3</span> Implementation: Balanced Tree Priority Queue</h2>
-<p>The scheduler (file: <code>lib/agent_scheduler/scheduler.ex</code>) uses Erlang’s <code>:gb_trees</code> (general balanced trees) for <span class="math inline">O(\log n)</span> enqueue and dequeue, matching the complexity of Linux CFS’s red-black tree:</p>
+<p>The scheduler (file: <code>lib/agent_scheduler/scheduler.ex</code>) uses Erlang’s <code>:gb_trees</code> (general balanced trees) for $O(\log n)$ enqueue and dequeue, matching the complexity of Linux CFS’s red-black tree:</p>
 <pre id="lst:scheduler" class="elixir" data-language="elixir" data-caption="Scheduler state and priority queue (from <code>scheduler.ex</code>)" data-label="lst:scheduler"><code>defstruct [
   :queue,
   vruntimes: %{},
@@ -439,7 +430,7 @@ end</code></pre>
   end
 end</code></pre>
 <h2 data-number="4.4" id="dependency-resolution-via-topological-sort"><span class="header-section-number">4.4</span> Dependency Resolution via Topological Sort</h2>
-<p>Agent jobs are frequently decomposed into subtasks with dependencies. The decomposition phase produces a directed acyclic graph (DAG) <span class="math inline">G = (V, E)</span> where vertices are subtasks and edges are data dependencies.</p>
+<p>Agent jobs are frequently decomposed into subtasks with dependencies. The decomposition phase produces a directed acyclic graph (DAG) $G = (V, E)$ where vertices are subtasks and edges are data dependencies.</p>
 <div class="algorithm" style="background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:0 8px 8px 0;padding:1.2rem 1.5rem;margin:1.5rem 0;">
 <p style="font-weight:700;color:var(--accent2);margin-bottom:.5rem;font-size:.9rem;">Algorithm 2: Dependency-Aware Scheduling via Topological Sort</p>
 <pre style="background:none;border:none;padding:0;margin:0;font-size:.85rem;"><code>function SCHEDULE_DAG(G = (V, E)):
@@ -452,52 +443,49 @@ end</code></pre>
     return σ</code></pre>
 </div>
 <div id="prop:schedule-optimality" class="proposition">
-<p><strong>Proposition 4</strong> (Schedule Optimality).  <em>Algorithm <a href="#alg:topo-sort" data-reference-type="ref" data-reference="alg:topo-sort">[alg:topo-sort]</a> produces a schedule whose makespan equals the critical path length of <span class="math inline">G</span> under unlimited agent parallelism. With <span class="math inline">k</span> available agents, the makespan is at most <span class="math inline">\lceil |V|/k \rceil + \text{cp}(G)</span>.</em></p>
+<p><strong>Proposition 4</strong> (Schedule Optimality).  <em>Algorithm <a href="#alg:topo-sort" data-reference-type="ref" data-reference="alg:topo-sort">[alg:topo-sort]</a> produces a schedule whose makespan equals the critical path length of $G$ under unlimited agent parallelism. With $k$ available agents, the makespan is at most $\lceil |V|/k \rceil + \text{cp}(G)$.</em></p>
 </div>
 <div class="proof">
-<p><em>Proof.</em> This follows from Graham’s classical result <span class="citation" data-cites="graham1969bounds"></span>: list scheduling on <span class="math inline">k</span> processors achieves makespan at most <span class="math inline">(|V| - \text{cp}(G))/k + \text{cp}(G)</span>. Our level-based batching is a special case where independent tasks at the same topological level are scheduled simultaneously. ◻</p>
+<p><em>Proof.</em> This follows from Graham’s classical result <span class="citation" data-cites="graham1969bounds"></span>: list scheduling on $k$ processors achieves makespan at most $(|V| - \text{cp}(G))/k + \text{cp}(G)$. Our level-based batching is a special case where independent tasks at the same topological level are scheduled simultaneously. ◻</p>
 </div>
 <h2 data-number="4.5" id="scheduling-complexity"><span class="header-section-number">4.5</span> Scheduling Complexity</h2>
 <div id="prop:complexity" class="proposition">
 <p><strong>Proposition 5</strong>.  <em>The scheduler operations have the following complexity, matching Linux CFS:</em></p>
 <ul>
-<li><p><em><strong>Enqueue:</strong> <span class="math inline">O(\log n)</span> (balanced tree insertion)</em></p></li>
-<li><p><em><strong>Dequeue:</strong> <span class="math inline">O(\log n)</span> (extract-min from balanced tree)</em></p></li>
-<li><p><em><strong>Space:</strong> <span class="math inline">O(n)</span> where <span class="math inline">n</span> is the queue size</em></p></li>
+<li><p><em><strong>Enqueue:</strong> $O(\log n)$ (balanced tree insertion)</em></p></li>
+<li><p><em><strong>Dequeue:</strong> $O(\log n)$ (extract-min from balanced tree)</em></p></li>
+<li><p><em><strong>Space:</strong> $O(n)$ where $n$ is the queue size</em></p></li>
 </ul>
 </div>
 <div class="proof">
-<p><em>Proof.</em> Erlang’s <code>gb_trees</code> module implements a general balanced tree with <span class="math inline">O(\log n)</span> insertion, deletion, and lookup. The <code>take_smallest</code> operation is <span class="math inline">O(\log n)</span>. ◻</p>
+<p><em>Proof.</em> Erlang’s <code>gb_trees</code> module implements a general balanced tree with $O(\log n)$ insertion, deletion, and lookup. The <code>take_smallest</code> operation is $O(\log n)$. ◻</p>
 </div>
 <h1 data-number="5" id="sec:pipeline"><span class="header-section-number">5</span> Composable Streaming Pipeline</h1>
 <h2 data-number="5.1" id="design-motivation"><span class="header-section-number">5.1</span> Design Motivation</h2>
-<p>The Agent-Testing-Framework implements a 5-phase streaming pipeline: <span class="math display">\begin{equation}
-
-  <code>Recon</code> \xrightarrow{\text{stream}} <code>Behavior</code> \xrightarrow{\text{stream}} <code>Load</code> \xrightarrow{\text{stream}} <code>Observer</code> \xrightarrow{\text{stream}} <code>Synthesis</code>
-\end{equation}</span></p>
-<p>Unlike batch pipelines, streaming pipelines allow downstream agents to begin processing before upstream agents complete. This is critical for agent workloads where individual phases may take minutes. The streaming architecture reduces total pipeline latency from <span class="math inline">\sum_{i=1}^{n} t_i</span> (sequential batch) to the critical path length, typically yielding 40–60% wall-clock time reduction.</p>
+<p>The Agent-Testing-Framework implements a 5-phase streaming pipeline: $$\texttt{Recon} \xrightarrow{\text{stream}} \texttt{Behavior} \xrightarrow{\text{stream}} \texttt{Load} \xrightarrow{\text{stream}} \texttt{Observer} \xrightarrow{\text{stream}} \texttt{Synthesis}$$</p>
+<p>Unlike batch pipelines, streaming pipelines allow downstream agents to begin processing before upstream agents complete. This is critical for agent workloads where individual phases may take minutes. The streaming architecture reduces total pipeline latency from $\sum_{i=1}^{n} t_i$ (sequential batch) to the critical path length, typically yielding 40–60% wall-clock time reduction.</p>
 <h2 data-number="5.2" id="pipeline-specification"><span class="header-section-number">5.2</span> Pipeline Specification</h2>
 <div id="def:streaming-pipeline" class="definition">
-<p><strong>Definition 6</strong> (Streaming Pipeline).  A <em>streaming pipeline</em> is a tuple <span class="math inline">\Pi = (S, E, \text{pub}, \text{sub})</span> where:</p>
+<p><strong>Definition 6</strong> (Streaming Pipeline).  A <em>streaming pipeline</em> is a tuple $\Pi = (S, E, \text{pub}, \text{sub})$ where:</p>
 <ul>
-<li><p><span class="math inline">S = \{s_1, &hellip;, s_n\}</span> is an ordered sequence of <em>stages</em></p></li>
-<li><p><span class="math inline">E</span> is a set of <em>event types</em></p></li>
-<li><p><span class="math inline">\text{pub}: S \to \mathcal{P}(E)</span> maps each stage to the event types it publishes</p></li>
-<li><p><span class="math inline">\text{sub}: S \to \mathcal{P}(E)</span> maps each stage to the event types it subscribes to</p></li>
+<li><p>$S = \{s_1, \ldots, s_n\}$ is an ordered sequence of <em>stages</em></p></li>
+<li><p>$E$ is a set of <em>event types</em></p></li>
+<li><p>$\text{pub}: S \to \mathcal{P}(E)$ maps each stage to the event types it publishes</p></li>
+<li><p>$\text{sub}: S \to \mathcal{P}(E)$ maps each stage to the event types it subscribes to</p></li>
 </ul>
-<p>Subject to the <em>pipeline ordering constraint</em>: <span class="math inline">\text{sub}(s_i) \subseteq \bigcup_{j &lt; i} \text{pub}(s_j)</span>. That is, stages can only subscribe to events published by earlier stages.</p>
+<p>Subject to the <em>pipeline ordering constraint</em>: $\text{sub}(s_i) \subseteq \bigcup_{j &lt; i} \text{pub}(s_j)$. That is, stages can only subscribe to events published by earlier stages.</p>
 </div>
 <div id="ex:web-testing" class="example">
-<p><strong>Example 7</strong> (Web Testing Pipeline).  The Agent-Testing-Framework’s 5-phase pipeline has the following event topology: <span class="math display">\begin{align*}
-  \text{pub}(<code>Recon</code>) &amp;= \{<code>page\_discovered</code>, <code>api\_found</code>, <code>sitemap\_built</code>\} \\
-  \text{sub}(<code>Behavior</code>) &amp;= \{<code>page\_discovered</code>, <code>sitemap\_built</code>\} \\
-  \text{pub}(<code>Behavior</code>) &amp;= \{<code>test\_generated</code>, <code>flow\_mapped</code>\} \\
-  \text{sub}(<code>Load</code>) &amp;= \{<code>api\_found</code>, <code>flow\_mapped</code>\} \\
-  \text{pub}(<code>Load</code>) &amp;= \{<code>load\_result</code>, <code>perf\_metric</code>\} \\
-  \text{sub}(<code>Observer</code>) &amp;= \{<code>test\_generated</code>, <code>load\_result</code>, <code>perf\_metric</code>\} \\
-  \text{pub}(<code>Observer</code>) &amp;= \{<code>anomaly\_detected</code>, <code>observation\_complete</code>\} \\
-  \text{sub}(<code>Synthesis</code>) &amp;= \{<code>test\_generated</code>, <code>load\_result</code>, <code>anomaly\_detected</code>, <code>observation\_complete</code>\}
-\end{align*}</span></p>
+<p><strong>Example 7</strong> (Web Testing Pipeline).  The Agent-Testing-Framework’s 5-phase pipeline has the following event topology: $$\begin{aligned}
+  \text{pub}(\texttt{Recon}) &amp;= \{\texttt{page\_discovered}, \texttt{api\_found}, \texttt{sitemap\_built}\} \\
+  \text{sub}(\texttt{Behavior}) &amp;= \{\texttt{page\_discovered}, \texttt{sitemap\_built}\} \\
+  \text{pub}(\texttt{Behavior}) &amp;= \{\texttt{test\_generated}, \texttt{flow\_mapped}\} \\
+  \text{sub}(\texttt{Load}) &amp;= \{\texttt{api\_found}, \texttt{flow\_mapped}\} \\
+  \text{pub}(\texttt{Load}) &amp;= \{\texttt{load\_result}, \texttt{perf\_metric}\} \\
+  \text{sub}(\texttt{Observer}) &amp;= \{\texttt{test\_generated}, \texttt{load\_result}, \texttt{perf\_metric}\} \\
+  \text{pub}(\texttt{Observer}) &amp;= \{\texttt{anomaly\_detected}, \texttt{observation\_complete}\} \\
+  \text{sub}(\texttt{Synthesis}) &amp;= \{\texttt{test\_generated}, \texttt{load\_result}, \texttt{anomaly\_detected}, \texttt{observation\_complete}\}
+\end{aligned}$$</p>
 </div>
 <p>The pipeline is visualized as a streaming DAG:</p>
 <figure id="fig:testing-pipeline">
@@ -654,22 +642,20 @@ end</code></pre>
 <p>Agent tasks are long-running (minutes to hours), involve expensive LLM calls, and may crash at any point. Without durability, a crash after completing 90% of the work requires re-executing the entire task. The Inngest execution model <span class="citation" data-cites="inngest2024"></span> solves this with <em>durable execution</em>: each step function is identified by a unique key, and its result is memoized. If a function is retried after a crash, completed steps are replayed from memoized results without re-execution.</p>
 <h2 data-number="6.2" id="step-functions"><span class="header-section-number">6.2</span> Step Functions</h2>
 <div id="def:step-function" class="definition">
-<p><strong>Definition 8</strong> (Step Function).  A <em>step function</em> is a tuple <span class="math inline">\phi = (\text{id}, f)</span> where:</p>
+<p><strong>Definition 8</strong> (Step Function).  A <em>step function</em> is a tuple $\phi = (\text{id}, f)$ where:</p>
 <ul>
-<li><p><span class="math inline">\text{id}</span> is a unique string identifier (the memoization key)</p></li>
-<li><p><span class="math inline">f</span> is a zero-arity function (a closure capturing its inputs)</p></li>
+<li><p>$\text{id}$ is a unique string identifier (the memoization key)</p></li>
+<li><p>$f$ is a zero-arity function (a closure capturing its inputs)</p></li>
 </ul>
 </div>
 <div id="def:memo-store" class="definition">
-<p><strong>Definition 9</strong> (Memoization Store).  A <em>memoization store</em> is a map <span class="math inline">M: \text{StepId} \to \text{Result}</span> from step identifiers to their computed results. In the implementation, this is the <code>memo_store</code> field of the agent struct.</p>
+<p><strong>Definition 9</strong> (Memoization Store).  A <em>memoization store</em> is a map $M: \text{StepId} \to \text{Result}$ from step identifiers to their computed results. In the implementation, this is the <code>memo_store</code> field of the agent struct.</p>
 </div>
 <div id="def:durable-exec" class="definition">
-<p><strong>Definition 10</strong> (Durable Execution).  Given a step function <span class="math inline">\phi = (\text{id}, f)</span> and a memoization store <span class="math inline">M</span>, the <em>durable execution</em> operator is: <span class="math display">\begin{equation}
-  \mathcal{D}(\phi, M) = \begin{cases}
+<p><strong>Definition 10</strong> (Durable Execution).  Given a step function $\phi = (\text{id}, f)$ and a memoization store $M$, the <em>durable execution</em> operator is: $$\mathcal{D}(\phi, M) = \begin{cases}
     M[\text{id}] &amp; \text{if } \text{id} \in \text{keys}(M) \\
     f() &amp; \text{otherwise}
-  \end{cases}
-\end{equation}</span> After execution, the store is updated: <span class="math inline">M&#39; = M \cup \{\text{id} &#8614; \mathcal{D}(\phi, M)\}</span>.</p>
+  \end{cases}$$ After execution, the store is updated: $M&#39; = M \cup \{\text{id} \mapsto \mathcal{D}(\phi, M)\}$.</p>
 </div>
 <h2 data-number="6.3" id="implementation-memoized-step-execution"><span class="header-section-number">6.3</span> Implementation: Memoized Step Execution</h2>
 <p>The agent GenServer implements durable step execution through pattern matching on the memo store:</p>
@@ -716,17 +702,17 @@ end</code></pre>
 <p>The key insight is in the <code>case Map.get(state.memo_store, step_id)</code> branch: if the step has been completed before (its ID exists in the store), the cached result is returned immediately without executing the function. If not, the function is executed, its result is stored, and execution metrics are updated—all immutably through the pipe operator.</p>
 <h2 data-number="6.4" id="idempotency-guarantee"><span class="header-section-number">6.4</span> Idempotency Guarantee</h2>
 <div id="thm:idempotent-execution" class="theorem">
-<p><strong>Theorem 11</strong> (Idempotency of Durable Execution).  <em>Let <span class="math inline">\phi_1, &hellip;, \phi_n</span> be a sequence of step functions with initial memoization store <span class="math inline">M_0 = \emptyset</span>. Let <span class="math inline">M_n</span> be the store after executing all steps. If the execution is replayed from <span class="math inline">M_n</span> (i.e., the agent crashes and restarts with the full memo store), the replay produces identical results without re-executing any step function.</em></p>
+<p><strong>Theorem 11</strong> (Idempotency of Durable Execution).  <em>Let $\phi_1, \ldots, \phi_n$ be a sequence of step functions with initial memoization store $M_0 = \emptyset$. Let $M_n$ be the store after executing all steps. If the execution is replayed from $M_n$ (i.e., the agent crashes and restarts with the full memo store), the replay produces identical results without re-executing any step function.</em></p>
 </div>
 <div class="proof">
-<p><em>Proof.</em> By induction on <span class="math inline">n</span>. For <span class="math inline">n = 0</span>, the result is trivial. Assume the property holds for <span class="math inline">n-1</span> steps with store <span class="math inline">M_{n-1}</span>. For the <span class="math inline">n</span>-th step <span class="math inline">\phi_n = (\text{id}_n, f_n)</span>:</p>
-<p>Since <span class="math inline">\text{id}_n \in \text{keys}(M_n)</span>, the durable execution operator returns <span class="math inline">M_n[\text{id}_n]</span>, which equals <span class="math inline">f_n()</span> from the original execution. The function <span class="math inline">f_n</span> is not re-invoked. By the inductive hypothesis, steps <span class="math inline">1</span> through <span class="math inline">n-1</span> are similarly replayed from cache. Therefore, the entire replay produces the same results as the original execution, with zero re-computation. ◻</p>
+<p><em>Proof.</em> By induction on $n$. For $n = 0$, the result is trivial. Assume the property holds for $n-1$ steps with store $M_{n-1}$. For the $n$-th step $\phi_n = (\text{id}_n, f_n)$:</p>
+<p>Since $\text{id}_n \in \text{keys}(M_n)$, the durable execution operator returns $M_n[\text{id}_n]$, which equals $f_n()$ from the original execution. The function $f_n$ is not re-invoked. By the inductive hypothesis, steps $1$ through $n-1$ are similarly replayed from cache. Therefore, the entire replay produces the same results as the original execution, with zero re-computation. ◻</p>
 </div>
 <div id="cor:crash-recovery" class="corollary">
-<p><strong>Corollary 12</strong> (Partial Crash Recovery).  <em>If execution crashes after completing step <span class="math inline">k &lt; n</span> with store <span class="math inline">M_k</span>, then restarting the agent replays steps <span class="math inline">1, &hellip;, k</span> from cache and continues fresh execution from step <span class="math inline">k+1</span>.</em></p>
+<p><strong>Corollary 12</strong> (Partial Crash Recovery).  <em>If execution crashes after completing step $k &lt; n$ with store $M_k$, then restarting the agent replays steps $1, \ldots, k$ from cache and continues fresh execution from step $k+1$.</em></p>
 </div>
 <div class="proof">
-<p><em>Proof.</em> Steps <span class="math inline">1, &hellip;, k</span> all have their results in <span class="math inline">M_k</span> and are replayed via cache lookup. Step <span class="math inline">k+1</span> is not in <span class="math inline">M_k</span> and executes normally. This is exactly the behavior of the <code>case Map.get</code> branch in Listing <a href="#lst:durable-step" data-reference-type="ref" data-reference="lst:durable-step">[lst:durable-step]</a>. ◻</p>
+<p><em>Proof.</em> Steps $1, \ldots, k$ all have their results in $M_k$ and are replayed via cache lookup. Step $k+1$ is not in $M_k$ and executes normally. This is exactly the behavior of the <code>case Map.get</code> branch in Listing <a href="#lst:durable-step" data-reference-type="ref" data-reference="lst:durable-step">[lst:durable-step]</a>. ◻</p>
 </div>
 <h2 data-number="6.5" id="checkpointing"><span class="header-section-number">6.5</span> Checkpointing</h2>
 <p>Beyond per-step memoization, agents support coarser-grained checkpointing—saving the entire agent state at a point in time:</p>
@@ -901,7 +887,7 @@ end</code></pre>
 </div>
 <p>This mapping is monotone: more severe failures map to more comprehensive recovery strategies. A crash (the most severe) triggers a full restart. A timeout triggers a gentler retry with backoff. Invalid output triggers a retry with modified prompting. This monotone structure means that the mapping composes correctly across supervision tree levels: the recovery strategy for a composite failure (e.g., a subtree where multiple agents fail) is at least as strong as the recovery for any individual failure.</p>
 <h2 data-number="7.6" id="process-registration-and-lookup"><span class="header-section-number">7.6</span> Process Registration and Lookup</h2>
-<p>Every agent is registered in the OTP Registry for <span class="math inline">O(1)</span> lookup by ID:</p>
+<p>Every agent is registered in the OTP Registry for $O(1)$ lookup by ID:</p>
 <pre id="lst:registry" class="elixir" data-language="elixir" data-caption="Registry-based process naming (from <code>agent.ex</code>)" data-label="lst:registry"><code>def start_link(opts) do
   id = Keyword.fetch!(opts, :id)
   GenServer.start_link(__MODULE__, opts,
@@ -932,30 +918,22 @@ end</code></pre>
 <p>Events emitted include: <code>agent_started</code>, <code>step_completed</code>, <code>step_replayed</code>, <code>step_failed</code>, <code>job_assigned</code>, <code>approval_requested</code>, <code>checkpoint_created</code>, <code>job_completed</code>, <code>agent_cancelled</code>, and <code>agent_terminated</code>. These can be consumed by monitoring dashboards, alerting systems, or the evaluation framework.</p>
 <h1 data-number="8" id="sec:evaluation"><span class="header-section-number">8</span> 6-Dimensional Quality Evaluation</h1>
 <h2 data-number="8.1" id="the-evaluation-space"><span class="header-section-number">8.1</span> The Evaluation Space</h2>
-<p>Agent quality is measured across six orthogonal dimensions, each normalized to <span class="math inline">[0, 1]</span>:</p>
+<p>Agent quality is measured across six orthogonal dimensions, each normalized to $[0, 1]$:</p>
 <div id="def:eval-vector" class="definition">
-<p><strong>Definition 13</strong> (Evaluation Vector).  An <em>evaluation vector</em> is <span class="math inline">\mathbf{v} = (q, a, s, c, e, r) \in [0,1]^6</span> where:</p>
+<p><strong>Definition 13</strong> (Evaluation Vector).  An <em>evaluation vector</em> is $\mathbf{v} = (q, a, s, c, e, r) \in [0,1]^6$ where:</p>
 <ul>
-<li><p><span class="math inline">q</span> = <strong>Quality</strong>: correctness and completeness of output</p></li>
-<li><p><span class="math inline">a</span> = <strong>Adherence</strong>: conformance to task specification and constraints</p></li>
-<li><p><span class="math inline">s</span> = <strong>Speed</strong>: execution time relative to SLA (<span class="math inline">s = 1</span> means at or below target)</p></li>
-<li><p><span class="math inline">c</span> = <strong>Cost efficiency</strong>: token/resource usage relative to budget</p></li>
-<li><p><span class="math inline">e</span> = <strong>Error rate</strong>: <span class="math inline">1 - \text{raw\_error\_rate}</span> (inverted so higher is better)</p></li>
-<li><p><span class="math inline">r</span> = <strong>Revision count</strong>: <span class="math inline">1 - \min(\text{revisions}/\text{max\_revisions}, 1)</span> (inverted)</p></li>
+<li><p>$q$ = <strong>Quality</strong>: correctness and completeness of output</p></li>
+<li><p>$a$ = <strong>Adherence</strong>: conformance to task specification and constraints</p></li>
+<li><p>$s$ = <strong>Speed</strong>: execution time relative to SLA ($s = 1$ means at or below target)</p></li>
+<li><p>$c$ = <strong>Cost efficiency</strong>: token/resource usage relative to budget</p></li>
+<li><p>$e$ = <strong>Error rate</strong>: $1 - \text{raw\_error\_rate}$ (inverted so higher is better)</p></li>
+<li><p>$r$ = <strong>Revision count</strong>: $1 - \min(\text{revisions}/\text{max\_revisions}, 1)$ (inverted)</p></li>
 </ul>
 </div>
 <div id="def:composite-score" class="definition">
-<p><strong>Definition 14</strong> (Weight Vector and Composite Score).  A <em>weight vector</em> <span class="math inline">\mathbf{w} = (w_q, w_a, w_s, w_c, w_e, w_r)</span> satisfies <span class="math inline">\sum w_i = 1</span> and <span class="math inline">w_i &ge; 0</span>. The <em>composite score</em> is the weighted sum: <span class="math display">\begin{equation}
-
-  \text{score}(\mathbf{v}) = \sum_{i=1}^{6} w_i v_i = \mathbf{w} &middot; \mathbf{v}
-\end{equation}</span> The <em>weighted distance</em> between two evaluations is: <span class="math display">\begin{equation}
-
-  d_{\mathbf{w}}(\mathbf{v}, \mathbf{v}&#39;) = \sqrt{\sum_{i=1}^{6} w_i (v_i - v&#39;_i)^2}
-\end{equation}</span></p>
+<p><strong>Definition 14</strong> (Weight Vector and Composite Score).  A <em>weight vector</em> $\mathbf{w} = (w_q, w_a, w_s, w_c, w_e, w_r)$ satisfies $\sum w_i = 1$ and $w_i \ge 0$. The <em>composite score</em> is the weighted sum: $$\text{score}(\mathbf{v}) = \sum_{i=1}^{6} w_i v_i = \mathbf{w} \cdot \mathbf{v}$$ The <em>weighted distance</em> between two evaluations is: $$d_{\mathbf{w}}(\mathbf{v}, \mathbf{v}&#39;) = \sqrt{\sum_{i=1}^{6} w_i (v_i - v&#39;_i)^2}$$</p>
 </div>
-<p>The default weights in the implementation are: <span class="math display">\begin{equation*}
-  \mathbf{w}_{\text{default}} = (0.25, 0.20, 0.15, 0.15, 0.15, 0.10)
-\end{equation*}</span> emphasizing quality and adherence, with lower weight on revision count (which is partly a function of oversight mode rather than agent capability).</p>
+<p>The default weights in the implementation are: $$\mathbf{w}_{\text{default}} = (0.25, 0.20, 0.15, 0.15, 0.15, 0.10)$$ emphasizing quality and adherence, with lower weight on revision count (which is partly a function of oversight mode rather than agent capability).</p>
 <h2 data-number="8.2" id="implementation-the-evaluator-genserver"><span class="header-section-number">8.2</span> Implementation: The Evaluator GenServer</h2>
 <p>The evaluator (file: <code>lib/agent_scheduler/evaluator.ex</code>) maintains per-agent score histories, composite scores, and reputations:</p>
 <pre id="lst:evaluator" class="elixir" data-language="elixir" data-caption="Evaluation with score normalization and EWMA (from <code>evaluator.ex</code>)" data-label="lst:evaluator"><code>def handle_call({:evaluate, agent_id, raw_scores, opts},
@@ -1025,26 +1003,19 @@ end</code></pre>
 <h2 data-number="8.3" id="reputation-via-ewma"><span class="header-section-number">8.3</span> Reputation via EWMA</h2>
 <p>Agent reputation is computed as an exponentially-weighted moving average (EWMA) of composite scores:</p>
 <div id="def:reputation" class="definition">
-<p><strong>Definition 15</strong> (Reputation).  Given an agent’s score history <span class="math inline">\{s_1, s_2, &hellip;, s_T\}</span>, the reputation at time <span class="math inline">T</span> is: <span class="math display">\begin{equation}
-
-  R_T = \alpha \, s_T + (1 - \alpha) \, R_{T-1}, \quad R_1 = s_1
-\end{equation}</span> where <span class="math inline">\alpha \in (0,1)</span> is the decay parameter (default <span class="math inline">\alpha = 0.3</span>).</p>
+<p><strong>Definition 15</strong> (Reputation).  Given an agent’s score history $\{s_1, s_2, \ldots, s_T\}$, the reputation at time $T$ is: $$R_T = \alpha \, s_T + (1 - \alpha) \, R_{T-1}, \quad R_1 = s_1$$ where $\alpha \in (0,1)$ is the decay parameter (default $\alpha = 0.3$).</p>
 </div>
-<p>The EWMA gives more weight to recent performance while maintaining stability. With <span class="math inline">\alpha = 0.3</span>, the most recent evaluation contributes 30% to the reputation, and the historical average contributes 70%.</p>
+<p>The EWMA gives more weight to recent performance while maintaining stability. With $\alpha = 0.3$, the most recent evaluation contributes 30% to the reputation, and the historical average contributes 70%.</p>
 <div id="thm:reputation-convergence" class="theorem">
-<p><strong>Theorem 16</strong> (Reputation Convergence).  <em>If an agent achieves consistent composite scores with <span class="math inline">s_t \to s^*</span> as <span class="math inline">t \to &infin;</span>, then <span class="math inline">R_t \to s^*</span>. More precisely: <span class="math display">\begin{equation}
-  |R_T - s^*| &le; (1-\alpha)^T |R_1 - s^*| + \sup_{k &ge; 1} |s_k - s^*|
-\end{equation}</span></em></p>
+<p><strong>Theorem 16</strong> (Reputation Convergence).  <em>If an agent achieves consistent composite scores with $s_t \to s^*$ as $t \to \infty$, then $R_t \to s^*$. More precisely: $$|R_T - s^*| \le (1-\alpha)^T |R_1 - s^*| + \sup_{k \ge 1} |s_k - s^*|$$</em></p>
 </div>
 <div class="proof">
-<p><em>Proof.</em> Expanding the EWMA recursion: <span class="math display">\begin{equation}
-  R_T = \alpha \sum_{k=0}^{T-1} (1-\alpha)^k s_{T-k} + (1-\alpha)^{T-1} s_1
-\end{equation}</span></p>
-<p>For the convergence bound, since <span class="math inline">s_t \to s^*</span>, for any <span class="math inline">\varepsilon &gt; 0</span> there exists <span class="math inline">N</span> such that <span class="math inline">|s_t - s^*| &lt; \varepsilon</span> for all <span class="math inline">t &gt; N</span>. Decompose: <span class="math display">\begin{align}
+<p><em>Proof.</em> Expanding the EWMA recursion: $$R_T = \alpha \sum_{k=0}^{T-1} (1-\alpha)^k s_{T-k} + (1-\alpha)^{T-1} s_1$$</p>
+<p>For the convergence bound, since $s_t \to s^*$, for any $\varepsilon &gt; 0$ there exists $N$ such that $|s_t - s^*| &lt; \varepsilon$ for all $t &gt; N$. Decompose: $$\begin{aligned}
   |R_T - s^*| &amp;= \left| \alpha \sum_{k=0}^{T-1} (1-\alpha)^k (s_{T-k} - s^*) + (1-\alpha)^{T-1}(s_1 - s^*) \right| \\
-  &amp;&le; \alpha \sum_{k=0}^{T-N-1} (1-\alpha)^k \varepsilon + \alpha \sum_{k=T-N}^{T-1} (1-\alpha)^k \|s - s^*\|_&infin; + (1-\alpha)^{T-1} |s_1 - s^*|
-\end{align}</span></p>
-<p>The first term is bounded by <span class="math inline">\varepsilon</span> (geometric sum bounded by <span class="math inline">1/\alpha &middot; \alpha = 1</span>). The remaining terms decay exponentially with <span class="math inline">T - N</span>. Since <span class="math inline">\varepsilon</span> was arbitrary, <span class="math inline">R_T \to s^*</span>. ◻</p>
+  &amp;\le \alpha \sum_{k=0}^{T-N-1} (1-\alpha)^k \varepsilon + \alpha \sum_{k=T-N}^{T-1} (1-\alpha)^k \|s - s^*\|_\infty + (1-\alpha)^{T-1} |s_1 - s^*|
+\end{aligned}$$</p>
+<p>The first term is bounded by $\varepsilon$ (geometric sum bounded by $1/\alpha \cdot \alpha = 1$). The remaining terms decay exponentially with $T - N$. Since $\varepsilon$ was arbitrary, $R_T \to s^*$. ◻</p>
 </div>
 <p>This convergence guarantee means that the reputation system is stable: an agent that maintains consistent quality will converge to a reputation reflecting that quality, and temporary fluctuations are smoothed rather than amplified.</p>
 <h2 data-number="8.4" id="distance-based-agent-comparison"><span class="header-section-number">8.4</span> Distance-Based Agent Comparison</h2>
@@ -1070,12 +1041,12 @@ end</code></pre>
 <thead>
 <tr>
 <th style="text-align: left;"><strong>Domain</strong></th>
-<th style="text-align: center;"><span class="math inline">w_q</span></th>
-<th style="text-align: center;"><span class="math inline">w_a</span></th>
-<th style="text-align: center;"><span class="math inline">w_s</span></th>
-<th style="text-align: center;"><span class="math inline">w_c</span></th>
-<th style="text-align: center;"><span class="math inline">w_e</span></th>
-<th style="text-align: center;"><span class="math inline">w_r</span></th>
+<th style="text-align: center;">$w_q$</th>
+<th style="text-align: center;">$w_a$</th>
+<th style="text-align: center;">$w_s$</th>
+<th style="text-align: center;">$w_c$</th>
+<th style="text-align: center;">$w_e$</th>
+<th style="text-align: center;">$w_r$</th>
 </tr>
 </thead>
 <tbody>
@@ -1119,9 +1090,7 @@ end</code></pre>
 </table>
 </div>
 <h2 data-number="8.6" id="reputation-scheduling-coupling"><span class="header-section-number">8.6</span> Reputation-Scheduling Coupling</h2>
-<p>Evaluation scores influence scheduling priority through reputation. We define the <em>effective weight</em> of an agent as: <span class="math display">\begin{equation}
-  w_{\text{eff}}(A) = w(p_A) &middot; (1 + \beta R_A)
-\end{equation}</span> where <span class="math inline">\beta &gt; 0</span> is a reputation sensitivity parameter and <span class="math inline">R_A</span> is the agent’s reputation. Agents with higher reputation accumulate avruntime more slowly, receiving proportionally more execution opportunities. This creates a positive feedback loop that rewards quality.</p>
+<p>Evaluation scores influence scheduling priority through reputation. We define the <em>effective weight</em> of an agent as: $$w_{\text{eff}}(A) = w(p_A) \cdot (1 + \beta R_A)$$ where $\beta &gt; 0$ is a reputation sensitivity parameter and $R_A$ is the agent’s reputation. Agents with higher reputation accumulate avruntime more slowly, receiving proportionally more execution opportunities. This creates a positive feedback loop that rewards quality.</p>
 <h1 data-number="9" id="sec:case-studies"><span class="header-section-number">9</span> Case Studies</h1>
 <p>We validate the framework through three case studies drawn from production systems.</p>
 <h2 data-number="9.1" id="case-study-1-web-testing-agent"><span class="header-section-number">9.1</span> Case Study 1: Web Testing Agent</h2>
@@ -1129,13 +1098,13 @@ end</code></pre>
 <h4 data-number="9.1.0.1" id="architecture."><span class="header-section-number">9.1.0.1</span> Architecture.</h4>
 <p>The pipeline is created using the declarative API shown in Listing <a href="#lst:create-pipeline" data-reference-type="ref" data-reference="lst:create-pipeline">[lst:create-pipeline]</a>. Each phase runs as a GenServer process, consuming events from upstream phases and publishing events downstream.</p>
 <h4 data-number="9.1.0.2" id="streaming-in-action."><span class="header-section-number">9.1.0.2</span> Streaming in action.</h4>
-<p>The Recon phase crawls the target application, discovering pages and API endpoints. As each page is discovered, a <code>page_discovered</code> event is published. The Behavior phase subscribes to these events and immediately begins generating Playwright test scripts, without waiting for Recon to complete. Similarly, the Load phase subscribes to <code>api_found</code> events and begins generating k6 load testing scripts. This streaming architecture reduces total pipeline latency from <span class="math inline">\sum_{i=1}^{5} t_i</span> (sequential) to the critical path length.</p>
+<p>The Recon phase crawls the target application, discovering pages and API endpoints. As each page is discovered, a <code>page_discovered</code> event is published. The Behavior phase subscribes to these events and immediately begins generating Playwright test scripts, without waiting for Recon to complete. Similarly, the Load phase subscribes to <code>api_found</code> events and begins generating k6 load testing scripts. This streaming architecture reduces total pipeline latency from $\sum_{i=1}^{5} t_i$ (sequential) to the critical path length.</p>
 <h4 data-number="9.1.0.3" id="fault-tolerance."><span class="header-section-number">9.1.0.3</span> Fault tolerance.</h4>
 <p>Each phase runs under the DynamicSupervisor with <code>:one_for_one</code> strategy. If the Load phase crashes due to a target server timeout, it is restarted without affecting Behavior or Observer. The memoization store ensures completed k6 scripts are not regenerated.</p>
 <h4 data-number="9.1.0.4" id="evaluation."><span class="header-section-number">9.1.0.4</span> Evaluation.</h4>
-<p><span class="math display">\begin{align*}
+<p>$$\begin{aligned}
   \mathbf{v}_{\text{web-test}} = (q: 0.87,\ a: 0.92,\ s: 0.78,\ c: 0.85,\ e: 0.95,\ r: 0.88)
-\end{align*}</span> Composite score: <span class="math inline">\mathbf{w} &middot; \mathbf{v} = 0.25(0.87) + 0.20(0.92) + 0.15(0.78) + 0.15(0.85) + 0.15(0.95) + 0.10(0.88) = 0.877</span>.</p>
+\end{aligned}$$ Composite score: $\mathbf{w} \cdot \mathbf{v} = 0.25(0.87) + 0.20(0.92) + 0.15(0.78) + 0.15(0.85) + 0.15(0.95) + 0.10(0.88) = 0.877$.</p>
 <h2 data-number="9.2" id="case-study-2-legal-analysis-agent"><span class="header-section-number">9.2</span> Case Study 2: Legal Analysis Agent</h2>
 <p>A legal analysis agent processes contracts, identifying risks, obligations, and compliance requirements.</p>
 <h4 data-number="9.2.0.1" id="pipeline."><span class="header-section-number">9.2.0.1</span> Pipeline.</h4>
@@ -1151,18 +1120,18 @@ end</code></pre>
 <h4 data-number="9.2.0.2" id="supervision."><span class="header-section-number">9.2.0.2</span> Supervision.</h4>
 <p>The linear dependency chain uses <code>:rest_for_one</code>: if the risk scoring phase crashes, it and the downstream recommendation phase are restarted, but the completed clause extraction is preserved in the memo store.</p>
 <h4 data-number="9.2.0.3" id="failure-recovery-mapping."><span class="header-section-number">9.2.0.3</span> Failure recovery mapping.</h4>
-<p><span class="math display">\begin{align*}
-  <code>invalid\_output</code> &amp;\to <code>retry\_with\_backoff</code> \quad \text{(LLM hallucination)} \\
-  <code>human\_rejection</code> &amp;\to <code>retry\_with\_feedback</code> \quad \text{(incorporate reviewer notes)} \\
-  <code>timeout</code> &amp;\to <code>fallback\_agent</code> \quad \text{(switch to faster model)} \\
-  <code>crash</code> &amp;\to <code>human\_escalation</code> \quad \text{(legal analysis is high-stakes)}
-\end{align*}</span></p>
+<p>$$\begin{aligned}
+  \texttt{invalid\_output} &amp;\to \texttt{retry\_with\_backoff} \quad \text{(LLM hallucination)} \\
+  \texttt{human\_rejection} &amp;\to \texttt{retry\_with\_feedback} \quad \text{(incorporate reviewer notes)} \\
+  \texttt{timeout} &amp;\to \texttt{fallback\_agent} \quad \text{(switch to faster model)} \\
+  \texttt{crash} &amp;\to \texttt{human\_escalation} \quad \text{(legal analysis is high-stakes)}
+\end{aligned}$$</p>
 <h4 data-number="9.2.0.4" id="oversight."><span class="header-section-number">9.2.0.4</span> Oversight.</h4>
 <p>The oversight mode is <code>:supervised</code>—every intermediate output is reviewed before the next phase begins. This is at the top of the oversight ordering, appropriate for high-stakes legal work.</p>
 <h4 data-number="9.2.0.5" id="evaluation.-1"><span class="header-section-number">9.2.0.5</span> Evaluation.</h4>
-<p><span class="math display">\begin{align*}
+<p>$$\begin{aligned}
   \mathbf{v}_{\text{legal}} = (q: 0.91,\ a: 0.95,\ s: 0.65,\ c: 0.72,\ e: 0.88,\ r: 0.80)
-\end{align*}</span> Composite score with legal-domain weights (<span class="math inline">w_q = 0.35, w_a = 0.25, w_s = 0.05, w_c = 0.10, w_e = 0.15, w_r = 0.10</span>): <span class="math inline">0.35(0.91) + 0.25(0.95) + 0.05(0.65) + 0.10(0.72) + 0.15(0.88) + 0.10(0.80) = 0.882</span>.</p>
+\end{aligned}$$ Composite score with legal-domain weights ($w_q = 0.35, w_a = 0.25, w_s = 0.05, w_c = 0.10, w_e = 0.15, w_r = 0.10$): $0.35(0.91) + 0.25(0.95) + 0.05(0.65) + 0.10(0.72) + 0.15(0.88) + 0.10(0.80) = 0.882$.</p>
 <h2 data-number="9.3" id="case-study-3-security-auditing-agent"><span class="header-section-number">9.3</span> Case Study 3: Security Auditing Agent</h2>
 <p>A security auditing agent performs automated vulnerability assessment with parallel scanning subtasks.</p>
 <h4 data-number="9.3.0.1" id="dag-structure."><span class="header-section-number">9.3.0.1</span> DAG structure.</h4>
@@ -1181,9 +1150,9 @@ end</code></pre>
 <h4 data-number="9.3.0.2" id="oversight.-1"><span class="header-section-number">9.3.0.2</span> Oversight.</h4>
 <p>The mode is <code>:autonomous_escalation</code> with a confidence threshold: the agent operates autonomously unless it encounters an ambiguous finding (e.g., potential false positive), at which point it escalates to a human security analyst via <code>request_approval/2</code>.</p>
 <h4 data-number="9.3.0.3" id="evaluation.-2"><span class="header-section-number">9.3.0.3</span> Evaluation.</h4>
-<p><span class="math display">\begin{align*}
+<p>$$\begin{aligned}
   \mathbf{v}_{\text{security}} = (q: 0.83,\ a: 0.89,\ s: 0.82,\ c: 0.79,\ e: 0.91,\ r: 0.85)
-\end{align*}</span> Composite score: <span class="math inline">0.851</span> with default weights.</p>
+\end{aligned}$$ Composite score: $0.851$ with default weights.</p>
 <h2 data-number="9.4" id="comparative-evaluation"><span class="header-section-number">9.4</span> Comparative Evaluation</h2>
 <div id="tab:case-study-eval">
 <table>
@@ -1191,12 +1160,12 @@ end</code></pre>
 <thead>
 <tr>
 <th style="text-align: left;"><strong>Agent</strong></th>
-<th style="text-align: center;"><span class="math inline">q</span></th>
-<th style="text-align: center;"><span class="math inline">a</span></th>
-<th style="text-align: center;"><span class="math inline">s</span></th>
-<th style="text-align: center;"><span class="math inline">c</span></th>
-<th style="text-align: center;"><span class="math inline">1-e</span></th>
-<th style="text-align: center;"><span class="math inline">1-r</span></th>
+<th style="text-align: center;">$q$</th>
+<th style="text-align: center;">$a$</th>
+<th style="text-align: center;">$s$</th>
+<th style="text-align: center;">$c$</th>
+<th style="text-align: center;">$1-e$</th>
+<th style="text-align: center;">$1-r$</th>
 <th style="text-align: center;"><strong>Score</strong></th>
 </tr>
 </thead>
@@ -1260,8 +1229,8 @@ end</code></pre>
 </tr>
 <tr>
 <td style="text-align: left;">Weight source</td>
-<td style="text-align: left;">Nice values (<span class="math inline">-20</span> to <span class="math inline">+19</span>)</td>
-<td style="text-align: left;">Credit balance <span class="math inline">&times;</span> priority</td>
+<td style="text-align: left;">Nice values ($-20$ to $+19$)</td>
+<td style="text-align: left;">Credit balance $\times$ priority</td>
 </tr>
 <tr>
 <td style="text-align: left;">Preemption</td>
@@ -1555,13 +1524,13 @@ end</code></pre>
 <td style="text-align: left;"><code>:waiting_approval</code></td>
 <td style="text-align: left;"><code>:pending</code></td>
 <td style="text-align: left;"><code>respond_approval(:reject)</code></td>
-<td style="text-align: left;">Retries <span class="math inline">&lt;</span> max_retries</td>
+<td style="text-align: left;">Retries $&lt;$ max_retries</td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>:waiting_approval</code></td>
 <td style="text-align: left;"><code>:failed</code></td>
 <td style="text-align: left;"><code>respond_approval(:reject)</code></td>
-<td style="text-align: left;">Retries <span class="math inline">&ge;</span> max_retries</td>
+<td style="text-align: left;">Retries $\ge$ max_retries</td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>:checkpointed</code></td>

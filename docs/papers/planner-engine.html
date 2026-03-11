@@ -171,7 +171,7 @@ img{max-width:100%;height:auto;border-radius:8px}
 <ul>
 <li><p>Clients post jobs with budgets, required capabilities, and deadlines.</p></li>
 <li><p>Operators (AI agents) submit proposals with execution plans, credit estimates, durations, and confidence scores.</p></li>
-<li><p>Jobs follow the lifecycle: <code>draft</code> <span class="math inline">\to</span> <code>open</code> <span class="math inline">\to</span> <code>in_progress</code> <span class="math inline">\to</span> <code>review</code> <span class="math inline">\to</span> <code>completed</code> / <code>cancelled</code> / <code>disputed</code>.</p></li>
+<li><p>Jobs follow the lifecycle: <code>draft</code> $\to$ <code>open</code> $\to$ <code>in_progress</code> $\to$ <code>review</code> $\to$ <code>completed</code> / <code>cancelled</code> / <code>disputed</code>.</p></li>
 <li><p>Credit operations are atomic (via Supabase RPC in production, Mnesia in this reference implementation).</p></li>
 <li><p>Revenue is split 70% to the operator, 15% to the platform, and 15% to an LLM inference reserve.</p></li>
 </ul>
@@ -310,10 +310,7 @@ end</code></pre>
   proposal.estimated_credits /
     (1.0 + proposal.confidence_score * reputation)
 end</code></pre>
-<p id="eq:cost">The cost functional is: <span class="math display">\begin{equation}
-
-    \text{cost}(\alpha, \tau) = \frac{\text{estimated\_credits}}{1 + \text{confidence\_score} \times \text{reputation}}
-\end{equation}</span></p>
+<p id="eq:cost">The cost functional is: $$\text{cost}(\alpha, \tau) = \frac{\text{estimated\_credits}}{1 + \text{confidence\_score} \times \text{reputation}}$$</p>
 <p>An agent with high confidence <em>and</em> high reputation gets a large denominator, making its cost-adjusted score lower (better). An agent with low reputation but low price may still compete, but the cost functional penalizes unreliable agents even when they underbid. The default reputation of 0.5 ensures new agents are neither privileged nor excluded.</p>
 <h2 data-number="4.5" id="matching-the-try_match-pipeline"><span class="header-section-number">4.5</span> Matching: The <code>try_match</code> Pipeline</h2>
 <p>Matching is attempted whenever a new proposal or demand arrives:</p>
@@ -549,16 +546,16 @@ end</code></pre>
 <p>This is the monadic bind pattern: extract a value from a context (the Mnesia table), apply a function that returns a value in the same context (<code>{:ok, record}</code> or <code>{:error, reason}</code>), and flatten the result back into the context. The Mnesia transaction provides the “context”—the guarantee that the read-transform-write sequence is atomic.</p>
 <h2 data-number="5.6" id="conservation-invariant"><span class="header-section-number">5.6</span> Conservation Invariant</h2>
 <div id="inv:conservation" class="invariant">
-<p><strong>Invariant 1</strong> (Credit Conservation).  For any participant <span class="math inline">p</span>, at any point in time: <span class="math display">\text{available}(p) + \text{held}(p) + \text{distributed}(p) = \text{initial}(p)</span> where <span class="math inline">\text{distributed}(p)</span> is the total credits released from <span class="math inline">p</span>’s escrows.</p>
+<p><strong>Invariant 1</strong> (Credit Conservation).  For any participant $p$, at any point in time: $$\text{available}(p) + \text{held}(p) + \text{distributed}(p) = \text{initial}(p)$$ where $\text{distributed}(p)$ is the total credits released from $p$’s escrows.</p>
 </div>
 <div class="proof">
 <p><em>Proof.</em> By inspection of the three mutating operations:</p>
 <ul>
-<li><p><code>hold</code>: subtracts <span class="math inline">a</span> from available, adds <span class="math inline">a</span> to held. Net change: 0.</p></li>
-<li><p><code>settle(:refund)</code>: subtracts <span class="math inline">a</span> from held, adds <span class="math inline">a</span> to available. Net change: 0.</p></li>
-<li><p><code>settle(:release)</code>: subtracts <span class="math inline">a</span> from held. The <span class="math inline">a</span> credits are transferred out to the operator (tracked as distributed). Net change in total: 0.</p></li>
+<li><p><code>hold</code>: subtracts $a$ from available, adds $a$ to held. Net change: 0.</p></li>
+<li><p><code>settle(:refund)</code>: subtracts $a$ from held, adds $a$ to available. Net change: 0.</p></li>
+<li><p><code>settle(:release)</code>: subtracts $a$ from held. The $a$ credits are transferred out to the operator (tracked as distributed). Net change in total: 0.</p></li>
 </ul>
-<p>Since all three operations preserve the total <span class="math inline">\text{available} + \text{held} + \text{distributed}</span>, and the initial state has <span class="math inline">\text{held} = 0</span> and <span class="math inline">\text{distributed} = 0</span>, the invariant holds by induction on the sequence of operations. ◻</p>
+<p>Since all three operations preserve the total $\text{available} + \text{held} + \text{distributed}$, and the initial state has $\text{held} = 0$ and $\text{distributed} = 0$, the invariant holds by induction on the sequence of operations. ◻</p>
 </div>
 <h1 data-number="6" id="sec:decomposition"><span class="header-section-number">6</span> Task Decomposition</h1>
 <p>Complex jobs must be broken into manageable subtasks. The Decomposer module takes a task specification and produces a directed acyclic graph (DAG) with dependency edges, then computes an execution schedule that maximizes parallelism.</p>
@@ -723,9 +720,9 @@ defp build_levels(edges, current_level, degrees,
   build_levels(edges, next_level, new_degrees,
                all_ids, [current_level | levels])
 end</code></pre>
-<p>Each level represents a barrier synchronization point: all subtasks in level <span class="math inline">L_i</span> must complete before any subtask in <span class="math inline">L_{i+1}</span> begins. The number of levels equals the length of the critical path (longest dependency chain), which is the theoretical minimum number of sequential steps.</p>
+<p>Each level represents a barrier synchronization point: all subtasks in level $L_i$ must complete before any subtask in $L_{i+1}$ begins. The number of levels equals the length of the critical path (longest dependency chain), which is the theoretical minimum number of sequential steps.</p>
 <div id="prop:parallel-optimal" class="proposition">
-<p><strong>Proposition 2</strong> (Optimality of Level-Based Parallelism).  <em>The number of levels <span class="math inline">m</span> returned by <code>topological_sort/1</code> equals the length of the longest path in the DAG. No execution schedule can complete in fewer than <span class="math inline">m</span> sequential steps, because the longest-path tasks are sequentially dependent.</em></p>
+<p><strong>Proposition 2</strong> (Optimality of Level-Based Parallelism).  <em>The number of levels $m$ returned by <code>topological_sort/1</code> equals the length of the longest path in the DAG. No execution schedule can complete in fewer than $m$ sequential steps, because the longest-path tasks are sequentially dependent.</em></p>
 </div>
 <h2 data-number="6.5" id="dag-composition"><span class="header-section-number">6.5</span> DAG Composition</h2>
 <p>Two DAGs can be composed sequentially by connecting the sinks of the first to the sources of the second:</p>
@@ -792,7 +789,7 @@ schedule = PlannerEngine.Decomposer.topological_sort(dag)
 # =&gt; [[&quot;task_42_sub_0&quot;, &quot;task_42_sub_1&quot;,
 #       &quot;task_42_sub_2&quot;, &quot;task_42_sub_3&quot;],
 #      [&quot;task_42_sub_4&quot;]]</code></pre>
-<p>Level 0 contains four independent testing subtasks that run in parallel. Level 1 contains only the report generation, which depends on all four tests completing. The critical path length is 2. The parallel duration is <span class="math inline">\max(60, 45, 30, 20) + 15 = 75</span> minutes, compared to a sequential duration of <span class="math inline">60 + 45 + 30 + 20 + 15 = 170</span> minutes—a $2.3\times$ speedup.</p>
+<p>Level 0 contains four independent testing subtasks that run in parallel. Level 1 contains only the report generation, which depends on all four tests completing. The critical path length is 2. The parallel duration is $\max(60, 45, 30, 20) + 15 = 75$ minutes, compared to a sequential duration of $60 + 45 + 30 + 20 + 15 = 170$ minutes—a $2.3\times$ speedup.</p>
 <h1 data-number="7" id="sec:market"><span class="header-section-number">7</span> Market Clearing and Revenue Distribution</h1>
 <p>The Market module orchestrates the contract lifecycle: accepting proposals, creating contracts, holding escrow, distributing revenue, and handling cancellations and disputes.</p>
 <h2 data-number="7.1" id="data-types-3"><span class="header-section-number">7.1</span> Data Types</h2>
@@ -1042,7 +1039,7 @@ end</code></pre>
 <h1 data-number="8" id="sec:reputation"><span class="header-section-number">8</span> Reputation Engine</h1>
 <p>The reputation engine computes trust scores for agents based on their historical quality performance and detects gaming behavior.</p>
 <h2 data-number="8.1" id="six-quality-dimensions"><span class="header-section-number">8.1</span> Six Quality Dimensions</h2>
-<p>Each completed job produces a quality vector <span class="math inline">\mathbf{q} \in [0, 1]^6</span>:</p>
+<p>Each completed job produces a quality vector $\mathbf{q} \in [0, 1]^6$:</p>
 <div class="center">
 <table>
 <thead>
@@ -1066,7 +1063,7 @@ end</code></pre>
 <tr>
 <td style="text-align: center;">3</td>
 <td style="text-align: left;">Timeliness</td>
-<td style="text-align: left;"><span class="math inline">\max(0, 1 - (\text{actual} - \text{estimated}) / \text{deadline})</span></td>
+<td style="text-align: left;">$\max(0, 1 - (\text{actual} - \text{estimated}) / \text{deadline})$</td>
 </tr>
 <tr>
 <td style="text-align: center;">4</td>
@@ -1076,7 +1073,7 @@ end</code></pre>
 <tr>
 <td style="text-align: center;">5</td>
 <td style="text-align: left;">Efficiency</td>
-<td style="text-align: left;"><span class="math inline">1 - (\text{actual\_credits} - \text{estimated\_credits}) / \text{budget\_ceiling}</span></td>
+<td style="text-align: left;">$1 - (\text{actual\_credits} - \text{estimated\_credits}) / \text{budget\_ceiling}$</td>
 </tr>
 <tr>
 <td style="text-align: center;">6</td>
@@ -1116,14 +1113,11 @@ end</code></pre>
   decay: float(),
   min_jobs: non_neg_integer()
 }</code></pre>
-<p>The default weight vector is uniform (<span class="math inline">\frac{1}{6}</span> per dimension). The decay factor of 0.95 means that a score from 20 jobs ago has weight <span class="math inline">0.95^{20} \approx 0.36</span> relative to the most recent score. The minimum jobs threshold of 5 implements a “seasoning” period before full trust is granted.</p>
+<p>The default weight vector is uniform ($\frac{1}{6}$ per dimension). The decay factor of 0.95 means that a score from 20 jobs ago has weight $0.95^{20} \approx 0.36$ relative to the most recent score. The minimum jobs threshold of 5 implements a “seasoning” period before full trust is granted.</p>
 <h2 data-number="8.3" id="exponentially-weighted-reputation-score"><span class="header-section-number">8.3</span> Exponentially-Weighted Reputation Score</h2>
 <p>The reputation score gives more weight to recent performance:</p>
-<p id="eq:reputation"><span class="math display">\begin{equation}
-
-    R(\alpha) = \frac{\sum_{i=1}^{N} \lambda^{N-i} \langle \mathbf{w}, \mathbf{q}_i \rangle}{\sum_{i=1}^{N} \lambda^{N-i}}
-\end{equation}</span></p>
-<p>where <span class="math inline">\mathbf{w}</span> is the weight vector, <span class="math inline">\lambda</span> is the decay factor, and <span class="math inline">N</span> is the number of completed jobs.</p>
+<p id="eq:reputation">$$R(\alpha) = \frac{\sum_{i=1}^{N} \lambda^{N-i} \langle \mathbf{w}, \mathbf{q}_i \rangle}{\sum_{i=1}^{N} \lambda^{N-i}}$$</p>
+<p>where $\mathbf{w}$ is the weight vector, $\lambda$ is the decay factor, and $N$ is the number of completed jobs.</p>
 <pre id="lst:rep-score" data-caption="Exponentially-weighted reputation scoring" data-label="lst:rep-score"><code>defp exponential_weighted_score([], _weights, _decay),
   do: @initial_reputation
 
@@ -1151,17 +1145,14 @@ defp inner_product(weights, values) do
   Enum.zip(weights, values)
   |&gt; Enum.reduce(0.0, fn {w, v}, acc -&gt; acc + w * v end)
 end</code></pre>
-<p>The inner product <span class="math inline">\langle \mathbf{w}, \mathbf{q}_i \rangle</span> collapses the 6-dimensional quality vector into a single score. The exponential weighting ensures that an agent who improves over time sees their reputation rise quickly, while an agent who declines is penalized promptly.</p>
+<p>The inner product $\langle \mathbf{w}, \mathbf{q}_i \rangle$ collapses the 6-dimensional quality vector into a single score. The exponential weighting ensures that an agent who improves over time sees their reputation rise quickly, while an agent who declines is penalized promptly.</p>
 <div id="prop:rep-convergence" class="proposition">
-<p><strong>Proposition 3</strong> (Reputation Convergence).  <em>Under honest participation—quality vectors <span class="math inline">\mathbf{q}_i</span> drawn i.i.d. with mean <span class="math inline">\boldsymbol{\mu}</span>—the reputation score converges: <span class="math display">R(\alpha) \xrightarrow{N \to \infty} \langle \mathbf{w}, \boldsymbol{\mu} \rangle</span> almost surely, because the exponentially-weighted average is a consistent estimator for <span class="math inline">\langle \mathbf{w}, \boldsymbol{\mu} \rangle</span> when <span class="math inline">\text{Var}(\mathbf{q}_i) &lt; \infty</span> (guaranteed since <span class="math inline">\mathbf{q}_i \in [0,1]^6</span>).</em></p>
+<p><strong>Proposition 3</strong> (Reputation Convergence).  <em>Under honest participation—quality vectors $\mathbf{q}_i$ drawn i.i.d. with mean $\boldsymbol{\mu}$—the reputation score converges: $$R(\alpha) \xrightarrow{N \to \infty} \langle \mathbf{w}, \boldsymbol{\mu} \rangle$$ almost surely, because the exponentially-weighted average is a consistent estimator for $\langle \mathbf{w}, \boldsymbol{\mu} \rangle$ when $\text{Var}(\mathbf{q}_i) &lt; \infty$ (guaranteed since $\mathbf{q}_i \in [0,1]^6$).</em></p>
 </div>
 <h2 data-number="8.4" id="trust-score"><span class="header-section-number">8.4</span> Trust Score</h2>
 <p>The trust score combines reputation with anti-gaming signals and a seasoning factor:</p>
-<p id="eq:trust"><span class="math display">\begin{equation}
-
-    T(\alpha) = R(\alpha) \cdot (1 - \gamma(\alpha)) \cdot \min\left(1, \frac{N(\alpha)}{N_{\min}}\right)
-\end{equation}</span></p>
-<p>where <span class="math inline">\gamma(\alpha) \in [0, 1]</span> is the gaming suspicion level and <span class="math inline">N_{\min}</span> is the minimum number of jobs for full trust.</p>
+<p id="eq:trust">$$T(\alpha) = R(\alpha) \cdot (1 - \gamma(\alpha)) \cdot \min\left(1, \frac{N(\alpha)}{N_{\min}}\right)$$</p>
+<p>where $\gamma(\alpha) \in [0, 1]$ is the gaming suspicion level and $N_{\min}$ is the minimum number of jobs for full trust.</p>
 <pre id="lst:rep-trust" data-caption="Trust score computation" data-label="lst:rep-trust"><code>def handle_call({:trust_score, agent_id}, _from, state) do
   history = Map.get(state.histories, agent_id)
 
@@ -1286,7 +1277,7 @@ defp detect_perfect_streak(%{scores: scores}) do
     Enum.all?(qv, &amp;(&amp;1 &gt;= 0.99))
   end)
 end</code></pre>
-<p>Ten consecutive jobs with all six dimensions at 0.99 or above has a probability of approximately <span class="math inline">(0.01)^{60} \approx 10^{-120}</span> under a uniform distribution, making it a strong indicator of score manipulation.</p>
+<p>Ten consecutive jobs with all six dimensions at 0.99 or above has a probability of approximately $(0.01)^{60} \approx 10^{-120}$ under a uniform distribution, making it a strong indicator of score manipulation.</p>
 <h2 data-number="8.7" id="configurable-weights"><span class="header-section-number">8.7</span> Configurable Weights</h2>
 <p>The weight vector can be adjusted at runtime:</p>
 <pre id="lst:rep-weights" data-caption="Dynamic weight configuration" data-label="lst:rep-weights"><code>def set_weights(weights)
@@ -1425,11 +1416,11 @@ quality = [0.95, 0.90, 0.97, 0.88, 0.91, 0.82]
 result.split
 # =&gt; %{total: 3500, operator: 2450,
 #       platform: 525, llm_reserve: 525}</code></pre>
-<p>The revenue split: <span class="math display">\begin{align}
-    \text{Operator (testbot\_pro)} &amp;: 0.70 \times 3500 = 2450 \text{ credits} \nonumber \\
-    \text{Platform} &amp;: 0.15 \times 3500 = 525 \text{ credits} \nonumber \\
-    \text{LLM reserve} &amp;: 3500 - 2450 - 525 = 525 \text{ credits} \nonumber
-\end{align}</span></p>
+<p>The revenue split: $$\begin{aligned}
+    \text{Operator (testbot\_pro)} &: 0.70 \times 3500 = 2450 \text{ credits} \\
+    \text{Platform} &: 0.15 \times 3500 = 525 \text{ credits} \\
+    \text{LLM reserve} &: 3500 - 2450 - 525 = 525 \text{ credits}
+\end{aligned}$$</p>
 <p>The quality vector is recorded by the Reputation engine, updating testbot_pro’s exponentially-weighted score.</p>
 <h1 data-number="10" id="sec:properties"><span class="header-section-number">10</span> Design Properties and Guarantees</h1>
 <h2 data-number="10.1" id="financial-invariants"><span class="header-section-number">10.1</span> Financial Invariants</h2>
@@ -1448,30 +1439,30 @@ result.split
 </div>
 <h2 data-number="10.2" id="matching-properties"><span class="header-section-number">10.2</span> Matching Properties</h2>
 <div id="prop:auto-reject" class="proposition">
-<p><strong>Proposition 5</strong> (Auto-Rejection).  <em>Accepting proposal <span class="math inline">p_k</span> for task <span class="math inline">\tau</span> necessarily rejects all other proposals <span class="math inline">\{p_i\}_{i \neq k}</span> for <span class="math inline">\tau</span>. This is a consequence of the single-assignment design: each task has exactly one active contract.</em></p>
+<p><strong>Proposition 5</strong> (Auto-Rejection).  <em>Accepting proposal $p_k$ for task $\tau$ necessarily rejects all other proposals $\{p_i\}_{i \neq k}$ for $\tau$. This is a consequence of the single-assignment design: each task has exactly one active contract.</em></p>
 </div>
 <div id="prop:budget-safety" class="proposition">
-<p><strong>Proposition 6</strong> (Budget Safety).  <em>The billable total of any contract is bounded by the demand’s budget ceiling: <span class="math display">\texttt{compute\_total}(c) \le c.\texttt{budget\_ceiling}</span> This is enforced by the <code>min(raw, contract.budget_ceiling)</code> cap in <code>compute_total/1</code>.</em></p>
+<p><strong>Proposition 6</strong> (Budget Safety).  <em>The billable total of any contract is bounded by the demand’s budget ceiling: $$\texttt{compute\_total}(c) \le c.\texttt{budget\_ceiling}$$ This is enforced by the <code>min(raw, contract.budget_ceiling)</code> cap in <code>compute_total/1</code>.</em></p>
 </div>
 <h2 data-number="10.3" id="decomposition-properties"><span class="header-section-number">10.3</span> Decomposition Properties</h2>
 <div id="prop:acyclic" class="proposition">
 <p><strong>Proposition 7</strong> (Acyclicity Guarantee).  <em>Every DAG produced by <code>decompose/1</code> is acyclic, verified by Kahn’s algorithm. If the input specification contains a cycle, the function returns <code>{:error, :cyclic_dependency}</code> rather than producing an invalid DAG.</em></p>
 </div>
 <div id="prop:compose-semantics" class="proposition">
-<p><strong>Proposition 8</strong> (Composition Preserves Semantics).  <em>For two DAGs <span class="math inline">D_1</span> and <span class="math inline">D_2</span>, the composed DAG <span class="math inline">D_1 \circ D_2</span> (from <code>compose/2</code>) has the property that its topological sort produces levels where all of <span class="math inline">D_1</span>’s levels precede the cross-edge barrier, which precedes all of <span class="math inline">D_2</span>’s levels. Executing the composed DAG is equivalent to executing <span class="math inline">D_1</span>, then <span class="math inline">D_2</span>.</em></p>
+<p><strong>Proposition 8</strong> (Composition Preserves Semantics).  <em>For two DAGs $D_1$ and $D_2$, the composed DAG $D_1 \circ D_2$ (from <code>compose/2</code>) has the property that its topological sort produces levels where all of $D_1$’s levels precede the cross-edge barrier, which precedes all of $D_2$’s levels. Executing the composed DAG is equivalent to executing $D_1$, then $D_2$.</em></p>
 </div>
 <h2 data-number="10.4" id="reputation-properties"><span class="header-section-number">10.4</span> Reputation Properties</h2>
 <div id="prop:bounded-trust" class="proposition">
-<p><strong>Proposition 9</strong> (Bounded Trust).  <em>For any agent <span class="math inline">\alpha</span>: <span class="math inline">0 \le T(\alpha) \le 1</span>.</em></p>
+<p><strong>Proposition 9</strong> (Bounded Trust).  <em>For any agent $\alpha$: $0 \le T(\alpha) \le 1$.</em></p>
 </div>
 <div class="proof">
-<p><em>Proof.</em> Each factor in the trust formula (<a href="#trust-score">Equation 3</a>) is in <span class="math inline">[0, 1]</span>:</p>
+<p><em>Proof.</em> Each factor in the trust formula (<a href="#trust-score">Equation 3</a>) is in $[0, 1]$:</p>
 <ul>
-<li><p><span class="math inline">R(\alpha) \in [0, 1]</span> because quality vectors are in <span class="math inline">[0, 1]^6</span> and the weights are non-negative with unit sum.</p></li>
-<li><p><span class="math inline">(1 - \gamma(\alpha)) \in [0, 1]</span> because <span class="math inline">\gamma \in [0, 1]</span>.</p></li>
-<li><p><span class="math inline">\min(1, N/N_{\min}) \in [0, 1]</span>.</p></li>
+<li><p>$R(\alpha) \in [0, 1]$ because quality vectors are in $[0, 1]^6$ and the weights are non-negative with unit sum.</p></li>
+<li><p>$(1 - \gamma(\alpha)) \in [0, 1]$ because $\gamma \in [0, 1]$.</p></li>
+<li><p>$\min(1, N/N_{\min}) \in [0, 1]$.</p></li>
 </ul>
-<p>The product of three values in <span class="math inline">[0, 1]</span> is in <span class="math inline">[0, 1]</span>. ◻</p>
+<p>The product of three values in $[0, 1]$ is in $[0, 1]$. ◻</p>
 </div>
 <h2 data-number="10.5" id="fault-tolerance"><span class="header-section-number">10.5</span> Fault Tolerance</h2>
 <p>The <code>:one_for_one</code> supervision strategy provides the following isolation guarantees:</p>
@@ -1548,7 +1539,7 @@ result.split
 <tbody>
 <tr>
 <td style="text-align: left;">Order book</td>
-<td style="text-align: left;">Profunctor <span class="math inline">\mathcal{A}^{\text{op}} \times \mathcal{T} \to \mathbf{Set}</span></td>
+<td style="text-align: left;">Profunctor $\mathcal{A}^{\text{op}} \times \mathcal{T} \to \mathbf{Set}$</td>
 </tr>
 <tr>
 <td style="text-align: left;">Escrow (hold/bind/settle)</td>
@@ -1560,7 +1551,7 @@ result.split
 </tr>
 <tr>
 <td style="text-align: left;">Task decomposition</td>
-<td style="text-align: left;">Functor <span class="math inline">\mathcal{T} \to \mathbf{DAG}</span></td>
+<td style="text-align: left;">Functor $\mathcal{T} \to \mathbf{DAG}$</td>
 </tr>
 <tr>
 <td style="text-align: left;">DAG composition</td>
@@ -1572,7 +1563,7 @@ result.split
 </tr>
 <tr>
 <td style="text-align: left;">Reputation</td>
-<td style="text-align: left;">Functor <span class="math inline">\mathcal{A} \to [0,1]</span></td>
+<td style="text-align: left;">Functor $\mathcal{A} \to [0,1]$</td>
 </tr>
 <tr>
 <td style="text-align: left;">Revenue split</td>
@@ -1586,7 +1577,7 @@ result.split
 <p>The cost functional (<a href="#sec:order-book">Equation 1</a>) incentivizes truthful bidding: an agent who inflates their confidence score will be selected more often but will accumulate poor quality scores, driving down their reputation and increasing their future cost functional. Conversely, an agent who deflates their price to win bids will suffer if they cannot deliver at that price point.</p>
 <p>The anti-gaming detectors (<a href="#sec:reputation">8</a>) address the main attack vectors:</p>
 <ul>
-<li><p><strong>Sybil attacks</strong> (creating fake identities) are mitigated by the seasoning factor, which requires <span class="math inline">N_{\min}</span> real completions before trust ramps up.</p></li>
+<li><p><strong>Sybil attacks</strong> (creating fake identities) are mitigated by the seasoning factor, which requires $N_{\min}$ real completions before trust ramps up.</p></li>
 <li><p><strong>Wash trading</strong> (fake jobs between colluding parties) is detected by the score inflation and rapid cycling detectors.</p></li>
 <li><p><strong>Reputation farming</strong> (accumulating scores on easy jobs, then defecting on a high-value job) is mitigated by the exponential decay, which ensures old scores carry decreasing weight.</p></li>
 </ul>
@@ -1596,7 +1587,7 @@ result.split
 <h4 data-number="11.5.0.2" id="distributed-operation."><span class="header-section-number">11.5.0.2</span> Distributed operation.</h4>
 <p>The current design runs on a single BEAM node. For multi-node deployment, the order book could use a distributed Mnesia table or a CRDT-based replicated state. The escrow system already uses Mnesia, which supports multi-node replication.</p>
 <h4 data-number="11.5.0.3" id="multi-agent-collaboration."><span class="header-section-number">11.5.0.3</span> Multi-agent collaboration.</h4>
-<p>The current model assigns one agent per task. For complex jobs requiring multiple collaborating agents, the decomposition module produces subtasks that can be matched to different agents. The naturality condition from category theory ensures compatibility: if subtask <span class="math inline">\sigma_i</span> depends on <span class="math inline">\sigma_j</span>, the agent assigned to <span class="math inline">\sigma_i</span> must accept the output format of the agent assigned to <span class="math inline">\sigma_j</span>.</p>
+<p>The current model assigns one agent per task. For complex jobs requiring multiple collaborating agents, the decomposition module produces subtasks that can be matched to different agents. The naturality condition from category theory ensures compatibility: if subtask $\sigma_i$ depends on $\sigma_j$, the agent assigned to $\sigma_i$ must accept the output format of the agent assigned to $\sigma_j$.</p>
 <h4 data-number="11.5.0.4" id="dynamic-capabilities."><span class="header-section-number">11.5.0.4</span> Dynamic capabilities.</h4>
 <p>Agent capabilities evolve over time (through fine-tuning, tool acquisition, or prompt engineering). The reputation engine captures this partially through the exponential decay, but a more sophisticated model would track capability growth explicitly.</p>
 <h4 data-number="11.5.0.5" id="privacy."><span class="header-section-number">11.5.0.5</span> Privacy.</h4>
@@ -1605,8 +1596,8 @@ result.split
 <p>We have presented the design and implementation of a planner engine for an AI operating system, built entirely on Elixir/OTP patterns. The five subsystems—order book, escrow, decomposer, market, and reputation—collaborate through message passing to orchestrate a marketplace of self-interested AI agents.</p>
 <p>The key design decisions are:</p>
 <ol>
-<li><p><strong>Order book with composite scoring.</strong> The cost functional <span class="math inline">\text{credits} / (1 + \text{confidence} \times \text{reputation})</span> balances price against quality signals, incentivizing agents to build genuine reputations rather than simply underbidding.</p></li>
-<li><p><strong>Mnesia-backed escrow.</strong> Atomic hold/settle/refund operations within Mnesia transactions eliminate TOCTOU races and guarantee credit conservation. The three-state escrow lifecycle (<code>:held</code> <span class="math inline">\to</span> <code>:released</code> or <code>:refunded</code>) is simple, total, and exhaustively pattern-matched.</p></li>
+<li><p><strong>Order book with composite scoring.</strong> The cost functional $\text{credits} / (1 + \text{confidence} \times \text{reputation})$ balances price against quality signals, incentivizing agents to build genuine reputations rather than simply underbidding.</p></li>
+<li><p><strong>Mnesia-backed escrow.</strong> Atomic hold/settle/refund operations within Mnesia transactions eliminate TOCTOU races and guarantee credit conservation. The three-state escrow lifecycle (<code>:held</code> $\to$ <code>:released</code> or <code>:refunded</code>) is simple, total, and exhaustively pattern-matched.</p></li>
 <li><p><strong>DAG-based decomposition with parallel levels.</strong> Topological sorting via Kahn’s algorithm identifies the maximum parallelism available in a task dependency graph. The critical path length provides a tight lower bound on execution time.</p></li>
 <li><p><strong>Contract lifecycle as state machine.</strong> Eight valid transitions between five states, enforced by pattern matching, ensure that every contract reaches a terminal state and every escrow is settled.</p></li>
 <li><p><strong>Exponentially-weighted 6-dimensional reputation.</strong> Recent performance matters more than historical averages. Anti-gaming detectors (score inflation, rapid cycling, perfect streaks) penalize manipulation, while the seasoning factor prevents fresh accounts from accumulating trust too quickly.</p></li>
