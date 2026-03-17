@@ -1,0 +1,15 @@
+_build/
+deps/
+.git/
+.elixir_ls/
+.vscode/
+*.beam
+*.ez
+Mnesia.*
+*.swp
+*.swo
+*~
+.DS_Store
+cover/
+doc/
+tmp/

@@ -32,7 +32,7 @@ defmodule ToolInterface.Registry do
   use GenServer
   require Logger
 
-  @type tool_tier :: :builtin | :sandbox | :mcp
+  @type tool_tier :: :builtin | :sandbox | :external
 
   @type tool_spec :: %{
           name: String.t(),

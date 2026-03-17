@@ -72,7 +72,8 @@ defmodule AgentScheduler.Agent do
           retry_count: non_neg_integer(),
           max_retries: non_neg_integer(),
           started_at: integer() | nil,
-          checkpoint_data: term()
+          checkpoint_data: term(),
+          task_ref: reference() | nil
         }
 
   defstruct [
@@ -81,6 +82,7 @@ defmodule AgentScheduler.Agent do
     :started_at,
     :current_job,
     :checkpoint_data,
+    :task_ref,
     state: :pending,
     credits: 0,
     metrics: %{},
@@ -278,6 +280,9 @@ defmodule AgentScheduler.Agent do
     Logger.info("Agent #{state.id}: assigned job #{inspect(job[:id] || :anonymous)}")
     emit_telemetry(:job_assigned, %{agent_id: state.id, job: job})
 
+    # Spawn autonomous execution — the agent GenServer monitors the task
+    send(self(), {:execute_autonomous, job})
+
     {:reply, :ok, new_state}
   end
 
@@ -407,6 +412,92 @@ defmodule AgentScheduler.Agent do
   end
 
   @impl true
+  def handle_info({:execute_autonomous, job}, %{state: :running} = state) do
+    agent_id = state.id
+    agent_type = resolve_agent_type(state.profile)
+
+    case agent_type do
+      nil ->
+        Logger.warning("Agent #{agent_id}: no agent module found for profile, skipping autonomous execution")
+        {:noreply, state}
+
+      agent_module ->
+        # Spawn a monitored task for the autonomous pipeline
+        task =
+          Task.async(fn ->
+            context = %{
+              agent_id: agent_id,
+              agent_type: agent_module,
+              output_dir: "/tmp/agent-os/artifacts",
+              attempt: 0
+            }
+
+            input = normalize_job_input(job)
+            agent_module.run_autonomous(input, context)
+          end)
+
+        Logger.info("Agent #{agent_id}: spawned autonomous execution (task: #{inspect(task.pid)})")
+        {:noreply, Map.put(state, :task_ref, task.ref)}
+    end
+  end
+
+  def handle_info({:execute_autonomous, _job}, state) do
+    Logger.warning("Agent #{state.id}: ignoring execute_autonomous in #{state.state} state")
+    {:noreply, state}
+  end
+
+  @impl true
+  def handle_info({ref, result}, %{task_ref: ref} = state) when is_reference(ref) do
+    # Task completed — process result
+    Process.demonitor(ref, [:flush])
+
+    case result do
+      {:ok, %{artifacts: artifacts} = success} ->
+        elapsed = if state.started_at, do: System.monotonic_time(:millisecond) - state.started_at, else: 0
+        Logger.info("Agent #{state.id}: autonomous pipeline completed in #{elapsed}ms")
+        Logger.info("Agent #{state.id}: artifacts=#{inspect(Map.keys(artifacts))}")
+
+        new_state = %{state | state: :completed, checkpoint_data: success}
+        emit_telemetry(:job_completed, %{agent_id: state.id, elapsed_ms: elapsed, artifacts: artifacts})
+        {:noreply, Map.delete(new_state, :task_ref)}
+
+      {:error, reason} ->
+        Logger.error("Agent #{state.id}: autonomous pipeline failed — #{inspect(reason)}")
+
+        new_state = %{state | state: :failed, checkpoint_data: %{error: reason}}
+        emit_telemetry(:job_failed, %{agent_id: state.id, reason: reason})
+        {:noreply, Map.delete(new_state, :task_ref)}
+
+      {:escalate, detail} ->
+        Logger.warning("Agent #{state.id}: autonomous pipeline escalated — #{inspect(detail[:reason])}: #{detail[:message]}")
+
+        new_state = %{state | state: :waiting_approval, checkpoint_data: detail}
+        emit_telemetry(:escalation, %{agent_id: state.id, detail: detail})
+        {:noreply, Map.delete(new_state, :task_ref)}
+    end
+  end
+
+  def handle_info({:DOWN, ref, :process, _pid, reason}, %{task_ref: ref} = state) do
+    # Task crashed
+    Logger.error("Agent #{state.id}: autonomous execution crashed — #{inspect(reason)}")
+
+    new_state = %{state | state: :failed, checkpoint_data: %{error: {:task_crashed, reason}}}
+    emit_telemetry(:job_failed, %{agent_id: state.id, reason: {:task_crashed, reason}})
+    {:noreply, Map.delete(new_state, :task_ref)}
+  end
+
+  def handle_info({ref, _result}, state) when is_reference(ref) do
+    # Stale task result — ignore
+    Process.demonitor(ref, [:flush])
+    {:noreply, state}
+  end
+
+  def handle_info({:DOWN, _ref, :process, _pid, _reason}, state) do
+    # Stale DOWN message — ignore
+    {:noreply, state}
+  end
+
+  @impl true
   def terminate(reason, state) do
     Logger.info("Agent #{state.id}: terminating (reason: #{inspect(reason)}, state: #{state.state})")
     emit_telemetry(:agent_terminated, %{agent_id: state.id, reason: reason})
@@ -418,6 +509,40 @@ defmodule AgentScheduler.Agent do
   defp via_registry(agent_id) do
     {:via, Registry, {AgentScheduler.Registry, agent_id}}
   end
+
+  defp resolve_agent_type(profile) do
+    name = Map.get(profile, :name, "")
+
+    case String.downcase(name) do
+      "openclaw" -> AgentScheduler.Agents.OpenClaw
+      "nemoclaw" -> AgentScheduler.Agents.NemoClaw
+      _ ->
+        # Try the Agents.Registry for custom types
+        type_atom = name |> String.downcase() |> String.to_atom()
+
+        case AgentScheduler.Agents.Registry.lookup(type_atom) do
+          {:ok, module} -> module
+          _ -> nil
+        end
+    end
+  rescue
+    _ -> nil
+  end
+
+  defp normalize_job_input(job) when is_map(job) do
+    # Normalize string keys to atom keys for the agent
+    job
+    |> Enum.reduce(%{}, fn
+      {"topic", v}, acc -> Map.put(acc, :topic, v)
+      {"input", v}, acc when is_map(v) -> Map.merge(acc, normalize_job_input(v))
+      {"llm_config", v}, acc -> Map.put(acc, :llm_config, v)
+      {k, v}, acc when is_atom(k) -> Map.put(acc, k, v)
+      {k, v}, acc when is_binary(k) -> Map.put(acc, String.to_atom(k), v)
+      _, acc -> acc
+    end)
+  end
+
+  defp normalize_job_input(other), do: %{input: other}
 
   defp emit_telemetry(event, measurements) when is_atom(event) do
     :telemetry.execute(

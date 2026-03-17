@@ -79,4 +79,36 @@ defmodule AgentOS do
       planner: %{running: true}
     }
   end
+
+  @doc "Creates an agent from a complete AgentSpec."
+  @spec create_agent(AgentOS.AgentSpec.t()) :: {:ok, String.t()} | {:error, term()}
+  def create_agent(spec) do
+    resolved = AgentOS.AgentSpec.resolve_credentials(spec)
+
+    case AgentOS.AgentSpec.validate(resolved) do
+      :ok ->
+        provider = AgentOS.Providers.Resolver.resolve(resolved.provider)
+
+        provider.create_agent(%{
+          type: resolved.type,
+          name: resolved.name,
+          oversight: resolved.oversight,
+          env: credential_env(resolved.credentials),
+          resources: resolved.resources
+        })
+
+      {:error, _} = err ->
+        err
+    end
+  end
+
+  defp credential_env(creds) do
+    %{}
+    |> maybe_put("GITHUB_TOKEN", creds[:github_token])
+    |> maybe_put("FLY_API_TOKEN", creds[:fly_api_token])
+    |> maybe_put("AGENT_OS_API_KEY", creds[:agent_os_api_key])
+  end
+
+  defp maybe_put(map, _key, nil), do: map
+  defp maybe_put(map, key, val), do: Map.put(map, key, val)
 end

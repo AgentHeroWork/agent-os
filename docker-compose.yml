@@ -1,0 +1,20 @@
+services:
+  agent-os:
+    build: .
+    ports:
+      - "4000:4000"
+    environment:
+      - AGENT_OS_PORT=4000
+      - AGENT_OS_API_KEY=${AGENT_OS_API_KEY:-}
+      - FLY_API_TOKEN=${FLY_API_TOKEN:-}
+    volumes:
+      - mnesia_data:/data/mnesia
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  mnesia_data:

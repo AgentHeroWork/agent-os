@@ -43,6 +43,7 @@ defmodule AgentScheduler do
   def start(_type, _args) do
     children = [
       {Registry, keys: :unique, name: AgentScheduler.Registry},
+      {AgentScheduler.Agents.Registry, []},
       {AgentScheduler.Evaluator, []},
       {AgentScheduler.Scheduler, []},
       {AgentScheduler.Pipeline, []},
@@ -152,6 +153,34 @@ defmodule AgentScheduler do
   @spec create_pipeline(atom(), keyword()) :: {:ok, String.t()} | {:error, term()}
   def create_pipeline(name, stages) do
     AgentScheduler.Pipeline.create(name, stages)
+  end
+
+  @doc """
+  Starts an OpenClaw agent in the supervised pool.
+
+  OpenClaw agents have full tool access and default to `:autonomous_escalation` oversight.
+  """
+  @spec start_openclaw(String.t(), keyword()) :: {:ok, pid()} | {:error, term()}
+  def start_openclaw(name, opts \\ []) do
+    profile = AgentScheduler.Agents.OpenClaw.profile()
+    agent_id = "openclaw_#{name}_#{:erlang.unique_integer([:positive])}"
+    oversight = Keyword.get(opts, :oversight, profile.default_oversight)
+
+    start_agent(agent_id, profile, Keyword.merge(opts, oversight: oversight))
+  end
+
+  @doc """
+  Starts a NemoClaw agent in the supervised pool.
+
+  NemoClaw agents have restricted tools and default to `:supervised` oversight.
+  """
+  @spec start_nemoclaw(String.t(), keyword()) :: {:ok, pid()} | {:error, term()}
+  def start_nemoclaw(name, opts \\ []) do
+    profile = AgentScheduler.Agents.NemoClaw.profile()
+    agent_id = "nemoclaw_#{name}_#{:erlang.unique_integer([:positive])}"
+    oversight = Keyword.get(opts, :oversight, profile.default_oversight)
+
+    start_agent(agent_id, profile, Keyword.merge(opts, oversight: oversight))
   end
 
   # -- Private --
