@@ -13,7 +13,8 @@ defmodule AgentOS.Web.Router do
     AgentController,
     JobController,
     ToolController,
-    MemoryController
+    MemoryController,
+    VMController
   }
 
   plug Plug.Logger
@@ -87,6 +88,12 @@ defmodule AgentOS.Web.Router do
 
   get "/api/v1/memory/:id" do
     MemoryController.show(conn, id)
+  end
+
+  # ── VM Proxy (called by agents inside microVMs) ────────────────
+
+  post "/api/v1/vm/llm/chat" do
+    VMController.llm_chat(conn)
   end
 
   # ── Catch-all ───────────────────────────────────────────────────────
