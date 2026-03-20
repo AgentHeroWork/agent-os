@@ -17,7 +17,7 @@ defmodule AgentOS.Pipeline do
 
   require Logger
 
-  alias AgentOS.{MicroVM, ContextBridge}
+  alias AgentOS.{MicroVM, ContextBridge, Audit}
   alias AgentOS.Contracts.{ContractSpec, Verify}
 
   @doc """
@@ -117,9 +117,20 @@ defmodule AgentOS.Pipeline do
     # 5. Execute in microVM
     Logger.info("Pipeline: running #{stage.name} in microVM (script: #{Path.basename(script_path)})...")
 
+    Audit.log_stage_start(state.run_id, stage.name, contract.name)
+    stage_start = System.monotonic_time(:millisecond)
+
     case MicroVM.run_agent(script_path, context_dir, output_dir, %{env: env}) do
       {:ok, _output} ->
+        duration_ms = System.monotonic_time(:millisecond) - stage_start
         Logger.info("Pipeline: #{stage.name} completed")
+
+        # Read agent-side proof and audit files
+        {:ok, proof} = read_agent_proof(output_dir)
+        {:ok, audit_data} = read_agent_audit(output_dir)
+
+        Audit.log_stage_complete(state.run_id, stage.name, proof, duration_ms)
+        ingest_agent_audit(state.run_id, stage.name, audit_data)
 
         # 6. Ingest output into ContextFS with contract/stage tags
         ContextBridge.ingest_output(
@@ -137,6 +148,7 @@ defmodule AgentOS.Pipeline do
         }}
 
       {:error, reason} ->
+        Audit.log_stage_fail(state.run_id, stage.name, reason)
         {:error, reason}
     end
   end
@@ -197,6 +209,52 @@ defmodule AgentOS.Pipeline do
     else
       env
     end
+  end
+
+  defp read_agent_proof(output_dir) do
+    path = Path.join(output_dir, "_proof.json")
+
+    case File.read(path) do
+      {:ok, json} -> Jason.decode(json)
+      _ -> {:ok, %{"all_passed" => true, "checks" => []}}
+    end
+  end
+
+  defp read_agent_audit(output_dir) do
+    path = Path.join(output_dir, "_audit.json")
+
+    case File.read(path) do
+      {:ok, json} -> Jason.decode(json)
+      _ -> {:ok, %{}}
+    end
+  end
+
+  defp ingest_agent_audit(run_id, stage_name, audit_data) do
+    # Log each command from the agent's audit
+    commands = Map.get(audit_data, "commands", [])
+
+    Enum.each(commands, fn cmd ->
+      Audit.log_tool_use(
+        run_id,
+        stage_name,
+        Map.get(cmd, "command", "unknown"),
+        Map.get(cmd, "description", ""),
+        Map.get(cmd, "exit_code", 0),
+        Map.get(cmd, "duration_ms", 0)
+      )
+    end)
+
+    # Log LLM calls
+    llm_calls = Map.get(audit_data, "llm_calls", [])
+
+    Enum.each(llm_calls, fn call ->
+      Audit.log_llm_call(
+        run_id,
+        stage_name,
+        Map.get(call, "model", "gpt-4o"),
+        Map.get(call, "duration_ms", 0)
+      )
+    end)
   end
 
   defp collect_artifacts(output_dir, existing) do

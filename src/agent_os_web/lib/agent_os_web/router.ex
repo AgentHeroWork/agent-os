@@ -15,7 +15,8 @@ defmodule AgentOS.Web.Router do
     ToolController,
     MemoryController,
     VMController,
-    RunController
+    RunController,
+    AuditController
   }
 
   plug Plug.Logger
@@ -103,6 +104,16 @@ defmodule AgentOS.Web.Router do
 
   get "/api/v1/contracts" do
     RunController.list_contracts(conn)
+  end
+
+  # ── Audit ─────────────────────────────────────────────────────────
+
+  get "/api/v1/audit/:pipeline_id" do
+    AuditController.trail(conn, pipeline_id)
+  end
+
+  get "/api/v1/audit/:pipeline_id/:stage/proof" do
+    AuditController.proof(conn, pipeline_id, stage)
   end
 
   # ── VM Proxy (called by agents inside microVMs) ────────────────

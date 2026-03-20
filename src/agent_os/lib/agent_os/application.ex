@@ -22,7 +22,7 @@ defmodule AgentOS.Application do
     # AgentOS.Web) are separate OTP applications that start automatically as
     # deps via mix.exs. This supervisor exists for any agent_os-specific
     # processes (e.g., future background tasks).
-    children = []
+    children = [AgentOS.Audit]
 
     opts = [strategy: :one_for_one, name: AgentOS.Supervisor]
     Supervisor.start_link(children, opts)
