@@ -93,8 +93,13 @@ defmodule AgentOS.MicroVM do
     cpus = Map.get(opts, :cpus, @default_cpus)
     env = Map.get(opts, :env, %{})
 
+    # Mount the scripts directory so agent-runtime.sh is accessible inside the VM
+    scripts_dir = Path.dirname(script_path)
+    script_name = Path.basename(script_path)
+
     base = [
       image,
+      "-v", "#{scripts_dir}:/scripts",
       "-v", "#{context_dir}:/context",
       "-v", "#{output_dir}:/shared/output",
       "--memory", to_string(memory),
@@ -104,6 +109,7 @@ defmodule AgentOS.MicroVM do
 
     env_args = Enum.flat_map(env, fn {k, v} -> ["--env", "#{k}=#{v}"] end)
 
-    base ++ env_args ++ ["-e", script_path]
+    # Execute the script at its container path, not the host path
+    base ++ env_args ++ ["-e", "/scripts/#{script_name}"]
   end
 end

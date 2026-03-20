@@ -76,7 +76,7 @@ defmodule AgentOS.Pipeline do
         case Verify.check(artifacts, contract.verify) do
           :ok ->
             Logger.info("Pipeline: '#{contract.name}' completed successfully")
-            {:ok, artifacts}
+            {:ok, Map.put(artifacts, :run_id, run_id)}
 
           {:retry, reason} ->
             Logger.warning("Pipeline: verification failed — #{reason}")

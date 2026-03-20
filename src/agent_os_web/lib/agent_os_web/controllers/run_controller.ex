@@ -139,12 +139,20 @@ defmodule AgentOS.Web.Controllers.RunController do
   defp maybe_set_provider(spec, nil), do: spec
 
   defp maybe_set_provider(spec, provider) do
-    provider_atom = String.to_existing_atom(provider)
-    llm = Map.put(spec.llm_config, :provider, provider_atom)
-    %{spec | llm_config: llm, provider: provider_atom}
-  rescue
-    ArgumentError -> spec
+    case parse_provider(provider) do
+      {:ok, provider_atom} ->
+        llm = Map.put(spec.llm_config, :provider, provider_atom)
+        %{spec | llm_config: llm, provider: provider_atom}
+
+      :error ->
+        spec
+    end
   end
+
+  defp parse_provider("openai"), do: {:ok, :openai}
+  defp parse_provider("anthropic"), do: {:ok, :anthropic}
+  defp parse_provider("ollama"), do: {:ok, :ollama}
+  defp parse_provider(_), do: :error
 
   defp json_resp(conn, status, body) do
     conn

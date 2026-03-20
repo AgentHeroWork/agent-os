@@ -20,24 +20,35 @@ defmodule AgentOS.Web.Plugs.Auth do
   @impl true
   @spec call(Plug.Conn.t(), keyword()) :: Plug.Conn.t()
   def call(conn, _opts) do
-    case System.get_env("AGENT_OS_API_KEY") do
-      nil ->
-        # Dev mode — no auth required
-        conn
+    if vm_route?(conn) do
+      # VM proxy routes are called by agents inside microVMs with JOB_TOKEN.
+      # These are exempt from AGENT_OS_API_KEY auth — the microVM is already
+      # isolated and the JOB_TOKEN is injected by the orchestrator.
+      conn
+    else
+      case System.get_env("AGENT_OS_API_KEY") do
+        nil ->
+          # Dev mode — no auth required
+          conn
 
-      expected_key ->
-        case get_bearer_token(conn) do
-          {:ok, ^expected_key} ->
-            conn
+        expected_key ->
+          case get_bearer_token(conn) do
+            {:ok, ^expected_key} ->
+              conn
 
-          {:ok, _wrong_token} ->
-            unauthorized(conn)
+            {:ok, _wrong_token} ->
+              unauthorized(conn)
 
-          :error ->
-            unauthorized(conn)
-        end
+            :error ->
+              unauthorized(conn)
+          end
+      end
     end
   end
+
+  # VM proxy routes are exempt from API key auth
+  defp vm_route?(%{request_path: "/api/v1/vm/" <> _}), do: true
+  defp vm_route?(_), do: false
 
   # ── Private ───────────────────────────────────────────────────────
 

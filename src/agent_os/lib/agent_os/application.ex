@@ -16,15 +16,34 @@ defmodule AgentOS.Application do
   """
   use Application
 
+  require Logger
+
   @impl true
   def start(_type, _args) do
-    # All subsystems (MemoryLayer, ToolInterface, AgentScheduler, PlannerEngine,
-    # AgentOS.Web) are separate OTP applications that start automatically as
-    # deps via mix.exs. This supervisor exists for any agent_os-specific
-    # processes (e.g., future background tasks).
+    check_llm_config()
+
     children = [AgentOS.Audit]
 
     opts = [strategy: :one_for_one, name: AgentOS.Supervisor]
     Supervisor.start_link(children, opts)
+  end
+
+  defp check_llm_config do
+    openai = System.get_env("OPENAI_API_KEY")
+    anthropic = System.get_env("ANTHROPIC_API_KEY")
+
+    cond do
+      openai && openai != "" ->
+        Logger.info("AgentOS: LLM provider configured (OpenAI)")
+
+      anthropic && anthropic != "" ->
+        Logger.info("AgentOS: LLM provider configured (Anthropic)")
+
+      true ->
+        Logger.warning(
+          "AgentOS: No LLM API key found. Set OPENAI_API_KEY or ANTHROPIC_API_KEY. " <>
+            "Falling back to Ollama at localhost:11434."
+        )
+    end
   end
 end

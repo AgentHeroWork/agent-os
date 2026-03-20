@@ -40,10 +40,10 @@ export async function runSingle(args, opts) {
 
   if (opts.json) {
     out.json(result);
-  } else if (result.artifacts) {
-    out.info('Artifacts:');
-    for (const a of result.artifacts) {
-      out.info(`  - ${a.name || a.path || JSON.stringify(a)}`);
+  } else {
+    displayArtifacts(result.artifacts);
+    if (result.run_id) {
+      out.info(`\nAudit trail: ${opts.host}/api/v1/audit/${result.run_id}`);
     }
   }
 
@@ -78,19 +78,37 @@ export async function runPipeline(args, opts) {
   if (opts.json) {
     out.json(result);
   } else {
-    if (result.stages) {
+    if (result.stages && Array.isArray(result.stages)) {
       out.info('Stages:');
       for (const s of result.stages) {
         out.info(`  - ${s.name || s.stage}: ${s.status || 'done'}`);
       }
     }
-    if (result.artifacts) {
-      out.info('Artifacts:');
-      for (const a of result.artifacts) {
-        out.info(`  - ${a.name || a.path || JSON.stringify(a)}`);
-      }
+    displayArtifacts(result.artifacts);
+    if (result.run_id) {
+      out.info(`\nAudit trail: ${opts.host}/api/v1/audit/${result.run_id}`);
     }
   }
 
   return result;
+}
+
+/**
+ * Display artifacts — handles both map (object) and array formats.
+ * @param {object|Array} artifacts
+ */
+function displayArtifacts(artifacts) {
+  if (!artifacts) return;
+
+  out.info('Artifacts:');
+
+  if (Array.isArray(artifacts)) {
+    for (const a of artifacts) {
+      out.info(`  - ${a.name || a.path || JSON.stringify(a)}`);
+    }
+  } else if (typeof artifacts === 'object') {
+    for (const [key, value] of Object.entries(artifacts)) {
+      out.info(`  ${key}: ${value}`);
+    }
+  }
 }
