@@ -13,13 +13,27 @@ defmodule AgentOS.AgentRunner do
 
   require Logger
 
+  alias AgentOS.Contracts.{ContractSpec, Verify}
+
   @doc """
   Run an agent autonomously and validate against a contract.
 
-  Returns `{:ok, artifacts}` on success or `{:error, reason}` on failure.
+  Accepts either a module implementing the `Contract` behaviour or a
+  `%ContractSpec{}` struct (data-driven contract). Returns `{:ok, artifacts}`
+  on success or `{:error, reason}` on failure.
   """
-  @spec run(AgentOS.AgentSpec.t(), module(), map()) :: {:ok, map()} | {:error, term()}
-  def run(spec, contract, job) do
+  @spec run(AgentOS.AgentSpec.t(), module() | ContractSpec.t(), map()) :: {:ok, map()} | {:error, term()}
+  def run(spec, %ContractSpec{} = contract, job) do
+    agent_module = resolve_agent_module(spec.type)
+    input = Map.get(job, :input, job)
+    max_retries = ContractSpec.max_retries(contract)
+
+    Logger.info("AgentRunner: starting #{spec.name} (#{spec.type}) with contract spec '#{contract.name}'")
+
+    run_with_retries(spec, contract, agent_module, input, max_retries, 0)
+  end
+
+  def run(spec, contract, job) when is_atom(contract) do
     agent_module = resolve_agent_module(spec.type)
     input = Map.get(job, :input, job)
     max_retries = contract.max_retries()
@@ -55,11 +69,12 @@ defmodule AgentOS.AgentRunner do
   end
 
   defp validate_and_verify(spec, contract, agent_module, input, max_retries, attempt, artifacts, result) do
-    missing = check_required_artifacts(artifacts, contract.required_artifacts())
+    required = get_required_artifacts(contract)
+    missing = check_required_artifacts(artifacts, required)
 
     case missing do
       [] ->
-        case contract.verify(artifacts) do
+        case verify_contract(contract, artifacts) do
           :ok ->
             Logger.info("AgentRunner: #{spec.name} completed successfully")
             {:ok, Map.merge(artifacts, Map.get(result, :metadata, %{}))}
@@ -74,6 +89,12 @@ defmodule AgentOS.AgentRunner do
         run_with_retries(spec, contract, agent_module, input, max_retries, attempt + 1)
     end
   end
+
+  defp get_required_artifacts(%ContractSpec{} = spec), do: ContractSpec.required_artifacts(spec)
+  defp get_required_artifacts(module) when is_atom(module), do: module.required_artifacts()
+
+  defp verify_contract(%ContractSpec{verify: rules}, artifacts), do: Verify.check(artifacts, rules)
+  defp verify_contract(module, artifacts) when is_atom(module), do: module.verify(artifacts)
 
   defp check_required_artifacts(artifacts, required) do
     Enum.filter(required, fn key ->

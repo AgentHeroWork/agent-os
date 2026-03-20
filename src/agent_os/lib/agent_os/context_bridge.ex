@@ -117,20 +117,19 @@ defmodule AgentOS.ContextBridge do
   end
 
   # -- ContextFS CLI Interface --
+  # CLI is: contextfs memory search/save/list/recall (not contextfs search)
+  # Output is rich table format — we parse text lines, not JSON
 
   defp contextfs_search(query, opts) do
     limit = Keyword.get(opts, :limit, 10)
     type = Keyword.get(opts, :type)
 
-    args = ["search", query, "--json", "--limit", to_string(limit)]
+    args = ["memory", "search", query, "--limit", to_string(limit)]
     args = if type, do: args ++ ["--type", to_string(type)], else: args
 
     case System.cmd("contextfs", args, stderr_to_stdout: true) do
-      {json, 0} ->
-        case Jason.decode(json) do
-          {:ok, results} when is_list(results) -> results
-          _ -> []
-        end
+      {output, 0} ->
+        parse_search_output(output)
 
       {_, _} ->
         Logger.debug("ContextBridge: contextfs search returned no results for '#{query}'")
@@ -147,16 +146,39 @@ defmodule AgentOS.ContextBridge do
     tags = Keyword.get(opts, :tags, [])
     summary = Keyword.get(opts, :summary)
 
-    args = ["save", "--type", to_string(type)]
+    # contextfs memory save "content" --type fact --tags "tag1,tag2" --summary "..."
+    args = ["memory", "save", content, "--type", to_string(type)]
     args = if tags != [], do: args ++ ["--tags", Enum.join(tags, ",")], else: args
     args = if summary, do: args ++ ["--summary", summary], else: args
 
-    case System.cmd("contextfs", args, input: content, stderr_to_stdout: true) do
+    case System.cmd("contextfs", args, stderr_to_stdout: true) do
       {_, 0} -> :ok
       {output, _} -> Logger.warning("ContextBridge: contextfs save failed: #{String.slice(output, 0, 200)}")
     end
   rescue
     _ -> Logger.warning("ContextBridge: contextfs CLI not available for save")
+  end
+
+  # Parse contextfs table output into a list of maps
+  # Table format: | ID | Score | Type | Content | Tags | Source |
+  defp parse_search_output(output) do
+    output
+    |> String.split("\n")
+    |> Enum.filter(&String.contains?(&1, "│"))
+    |> Enum.reject(&(String.contains?(&1, "ID") and String.contains?(&1, "Score")))
+    |> Enum.reject(&String.contains?(&1, "━"))
+    |> Enum.chunk_every(1)
+    |> Enum.flat_map(fn lines ->
+      line = Enum.join(lines, " ")
+      parts = line |> String.split("│") |> Enum.map(&String.trim/1) |> Enum.reject(&(&1 == ""))
+
+      case parts do
+        [id, _score, type, content | _rest] ->
+          [%{"id" => id, "type" => type, "content" => content, "summary" => content}]
+        _ ->
+          []
+      end
+    end)
   end
 
   # -- File Rendering --

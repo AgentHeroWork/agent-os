@@ -1,0 +1,46 @@
+name: research-report
+description: Multi-agent research pipeline producing a paper and GitHub repo
+stages:
+  - name: researcher
+    instructions: |
+      Research the given topic thoroughly. Produce comprehensive findings with sources, data, and analysis.
+      Read /context/brief.md for the task description.
+      Read /context/known-facts.md and /context/prior-work.md for existing context.
+      Write your findings as markdown to /shared/output/findings.md
+      Include: executive summary, key findings by theme, technical details, references.
+    output:
+      - findings.md
+  - name: writer
+    instructions: |
+      Read /context/findings.md from the researcher.
+      Generate a complete LaTeX research paper with proper structure:
+      documentclass, packages, title, author (Agent-OS Pipeline), abstract, sections, references.
+      Compile to PDF if pdflatex is available.
+      Write paper.tex and README.md to /shared/output/
+    input_from: researcher
+    output:
+      - paper.tex
+      - README.md
+  - name: publisher
+    instructions: |
+      Read /context/paper.tex, /context/paper.pdf (if exists), /context/README.md, /context/findings.md
+      Create a GitHub repo under AgentHeroWork org and push all artifacts.
+      Write the repo URL to /shared/output/repo_url.txt
+    input_from: writer
+    output:
+      - repo_url.txt
+required_artifacts:
+  - findings_md
+  - paper_tex
+verify:
+  - file_exists: findings.md
+  - min_bytes: paper.tex
+    size: 500
+credentials:
+  - github_token
+memory:
+  load_past_runs: 5
+  load_procedures: 3
+  knowledge_base: false
+  search_mode: semantic
+max_retries: 2

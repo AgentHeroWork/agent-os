@@ -268,3 +268,39 @@ describe('command-specific options', () => {
     assert.equal(opts.follow, true);
   });
 });
+
+// ─── Run command parsing ────────────────────────────────────────────────────
+
+describe('run command parsing', () => {
+  it('should parse "run openclaw --topic test"', () => {
+    const { command, subcommand, opts } = parseGlobalArgs([
+      'run', 'openclaw', '--topic', 'quantum computing',
+    ]);
+    assert.equal(command, 'run');
+    assert.equal(subcommand, 'openclaw');
+    assert.equal(opts.topic, 'quantum computing');
+  });
+
+  it('should parse "run pipeline --contract research-report --topic test"', () => {
+    const { command, subcommand, opts } = parseGlobalArgs([
+      'run', 'pipeline', '--contract', 'research-report', '--topic', 'dark matter',
+    ]);
+    assert.equal(command, 'run');
+    assert.equal(subcommand, 'pipeline');
+    assert.equal(opts.contract, 'research-report');
+    assert.equal(opts.topic, 'dark matter');
+  });
+
+  it('should parse optional --model and --provider flags', () => {
+    const { opts } = parseGlobalArgs([
+      'run', 'openclaw', '--topic', 'test', '--model', 'gpt-4', '--provider', 'openai',
+    ]);
+    assert.equal(opts.model, 'gpt-4');
+    assert.equal(opts.provider, 'openai');
+  });
+
+  it('should have undefined topic when --topic is omitted', () => {
+    const { opts } = parseGlobalArgs(['run', 'openclaw']);
+    assert.equal(opts.topic, undefined);
+  });
+});

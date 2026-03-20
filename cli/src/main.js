@@ -12,6 +12,7 @@ import * as agentCmd from './commands/agent.js';
 import * as jobCmd from './commands/job.js';
 import * as memoryCmd from './commands/memory.js';
 import * as deployCmd from './commands/deploy.js';
+import * as runCmd from './commands/run.js';
 import * as http from './http.js';
 import * as out from './output.js';
 
@@ -33,6 +34,9 @@ COMMANDS
 
   memory search   Search memory          "<query>"
   memory show     Show memory entry      <id>
+
+  run <type>      Run a single agent     --topic <topic> [--model <m>] [--provider <p>]
+  run pipeline    Run a pipeline         --contract <name> --topic <topic>
 
   deploy docker   Deploy with Docker
   deploy fly      Deploy to Fly.io       [--region <region>] [--app <name>]
@@ -88,6 +92,10 @@ export function parseGlobalArgs(argv) {
       follow: { type: 'boolean', short: 'f', default: false },
       region: { type: 'string' },
       app: { type: 'string' },
+      topic: { type: 'string' },
+      contract: { type: 'string' },
+      model: { type: 'string' },
+      provider: { type: 'string' },
     },
     allowPositionals: true,
     strict: false,
@@ -113,6 +121,10 @@ export function parseGlobalArgs(argv) {
     follow: values.follow,
     region: values.region,
     app: values.app,
+    topic: values.topic,
+    contract: values.contract,
+    model: values.model,
+    provider: values.provider,
   };
 
   return { command, subcommand, args, opts };
@@ -180,6 +192,15 @@ export async function main(argv) {
             out.error(`Unknown memory command: ${subcommand}`);
             out.info('Available: search, show');
             process.exit(1);
+        }
+        break;
+
+      case 'run':
+        if (subcommand === 'pipeline') {
+          await runCmd.runPipeline(args, opts);
+        } else {
+          // subcommand is the agent type (openclaw, nemoclaw, etc.)
+          await runCmd.runSingle([subcommand, ...args], opts);
         }
         break;
 

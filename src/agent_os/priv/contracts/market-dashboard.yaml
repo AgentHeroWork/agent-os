@@ -1,0 +1,50 @@
+name: market-dashboard
+description: Multi-agent pipeline producing market research and a web dashboard
+stages:
+  - name: researcher
+    instructions: |
+      Research the given market/industry topic. Gather:
+      - Current prices, rates, and market indicators (write to /shared/output/market-data.json)
+      - Recent news, analysis, and expert commentary (write to /shared/output/news.json)
+      - Market summary and outlook (write to /shared/output/findings.md)
+      Be specific with numbers, dates, and sources.
+    output:
+      - findings.md
+      - market-data.json
+      - news.json
+  - name: developer
+    instructions: |
+      Read /context/findings.md, /context/market-data.json, /context/news.json
+      Build a Next.js dashboard application with:
+      - Price/indicator charts (use recharts or chart.js via CDN)
+      - News feed with timestamps
+      - Market summary section
+      - Responsive layout
+      Write the complete app to /shared/output/app/
+      Include package.json, pages/components, and any config files.
+    input_from: researcher
+    output:
+      - app/
+  - name: deployer
+    instructions: |
+      Read /context/app/
+      Create a GitHub repo and push the dashboard app.
+      If Vercel token is available, deploy to Vercel.
+      Write deployment/repo URL to /shared/output/deploy_url.txt
+    input_from: developer
+    output:
+      - deploy_url.txt
+required_artifacts:
+  - findings_md
+  - market_data_json
+verify:
+  - file_exists: findings.md
+  - file_exists: market-data.json
+credentials:
+  - github_token
+memory:
+  load_past_runs: 5
+  load_procedures: 3
+  knowledge_base: true
+  search_mode: semantic
+max_retries: 2
