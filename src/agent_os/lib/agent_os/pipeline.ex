@@ -105,7 +105,6 @@ defmodule AgentOS.Pipeline do
 
     # 1. Prepare context (ContextFS queries + previous stage output)
     {:ok, context_dir} = ContextBridge.prepare_context(task, agent_spec)
-
     # 2. Prepare output directory
     output_dir = ContextBridge.prepare_output_dir(stage_id)
 
@@ -116,15 +115,15 @@ defmodule AgentOS.Pipeline do
     env = build_env(stage, contract, opts)
 
     # 5. Execute in microVM
-    Logger.info("Pipeline: running #{stage.name} in microVM...")
+    Logger.info("Pipeline: running #{stage.name} in microVM (script: #{Path.basename(script_path)})...")
 
     case MicroVM.run_agent(script_path, context_dir, output_dir, %{env: env}) do
       {:ok, _output} ->
         Logger.info("Pipeline: #{stage.name} completed")
 
-        # 6. Ingest output into ContextFS
+        # 6. Ingest output into ContextFS with contract/stage tags
         ContextBridge.ingest_output(
-          %{id: stage_id, topic: state.topic},
+          %{id: stage_id, topic: state.topic, contract_name: contract.name, stage_name: stage.name},
           "pipeline_#{stage.name}",
           output_dir
         )
@@ -143,25 +142,26 @@ defmodule AgentOS.Pipeline do
   end
 
   defp resolve_scripts_dir do
-    # Look for scripts relative to the project root
-    candidates = [
-      Path.join(File.cwd!(), "sandbox/scripts"),
-      Path.expand("../../../../sandbox/scripts", __DIR__),
-      "/Users/mlong/Documents/Development/agentherowork/agent-os/sandbox/scripts"
-    ]
+    # Resolve scripts dir — check Application env, then common paths
+    configured = Application.get_env(:agent_os, :scripts_dir)
 
-    Enum.find(candidates, List.last(candidates), &File.dir?/1)
+    if configured && File.dir?(configured) do
+      configured
+    else
+      candidates = [
+        Path.join(File.cwd!(), "sandbox/scripts"),
+        Path.expand("../../../../sandbox/scripts", __DIR__),
+        Path.expand("../../../../../sandbox/scripts", __DIR__)
+      ]
+
+      Enum.find(candidates, hd(candidates), &File.dir?/1)
+    end
   end
 
-  defp resolve_script(stage, scripts_dir) do
-    # Try stage-specific script, fall back to generic
-    specific = Path.join(scripts_dir, "#{stage.name}.sh")
-
-    if File.exists?(specific) do
-      specific
-    else
-      Path.join(scripts_dir, "researcher.sh")
-    end
+  defp resolve_script(_stage, scripts_dir) do
+    # Universal agent runtime — the LLM decides which tools to use
+    # based on the contract instructions in /context/brief.md
+    Path.join(scripts_dir, "agent-runtime.sh")
   end
 
   defp build_env(_stage, contract, opts) do
@@ -169,19 +169,34 @@ defmodule AgentOS.Pipeline do
       "JOB_TOKEN" => "pipeline_#{:erlang.unique_integer([:positive])}"
     }
 
-    # Inject GitHub token if needed
-    base =
-      if :github_token in contract.credentials do
-        case System.cmd("gh", ["auth", "token"], stderr_to_stdout: true) do
-          {token, 0} -> Map.put(base, "GH_TOKEN", String.trim(token))
-          _ -> base
-        end
-      else
-        base
+    # Inject credentials declared by the contract
+    base = inject_credential(base, contract, :github_token, fn ->
+      case System.cmd("gh", ["auth", "token"], stderr_to_stdout: true) do
+        {token, 0} -> {"GH_TOKEN", String.trim(token)}
+        _ -> nil
       end
+    end)
+
+    base = inject_credential(base, contract, :vercel_token, fn ->
+      case System.get_env("VERCEL_TOKEN") do
+        nil -> nil
+        token -> {"VERCEL_TOKEN", token}
+      end
+    end)
 
     # Merge any custom env from opts
     Map.merge(base, Map.get(opts, :env, %{}))
+  end
+
+  defp inject_credential(env, contract, cred_atom, resolver_fn) do
+    if cred_atom in contract.credentials do
+      case resolver_fn.() do
+        {key, val} when is_binary(val) and val != "" -> Map.put(env, key, val)
+        _ -> env
+      end
+    else
+      env
+    end
   end
 
   defp collect_artifacts(output_dir, existing) do

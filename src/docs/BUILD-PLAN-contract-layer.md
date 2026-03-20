@@ -305,9 +305,9 @@ contextfs save --type fact --tags "contract:{name},stage:{stage},run:{id}"
 
 ---
 
-### Phase 4: End-to-End Validation
+### Phase 4: End-to-End Validation — Oil & Gas Live Dashboard
 
-**Goal:** Oil & gas market research through the full stack.
+**Goal:** Produce a live Vercel website with oil & gas market research, news feed, and charts. All execution in microVMs, all auth injected, no workarounds.
 
 ```bash
 agent-os run pipeline \
@@ -315,16 +315,48 @@ agent-os run pipeline \
   --topic "oil and gas market analysis — crude prices, natural gas, industry news"
 ```
 
+**What gets produced:**
+1. **Researcher** (microVM) → `findings.md` (detailed market analysis), `prices.json` (structured price data), `news.json` (headlines + sources)
+2. **Developer** (microVM) → `app/` directory with modern, mobile-friendly single-page dashboard using Chart.js + Tailwind via CDN. Real charts, news feed, market summary.
+3. **Deployer** (microVM) → Deploys to Vercel + pushes to GitHub repo. Returns live URL.
+
+**Auth injection (contract declares, orchestrator resolves):**
+```yaml
+credentials:
+  - github_token     # resolved: gh auth token → GH_TOKEN env var in VM
+  - vercel_token     # resolved: VERCEL_TOKEN env var → VERCEL_TOKEN in VM
+```
+
+The orchestrator resolves each credential from the host environment and injects them as env vars into the microVM. VMs never access host auth directly. The contract declares WHAT credentials are needed, the orchestrator handles HOW to get them.
+
+**Pipeline.build_env/3 resolves credentials:**
+```elixir
+if :vercel_token in contract.credentials do
+  case System.get_env("VERCEL_TOKEN") do
+    nil -> base  # skip if not set
+    token -> Map.put(base, "VERCEL_TOKEN", token)
+  end
+end
+```
+
+**Pre-requisites:**
+- `VERCEL_TOKEN` env var set (create at https://vercel.com/account/tokens)
+- `OPENAI_API_KEY` env var set
+- `msb server start --dev` running
+- `contextfs server start chroma` running
+- Elixir server running on port 4000
+
 **VALIDATE gate (FINAL):**
-- [ ] Node CLI sends request to Elixir server
+- [ ] Node CLI: `agent-os run pipeline --contract market-dashboard --topic "oil and gas"`
 - [ ] Server loads contract from YAML
 - [ ] Pipeline runs 3 stages in separate microVMs
-- [ ] Each stage: ContextBridge prepares context, MicroVM runs, ContextBridge ingests output
-- [ ] ContextFS has tagged memories from the run
-- [ ] GitHub repo exists with real content
-- [ ] Second run gets enriched context from first
-- [ ] Elixir CLI fully removed
-- [ ] Slack notification sent to #agenthero
+- [ ] Researcher produces real market data (findings.md, prices.json, news.json)
+- [ ] Developer produces modern mobile-friendly dashboard (app/index.html)
+- [ ] Deployer pushes to GitHub AND deploys to Vercel
+- [ ] Live Vercel URL is accessible and shows dashboard with charts + news
+- [ ] GitHub repo has all artifacts
+- [ ] ContextFS has tagged memories (contract:market-dashboard, stage:researcher, etc.)
+- [ ] Slack notification sent to #agenthero with live URL
 
 ---
 

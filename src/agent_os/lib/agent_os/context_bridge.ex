@@ -78,6 +78,8 @@ defmodule AgentOS.ContextBridge do
   @spec ingest_output(map(), String.t(), String.t()) :: :ok
   def ingest_output(task, agent_id, output_dir) do
     task_id = Map.get(task, :id, "unknown")
+    contract_name = Map.get(task, :contract_name, "unknown")
+    stage_name = Map.get(task, :stage_name, "unknown")
 
     case File.ls(output_dir) do
       {:ok, files} ->
@@ -87,7 +89,13 @@ defmodule AgentOS.ContextBridge do
           case File.read(path) do
             {:ok, content} when byte_size(content) > 0 ->
               type = infer_type(filename)
-              tags = ["agent:#{agent_id}", "task:#{task_id}", "pipeline"]
+              tags = [
+                "contract:#{contract_name}",
+                "stage:#{stage_name}",
+                "agent:#{agent_id}",
+                "task:#{task_id}",
+                "pipeline"
+              ]
               summary = extract_summary(content, filename)
 
               contextfs_save(content, type: type, tags: tags, summary: summary)

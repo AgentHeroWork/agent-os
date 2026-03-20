@@ -1,13 +1,13 @@
 name: market-dashboard
-description: Multi-agent pipeline producing market research and a web dashboard
+description: Multi-agent pipeline producing market research and a live Vercel dashboard
 stages:
   - name: researcher
     instructions: |
-      Research the given market/industry topic. Gather:
-      - Current prices, rates, and market indicators (write to /shared/output/market-data.json)
-      - Recent news, analysis, and expert commentary (write to /shared/output/news.json)
-      - Market summary and outlook (write to /shared/output/findings.md)
-      Be specific with numbers, dates, and sources.
+      Research the given market/industry topic thoroughly. Gather:
+      - Current prices, rates, and market indicators (write to /shared/output/market-data.json as valid JSON array)
+      - Recent news, analysis, and expert commentary (write to /shared/output/news.json as valid JSON array)
+      - Comprehensive market summary and outlook (write to /shared/output/findings.md)
+      Be specific with real numbers, dates, sources. Include at least 10 data points and 8 news items.
     output:
       - findings.md
       - market-data.json
@@ -15,25 +15,25 @@ stages:
   - name: developer
     instructions: |
       Read /context/findings.md, /context/market-data.json, /context/news.json
-      Build a Next.js dashboard application with:
-      - Price/indicator charts (use recharts or chart.js via CDN)
-      - News feed with timestamps
-      - Market summary section
-      - Responsive layout
-      Write the complete app to /shared/output/app/
-      Include package.json, pages/components, and any config files.
+      Build a modern, mobile-friendly single-page dashboard as a self-contained index.html.
+      Use Chart.js via CDN for charts, Tailwind CSS via CDN for styling.
+      Include: price charts, news feed with dates, market summary, responsive layout.
+      The dashboard must look professional — dark theme, clean typography, real data from the JSON files.
+      Write the complete app to /shared/output/app/index.html
     input_from: researcher
     output:
       - app/
   - name: deployer
     instructions: |
-      Read /context/app/
-      Create a GitHub repo and push the dashboard app.
-      If Vercel token is available, deploy to Vercel.
-      Write deployment/repo URL to /shared/output/deploy_url.txt
+      Deploy the dashboard app from /context/app/ to Vercel and push to GitHub.
+      Create a GitHub repo, push all artifacts (app/, findings.md, data files).
+      Deploy /context/app/ to Vercel using the VERCEL_TOKEN.
+      Write the live Vercel URL to /shared/output/deploy_url.txt
+      Write the GitHub repo URL to /shared/output/repo_url.txt
     input_from: developer
     output:
       - deploy_url.txt
+      - repo_url.txt
 required_artifacts:
   - findings_md
   - market_data_json
@@ -42,6 +42,7 @@ verify:
   - file_exists: market-data.json
 credentials:
   - github_token
+  - vercel_token
 memory:
   load_past_runs: 5
   load_procedures: 3
