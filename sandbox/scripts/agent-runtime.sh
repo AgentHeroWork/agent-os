@@ -17,6 +17,7 @@ MAX_ITERATIONS=10
 LLM_PROXY="http://localhost:4000/api/v1/vm/llm/chat"
 AUDIT_FILE="/shared/output/_audit.json"
 PROOF_FILE="/shared/output/_proof.json"
+LLM_MODEL="${LLM_MODEL:-gpt-4o}"
 
 # Timestamps and duration helpers
 STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
@@ -207,12 +208,12 @@ PLAN_RESPONSE=$(curl -s -X POST "$LLM_PROXY" \
   -H "Authorization: Bearer $JOB_TOKEN" \
   -d "$(jq -n \
     --arg prompt "$PLAN_PROMPT" \
-    '{messages: [{role: "user", content: $prompt}], model: "gpt-4o", max_tokens: 8192, temperature: 0.2}')" 2>&1)
+    '{messages: [{role: "user", content: $prompt}], model: "'"$LLM_MODEL"'", max_tokens: 8192, temperature: 0.2}')" 2>&1)
 
 LLM_END=$(date +%s%3N 2>/dev/null || echo $(($(date +%s) * 1000)))
 LLM_DUR=$((LLM_END - LLM_START))
 TOTAL_LLM=$((TOTAL_LLM + 1))
-audit_llm "plan" "gpt-4o" "$LLM_DUR"
+audit_llm "plan" "$LLM_MODEL" "$LLM_DUR"
 
 # Extract content from LLM response
 PLAN=""
@@ -295,12 +296,12 @@ Provide a FIXED command that accomplishes the same goal. Output ONLY the shell c
       -H "Authorization: Bearer $JOB_TOKEN" \
       -d "$(jq -n \
         --arg prompt "$FIX_PROMPT" \
-        '{messages: [{role: "user", content: $prompt}], model: "gpt-4o", max_tokens: 2048, temperature: 0.1}')" 2>&1)
+        '{messages: [{role: "user", content: $prompt}], model: "'"$LLM_MODEL"'", max_tokens: 2048, temperature: 0.1}')" 2>&1)
 
     FIX_LLM_END=$(date +%s%3N 2>/dev/null || echo $(($(date +%s) * 1000)))
     FIX_LLM_DUR=$((FIX_LLM_END - FIX_LLM_START))
     TOTAL_LLM=$((TOTAL_LLM + 1))
-    audit_llm "fix" "gpt-4o" "$FIX_LLM_DUR" "$((STEP_INDEX + 1))"
+    audit_llm "fix" "$LLM_MODEL" "$FIX_LLM_DUR" "$((STEP_INDEX + 1))"
 
     if echo "$FIX_RESPONSE" | jq -e '.content' > /dev/null 2>&1; then
       FIXED_CMD=$(echo "$FIX_RESPONSE" | jq -r '.content' | sed 's/^```sh//' | sed 's/^```bash//' | sed 's/^```//' | sed 's/```$//' | tr -d '\n')
@@ -498,12 +499,12 @@ Output ONLY the JSON array."
     -H "Authorization: Bearer $JOB_TOKEN" \
     -d "$(jq -n \
       --arg prompt "$REPAIR_PROMPT" \
-      '{messages: [{role: "user", content: $prompt}], model: "gpt-4o", max_tokens: 4096, temperature: 0.1}')" 2>&1)
+      '{messages: [{role: "user", content: $prompt}], model: "'"$LLM_MODEL"'", max_tokens: 4096, temperature: 0.1}')" 2>&1)
 
   REPAIR_LLM_END=$(date +%s%3N 2>/dev/null || echo $(($(date +%s) * 1000)))
   REPAIR_LLM_DUR=$((REPAIR_LLM_END - REPAIR_LLM_START))
   TOTAL_LLM=$((TOTAL_LLM + 1))
-  audit_llm "proof-repair" "gpt-4o" "$REPAIR_LLM_DUR"
+  audit_llm "proof-repair" "$LLM_MODEL" "$REPAIR_LLM_DUR"
 
   REPAIR_PLAN=""
   if echo "$REPAIR_RESPONSE" | jq -e '.content' > /dev/null 2>&1; then

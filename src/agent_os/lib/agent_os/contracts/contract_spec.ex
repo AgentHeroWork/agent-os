@@ -47,12 +47,16 @@ defmodule AgentOS.Contracts.ContractSpec do
           max_retries: non_neg_integer(),
           credentials: [atom()],
           memory: map(),
-          resources: map()
+          resources: map(),
+          model: String.t() | nil,
+          provider: atom() | nil
         }
 
   defstruct [
     :name,
     :description,
+    model: nil,
+    provider: nil,
     stages: [],
     required_artifacts: [],
     verify: [],
@@ -87,6 +91,8 @@ defmodule AgentOS.Contracts.ContractSpec do
       spec = %__MODULE__{
         name: name,
         description: get_string(attrs, "description"),
+        model: get_string(attrs, "model"),
+        provider: parse_provider_field(attrs),
         stages: stages,
         required_artifacts: artifacts,
         verify: verify_rules,
@@ -155,7 +161,9 @@ defmodule AgentOS.Contracts.ContractSpec do
         output: List.wrap(stage["output"] || stage[:output] || []),
         input_from: parse_input_from(stage["input_from"] || stage[:input_from]),
         image: stage["image"] || stage[:image],
-        tools: parse_atom_list_raw(stage["tools"] || stage[:tools] || [])
+        tools: parse_atom_list_raw(stage["tools"] || stage[:tools] || []),
+        model: stage["model"] || stage[:model],
+        provider: parse_provider_field(stage)
       }
     end)
   end
@@ -164,6 +172,17 @@ defmodule AgentOS.Contracts.ContractSpec do
   defp parse_input_from(val) when is_atom(val), do: val
   defp parse_input_from(val) when is_binary(val), do: String.to_atom(val)
   defp parse_input_from(list) when is_list(list), do: Enum.map(list, &atomize/1)
+
+  defp parse_provider_field(attrs) do
+    val = Map.get(attrs, "provider") || Map.get(attrs, :provider)
+
+    case val do
+      nil -> nil
+      v when is_atom(v) -> v
+      v when is_binary(v) -> String.to_atom(v)
+      _ -> nil
+    end
+  end
 
   defp parse_artifacts(attrs) do
     raw = Map.get(attrs, "required_artifacts") || Map.get(attrs, :required_artifacts, [])

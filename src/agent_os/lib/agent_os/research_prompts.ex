@@ -13,10 +13,9 @@ defmodule AgentOS.ResearchPrompts do
   @spec plan_prompt(atom(), String.t()) :: {String.t(), String.t()}
   def plan_prompt(:open_claw, topic) do
     system = """
-    You are a senior particle physics researcher at CERN with expertise in \
-    experimental and theoretical high-energy physics. You are planning a \
-    research paper. Be specific about sections, key arguments, and references \
-    to include. Output a structured research plan.
+    You are a senior researcher and domain expert. You are planning a \
+    detailed research paper on the given topic. Be specific about sections, \
+    key arguments, and references to include. Output a structured research plan.
     """
 
     user = """
@@ -37,11 +36,10 @@ defmodule AgentOS.ResearchPrompts do
 
   def plan_prompt(:nemo_claw, topic) do
     system = """
-    You are a privacy-preserving computation researcher specializing in \
-    applying differential privacy, federated learning, and homomorphic \
-    encryption to high-energy physics data analysis. You are planning a \
-    research paper. Focus on privacy guarantees and their trade-offs with \
-    analytical utility.
+    You are a researcher specializing in privacy-preserving and secure \
+    computation methods. You are planning a research paper about applying \
+    privacy techniques to the given topic domain. Focus on privacy \
+    guarantees and their trade-offs with analytical utility.
     """
 
     user = """
@@ -52,9 +50,9 @@ defmodule AgentOS.ResearchPrompts do
     Provide your plan as a structured outline with:
     1. Paper title
     2. Abstract summary (2-3 sentences)
-    3. Section outline (Introduction, Privacy Framework, Methods, Application to CERN Data, Results, Conclusions)
+    3. Section outline (Introduction, Privacy Framework, Methods, Application, Results, Conclusions)
     4. Key arguments about privacy-utility trade-offs
-    5. At least 15 specific references to cite (real papers on differential privacy, federated learning, HEP)
+    5. At least 15 specific references to cite (real papers on differential privacy, federated learning, secure computation)
     """
 
     {String.trim(system), String.trim(user)}
@@ -71,10 +69,10 @@ defmodule AgentOS.ResearchPrompts do
   @spec research_prompt(atom(), String.t(), String.t()) :: {String.t(), String.t()}
   def research_prompt(:open_claw, topic, plan) do
     system = """
-    You are a senior particle physics researcher at CERN. Write a detailed, \
-    substantive research paper. Include real physics concepts, equations in \
-    LaTeX math mode ($...$ for inline, $$...$$ for display), experimental \
-    data references, and analytical rigor.
+    You are a senior researcher and domain expert. Write a detailed, \
+    substantive research paper. Include real concepts, data references, \
+    and analytical rigor appropriate to the topic domain. Use equations in \
+    LaTeX math mode ($...$ for inline, $$...$$ for display) where relevant.
 
     IMPORTANT: Output ONLY the text content for each section. Do NOT include \
     LaTeX document preamble, \\documentclass, \\begin{document}, or section \
@@ -104,7 +102,6 @@ defmodule AgentOS.ResearchPrompts do
     - Each section should be at least 3 paragraphs
     - Include at least 5 equations in LaTeX math mode
     - Reference at least 15 real papers with authors, titles, journals, and years
-    - Discuss experimental results from CERN (LHC, ATLAS, CMS, etc.)
     - Be scientifically rigorous and substantive
     """
 
@@ -113,11 +110,12 @@ defmodule AgentOS.ResearchPrompts do
 
   def research_prompt(:nemo_claw, topic, plan) do
     system = """
-    You are a privacy-preserving computation researcher. Write a detailed \
-    research paper on applying privacy techniques to CERN/HEP data analysis. \
-    Cover differential privacy, federated learning, homomorphic encryption, \
-    and secure multi-party computation. Include mathematical formulations \
-    in LaTeX math mode ($...$ for inline, $$...$$ for display).
+    You are a researcher specializing in privacy-preserving and secure \
+    computation methods. Write a detailed research paper about applying \
+    privacy techniques to the given topic domain. Cover differential privacy, \
+    federated learning, homomorphic encryption, and secure multi-party \
+    computation. Include mathematical formulations in LaTeX math mode \
+    ($...$ for inline, $$...$$ for display).
 
     IMPORTANT: Output ONLY the text content for each section. Do NOT include \
     LaTeX document preamble, \\documentclass, \\begin{document}, or section \
@@ -130,7 +128,7 @@ defmodule AgentOS.ResearchPrompts do
     INTRODUCTION: <introduction content>
     PRIVACY_FRAMEWORK: <privacy framework content>
     METHODS: <methods and techniques content>
-    APPLICATION: <application to CERN data content>
+    APPLICATION: <application to topic domain content>
     RESULTS: <results and evaluation content>
     CONCLUSIONS: <conclusions content>
     REFERENCES: <numbered reference list, one per line>
@@ -147,8 +145,8 @@ defmodule AgentOS.ResearchPrompts do
     Requirements:
     - Each section should be at least 3 paragraphs
     - Include privacy budget equations ($\\epsilon$-differential privacy)
-    - Reference at least 15 real papers on privacy-preserving computation and HEP
-    - Discuss specific CERN use cases (detector calibration, cross-experiment analysis)
+    - Reference at least 15 real papers on privacy-preserving computation
+    - Discuss specific use cases for applying privacy techniques to the topic domain
     - Address the privacy-utility trade-off quantitatively
     """
 

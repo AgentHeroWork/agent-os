@@ -1,5 +1,6 @@
 name: research-report
 description: Multi-agent research pipeline producing a paper and GitHub repo
+model: gpt-4o
 stages:
   - name: researcher
     instructions: |

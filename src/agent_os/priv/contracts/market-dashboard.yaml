@@ -1,5 +1,6 @@
 name: market-dashboard
 description: Multi-agent pipeline producing market research and a live Vercel dashboard
+model: gpt-4o
 stages:
   - name: researcher
     instructions: |

@@ -141,15 +141,10 @@ defmodule AgentOS.AgentRunner do
     }
   end
 
-  defp resolve_agent_module(:open_claw), do: AgentOS.Agents.OpenClaw
-  defp resolve_agent_module(:openclaw), do: AgentOS.Agents.OpenClaw
-  defp resolve_agent_module(:nemo_claw), do: AgentOS.Agents.NemoClaw
-  defp resolve_agent_module(:nemoclaw), do: AgentOS.Agents.NemoClaw
-
   defp resolve_agent_module(type) do
     case AgentScheduler.Agents.Registry.lookup(type) do
       {:ok, module} -> module
-      _ -> raise "Unknown agent type: #{inspect(type)}"
+      {:error, :not_found} -> raise "Unknown agent type: #{inspect(type)}. Check AgentScheduler.Agents.Registry."
     end
   end
 end

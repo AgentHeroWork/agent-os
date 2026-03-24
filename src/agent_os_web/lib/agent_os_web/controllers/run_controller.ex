@@ -39,7 +39,14 @@ defmodule AgentOS.Web.Controllers.RunController do
         |> maybe_set_model(body["model"])
         |> maybe_set_provider(body["provider"])
 
-      contract = resolve_contract(type)
+      contract = case body["contract"] do
+        nil -> resolve_contract(type)
+        name ->
+          case AgentOS.Contracts.Loader.load(name) do
+            {:ok, contract_spec} -> contract_spec
+            _ -> resolve_contract(type)
+          end
+      end
       input = %{input: %{topic: topic}}
 
       case AgentOS.AgentRunner.run(spec, contract, input) do
@@ -104,12 +111,15 @@ defmodule AgentOS.Web.Controllers.RunController do
 
   # ── Private ──────────────────────────────────────────────────────
 
-  defp parse_type("openclaw"), do: {:ok, :open_claw}
-  defp parse_type("nemoclaw"), do: {:ok, :nemo_claw}
-  defp parse_type("open_claw"), do: {:ok, :open_claw}
-  defp parse_type("nemo_claw"), do: {:ok, :nemo_claw}
   defp parse_type(nil), do: {:error, "missing required field: type"}
-  defp parse_type(other), do: {:error, "unknown agent type: #{other}"}
+  defp parse_type(type_str) when is_binary(type_str) do
+    type_atom = String.to_atom(type_str)
+    case AgentScheduler.Agents.Registry.lookup(type_atom) do
+      {:ok, _module} -> {:ok, type_atom}
+      {:error, :not_found} ->
+        {:error, "unknown agent type: #{type_str}"}
+    end
+  end
 
   defp require_param(body, key) do
     case body[key] do
@@ -118,8 +128,6 @@ defmodule AgentOS.Web.Controllers.RunController do
     end
   end
 
-  defp resolve_contract(:open_claw), do: AgentOS.Contracts.ResearchContract
-  defp resolve_contract(:nemo_claw), do: AgentOS.Contracts.ResearchContract
   defp resolve_contract(_), do: AgentOS.Contracts.ResearchContract
 
   defp maybe_set_model(spec, nil), do: spec

@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls -la /Users/mlong/.claude/oauth*)",
+      "Bash(ls -la /Users/mlong/.claude/mcp-auth*)",
+      "Bash(ls -la /Users/mlong/.claude/credentials*)"
+    ]
+  }
+}

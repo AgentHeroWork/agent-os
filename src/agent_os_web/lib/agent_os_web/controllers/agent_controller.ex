@@ -161,10 +161,15 @@ defmodule AgentOS.Web.Controllers.AgentController do
     end
   end
 
-  defp parse_type("openclaw"), do: {:ok, :openclaw}
-  defp parse_type("nemoclaw"), do: {:ok, :nemoclaw}
   defp parse_type(nil), do: {:error, "missing required field: type"}
-  defp parse_type(other), do: {:error, "unknown agent type: #{other}"}
+  defp parse_type(type_str) when is_binary(type_str) do
+    type_atom = String.to_atom(type_str)
+    case AgentScheduler.Agents.Registry.lookup(type_atom) do
+      {:ok, _module} -> {:ok, type_atom}
+      {:error, :not_found} ->
+        {:error, "unknown agent type: #{type_str}"}
+    end
+  end
 
   defp require_param(body, key) do
     case body[key] do
@@ -173,8 +178,14 @@ defmodule AgentOS.Web.Controllers.AgentController do
     end
   end
 
-  defp agent_profile(:openclaw), do: AgentOS.Agents.OpenClaw.profile()
-  defp agent_profile(:nemoclaw), do: AgentOS.Agents.NemoClaw.profile()
+  defp agent_profile(type) do
+    case AgentScheduler.Agents.Registry.lookup(type) do
+      {:ok, module} -> module.profile()
+      {:error, :not_found} ->
+        %{name: to_string(type), capabilities: [], task_domain: [],
+          default_oversight: :autonomous_escalation, description: "Agent type: #{type}"}
+    end
+  end
 
   defp parse_oversight(nil), do: :autonomous_escalation
   defp parse_oversight("autonomous"), do: :autonomous

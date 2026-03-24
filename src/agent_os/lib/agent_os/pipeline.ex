@@ -194,7 +194,7 @@ defmodule AgentOS.Pipeline do
     Path.join(scripts_dir, "agent-runtime.sh")
   end
 
-  defp build_env(_stage, contract, opts) do
+  defp build_env(stage, contract, opts) do
     base = %{
       "JOB_TOKEN" => "pipeline_#{:erlang.unique_integer([:positive])}"
     }
@@ -213,6 +213,13 @@ defmodule AgentOS.Pipeline do
         token -> {"VERCEL_TOKEN", token}
       end
     end)
+
+    # Inject LLM model from contract or stage
+    model = stage[:model] || contract.model
+    base = if model, do: Map.put(base, "LLM_MODEL", model), else: base
+
+    provider = stage[:provider] || contract.provider
+    base = if provider, do: Map.put(base, "LLM_PROVIDER", to_string(provider)), else: base
 
     # Merge any custom env from opts
     Map.merge(base, Map.get(opts, :env, %{}))
