@@ -32,14 +32,9 @@ defmodule AgentOS.Pipeline do
   def run(%ContractSpec{} = contract, input, opts \\ %{}) do
     Logger.info("Pipeline: starting '#{contract.name}' (#{length(contract.stages)} stages)")
 
-    # Check microsandbox health — fail fast
-    case MicroVM.health() do
-      :ok ->
-        execute_stages(contract, input, opts)
-
-      {:error, reason} ->
-        Logger.error("Pipeline: microsandbox not available — #{inspect(reason)}")
-        {:error, {:microsandbox_not_running, reason}}
+    with :ok <- validate_credentials(contract),
+         :ok <- check_microsandbox() do
+      execute_stages(contract, input, opts)
     end
   end
 
@@ -88,16 +83,40 @@ defmodule AgentOS.Pipeline do
             # Broadcast pipeline completion via PubSub for SSE consumers
             broadcast_pipeline_complete(run_id)
 
+            # Notify configured channels (Slack, Telegram, etc.)
+            AgentOS.Notifications.Dispatcher.dispatch(:pipeline_complete, %{
+              contract_name: contract.name,
+              topic: topic,
+              run_id: run_id,
+              duration_ms: duration_ms,
+              artifacts: artifacts,
+              proof: proof
+            })
+
             {:ok, Map.put(artifacts, :run_id, run_id)}
 
           {:retry, reason} ->
             Logger.warning("Pipeline: verification failed — #{reason}")
             broadcast_pipeline_error(run_id, {:verification_failed, reason})
+
+            AgentOS.Notifications.Dispatcher.dispatch(:pipeline_failed, %{
+              contract_name: contract.name,
+              topic: topic,
+              error: {:verification_failed, reason}
+            })
+
             {:error, {:verification_failed, reason}}
         end
 
       {:error, _} = err ->
         broadcast_pipeline_error(run_id, err)
+
+        AgentOS.Notifications.Dispatcher.dispatch(:pipeline_failed, %{
+          contract_name: contract.name,
+          topic: topic,
+          error: err
+        })
+
         err
     end
   end
@@ -194,25 +213,32 @@ defmodule AgentOS.Pipeline do
     Path.join(scripts_dir, "agent-runtime.sh")
   end
 
+  defp validate_credentials(contract) do
+    missing = Enum.reject(contract.credentials, &AgentOS.Secrets.available?/1)
+
+    case missing do
+      [] -> :ok
+      list ->
+        Logger.error("Pipeline: missing credentials: #{inspect(list)}")
+        {:error, {:missing_credentials, list}}
+    end
+  end
+
+  defp check_microsandbox do
+    case MicroVM.health() do
+      :ok -> :ok
+      {:error, reason} ->
+        Logger.error("Pipeline: microsandbox not available — #{inspect(reason)}")
+        {:error, {:microsandbox_not_running, reason}}
+    end
+  end
+
   defp build_env(stage, contract, opts) do
-    base = %{
-      "JOB_TOKEN" => "pipeline_#{:erlang.unique_integer([:positive])}"
-    }
+    base = %{"JOB_TOKEN" => "pipeline_#{:erlang.unique_integer([:positive])}"}
 
-    # Inject credentials declared by the contract
-    base = inject_credential(base, contract, :github_token, fn ->
-      case System.cmd("gh", ["auth", "token"], stderr_to_stdout: true) do
-        {token, 0} -> {"GH_TOKEN", String.trim(token)}
-        _ -> nil
-      end
-    end)
-
-    base = inject_credential(base, contract, :vercel_token, fn ->
-      case System.get_env("VERCEL_TOKEN") do
-        nil -> nil
-        token -> {"VERCEL_TOKEN", token}
-      end
-    end)
+    # Inject credentials via Secrets backend
+    base = inject_secret(base, contract, :github_token, "GH_TOKEN")
+    base = inject_secret(base, contract, :vercel_token, "VERCEL_TOKEN")
 
     # Inject LLM model from contract or stage
     model = stage[:model] || contract.model
@@ -221,14 +247,13 @@ defmodule AgentOS.Pipeline do
     provider = stage[:provider] || contract.provider
     base = if provider, do: Map.put(base, "LLM_PROVIDER", to_string(provider)), else: base
 
-    # Merge any custom env from opts
     Map.merge(base, Map.get(opts, :env, %{}))
   end
 
-  defp inject_credential(env, contract, cred_atom, resolver_fn) do
+  defp inject_secret(env, contract, cred_atom, env_var) do
     if cred_atom in contract.credentials do
-      case resolver_fn.() do
-        {key, val} when is_binary(val) and val != "" -> Map.put(env, key, val)
+      case AgentOS.Secrets.resolve(cred_atom) do
+        {:ok, val} -> Map.put(env, env_var, val)
         _ -> env
       end
     else

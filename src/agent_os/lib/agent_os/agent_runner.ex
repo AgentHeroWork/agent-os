@@ -108,6 +108,9 @@ defmodule AgentOS.AgentRunner do
     message = Map.get(detail, :message, "No message")
     Logger.warning("AgentRunner: escalation from #{spec.name} — #{reason}: #{message}")
 
+    # Notify configured channels about escalation
+    AgentOS.Notifications.Dispatcher.dispatch(:escalation, detail)
+
     case reason do
       :compilation_stuck ->
         if attempt < max_retries do

@@ -164,13 +164,30 @@ defmodule AgentOS.Audit do
     case :mnesia.create_table(@table,
            attributes: [:id, :pipeline_id, :stage, :event, :data, :timestamp],
            type: :bag,
+           disc_copies: [node()],
            index: [:pipeline_id, :stage]
          ) do
       {:atomic, :ok} ->
-        Logger.info("[Audit] Created Mnesia table #{@table}")
+        Logger.info("[Audit] Created Mnesia table #{@table} with disc_copies")
 
       {:aborted, {:already_exists, @table}} ->
-        Logger.debug("[Audit] Mnesia table #{@table} already exists")
+        # Migrate existing ram_copies table to disc_copies if needed
+        case :mnesia.table_info(@table, :storage_type) do
+          :ram_copies ->
+            case :mnesia.change_table_copy_type(@table, node(), :disc_copies) do
+              {:atomic, :ok} ->
+                Logger.info("[Audit] Migrated #{@table} from ram_copies to disc_copies")
+
+              {:aborted, migrate_reason} ->
+                Logger.warning("[Audit] Could not migrate to disc_copies: #{inspect(migrate_reason)}")
+            end
+
+          :disc_copies ->
+            Logger.debug("[Audit] Mnesia table #{@table} already uses disc_copies")
+
+          other ->
+            Logger.debug("[Audit] Mnesia table #{@table} uses #{inspect(other)}")
+        end
 
       {:aborted, reason} ->
         Logger.warning("[Audit] Mnesia table creation: #{inspect(reason)}")

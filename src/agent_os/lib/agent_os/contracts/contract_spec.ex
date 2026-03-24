@@ -49,7 +49,8 @@ defmodule AgentOS.Contracts.ContractSpec do
           memory: map(),
           resources: map(),
           model: String.t() | nil,
-          provider: atom() | nil
+          provider: atom() | nil,
+          deploy_mode: :push | :pr
         }
 
   defstruct [
@@ -73,7 +74,8 @@ defmodule AgentOS.Contracts.ContractSpec do
       memory_mb: 512,
       cpus: 1,
       timeout_ms: 300_000
-    }
+    },
+    deploy_mode: :push
   ]
 
   @doc """
@@ -99,7 +101,8 @@ defmodule AgentOS.Contracts.ContractSpec do
         max_retries: get_integer(attrs, "max_retries", 2),
         credentials: parse_atom_list(attrs, "credentials"),
         memory: parse_memory(attrs),
-        resources: parse_resources(attrs)
+        resources: parse_resources(attrs),
+        deploy_mode: parse_deploy_mode(attrs)
       }
 
       {:ok, spec}
@@ -232,6 +235,14 @@ defmodule AgentOS.Contracts.ContractSpec do
 
   defp parse_atom_list_raw(list) when is_list(list), do: Enum.map(list, &atomize/1)
   defp parse_atom_list_raw(_), do: []
+
+  defp parse_deploy_mode(attrs) do
+    case Map.get(attrs, "deploy_mode") || Map.get(attrs, :deploy_mode) do
+      "pr" -> :pr
+      :pr -> :pr
+      _ -> :push
+    end
+  end
 
   defp atomize(val) when is_atom(val), do: val
   defp atomize(val) when is_binary(val), do: String.to_atom(val)

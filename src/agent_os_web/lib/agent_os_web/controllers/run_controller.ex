@@ -49,6 +49,13 @@ defmodule AgentOS.Web.Controllers.RunController do
       end
       input = %{input: %{topic: topic}}
 
+      # Track job for status queries
+      try do
+        AgentOS.JobTracker.track(agent_id, :running)
+      catch
+        _, _ -> :ok
+      end
+
       case AgentOS.AgentRunner.run(spec, contract, input) do
         {:ok, artifacts} ->
           json_resp(conn, 200, %{artifacts: artifacts})
@@ -80,6 +87,14 @@ defmodule AgentOS.Web.Controllers.RunController do
       env = body["env"] || %{}
       opts = %{env: env}
       input = %{topic: topic}
+      pipeline_id = "pipeline_#{:erlang.unique_integer([:positive])}"
+
+      # Track job for status queries
+      try do
+        AgentOS.JobTracker.track(pipeline_id, :running)
+      catch
+        _, _ -> :ok
+      end
 
       case AgentOS.Pipeline.run(contract_spec, input, opts) do
         {:ok, artifacts} ->
@@ -105,7 +120,30 @@ defmodule AgentOS.Web.Controllers.RunController do
   """
   @spec list_contracts(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def list_contracts(conn, _params) do
-    contracts = AgentOS.Contracts.Loader.list()
+    contracts =
+      AgentOS.Contracts.Loader.list()
+      |> Enum.map(fn name ->
+        case AgentOS.Contracts.Loader.load(name) do
+          {:ok, spec} ->
+            %{
+              name: spec.name,
+              description: spec.description,
+              stages:
+                Enum.map(spec.stages, fn s ->
+                  %{name: s.name, instructions: s.instructions}
+                end),
+              required_artifacts: spec.required_artifacts,
+              model: spec.model,
+              provider: spec.provider,
+              max_retries: spec.max_retries,
+              credentials: spec.credentials
+            }
+
+          _ ->
+            %{name: name}
+        end
+      end)
+
     json_resp(conn, 200, %{contracts: contracts})
   end
 

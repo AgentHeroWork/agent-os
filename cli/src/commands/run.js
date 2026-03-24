@@ -78,7 +78,16 @@ export async function runPipeline(args, opts) {
   out.info(`Running pipeline '${opts.contract}'...`);
   out.info(`Topic: ${opts.topic}`);
 
-  const spinner = setInterval(() => process.stdout.write('.'), 1000);
+  // TODO: When server supports async pipeline execution:
+  // 1. POST /api/v1/pipeline/run returns immediately with {run_id}
+  // 2. Subscribe to SSE at /api/v1/events/{run_id}
+  // 3. Display stage-by-stage progress
+  // For now, the POST blocks until completion.
+  const startTime = Date.now();
+  const spinner = setInterval(() => {
+    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+    process.stdout.write(`\rRunning pipeline '${opts.contract}'... ${elapsed}s`);
+  }, 1000);
   let result;
   try {
     result = await http.post('/api/v1/pipeline/run', {
@@ -86,7 +95,7 @@ export async function runPipeline(args, opts) {
       topic: opts.topic,
     }, opts);
     clearInterval(spinner);
-    console.log(''); // newline after dots
+    console.log(''); // newline after progress
   } catch (e) {
     clearInterval(spinner);
     console.log('');

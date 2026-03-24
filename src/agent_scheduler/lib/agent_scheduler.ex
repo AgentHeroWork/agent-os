@@ -100,8 +100,18 @@ defmodule AgentScheduler do
     }
 
     case AgentScheduler.Scheduler.enqueue(client_id, job_spec) do
-      :ok -> {:ok, job_id}
-      {:error, _} = error -> error
+      :ok ->
+        # Track job for status queries (runtime dispatch to avoid compile-time dep)
+        try do
+          apply(Module.concat([:AgentOS, :JobTracker]), :track, [job_id, :pending])
+        catch
+          _, _ -> :ok
+        end
+
+        {:ok, job_id}
+
+      {:error, _} = error ->
+        error
     end
   end
 
