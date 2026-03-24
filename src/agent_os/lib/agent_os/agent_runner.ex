@@ -141,10 +141,10 @@ defmodule AgentOS.AgentRunner do
     }
   end
 
-  defp resolve_agent_module(:open_claw), do: AgentScheduler.Agents.OpenClaw
-  defp resolve_agent_module(:openclaw), do: AgentScheduler.Agents.OpenClaw
-  defp resolve_agent_module(:nemo_claw), do: AgentScheduler.Agents.NemoClaw
-  defp resolve_agent_module(:nemoclaw), do: AgentScheduler.Agents.NemoClaw
+  defp resolve_agent_module(:open_claw), do: AgentOS.Agents.OpenClaw
+  defp resolve_agent_module(:openclaw), do: AgentOS.Agents.OpenClaw
+  defp resolve_agent_module(:nemo_claw), do: AgentOS.Agents.NemoClaw
+  defp resolve_agent_module(:nemoclaw), do: AgentOS.Agents.NemoClaw
 
   defp resolve_agent_module(type) do
     case AgentScheduler.Agents.Registry.lookup(type) do

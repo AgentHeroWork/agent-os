@@ -407,8 +407,23 @@ defmodule PlannerEngine.OrderBook do
 
   @spec cost_functional(proposal()) :: float()
   defp cost_functional(proposal) do
-    reputation = Map.get(proposal, :reputation, 0.5)
+    reputation = fetch_reputation(proposal.agent_id)
     proposal.estimated_credits / (1.0 + proposal.confidence_score * reputation)
+  end
+
+  @spec fetch_reputation(String.t()) :: float()
+  defp fetch_reputation(agent_id) do
+    case Process.whereis(PlannerEngine.Reputation) do
+      nil ->
+        0.5
+
+      _pid ->
+        try do
+          PlannerEngine.Reputation.trust_score(agent_id)
+        catch
+          :exit, _ -> 0.5
+        end
+    end
   end
 
   @spec generate_id() :: String.t()

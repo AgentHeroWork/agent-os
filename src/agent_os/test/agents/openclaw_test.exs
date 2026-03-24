@@ -1,7 +1,7 @@
-defmodule AgentScheduler.Agents.OpenClawTest do
+defmodule AgentOS.Agents.OpenClawTest do
   use ExUnit.Case, async: true
 
-  alias AgentScheduler.Agents.OpenClaw
+  alias AgentOS.Agents.OpenClaw
 
   describe "profile/0" do
     test "returns correct profile" do

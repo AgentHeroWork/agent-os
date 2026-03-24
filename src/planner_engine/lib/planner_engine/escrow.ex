@@ -43,6 +43,7 @@ defmodule PlannerEngine.Escrow do
   @type escrow_record :: %{
           id: String.t(),
           client_id: String.t(),
+          operator_id: String.t() | nil,
           amount: non_neg_integer(),
           contract_id: String.t(),
           status: :held | :released | :refunded,
@@ -78,6 +79,7 @@ defmodule PlannerEngine.Escrow do
     * `client_id` — The client whose credits are being held
     * `amount` — Number of credits to hold
     * `contract_id` — The contract this escrow is associated with
+    * `operator_id` — The operator who will receive credits on release
 
   ## Returns
 
@@ -85,10 +87,10 @@ defmodule PlannerEngine.Escrow do
     * `{:error, :insufficient_funds}` — Client balance too low
     * `{:error, reason}` — Mnesia transaction failed
   """
-  @spec hold(String.t(), non_neg_integer(), String.t()) ::
+  @spec hold(String.t(), non_neg_integer(), String.t(), String.t()) ::
           {:ok, String.t()} | {:error, atom()}
-  def hold(client_id, amount, contract_id) do
-    GenServer.call(__MODULE__, {:hold, client_id, amount, contract_id})
+  def hold(client_id, amount, contract_id, operator_id) do
+    GenServer.call(__MODULE__, {:hold, client_id, amount, contract_id, operator_id})
   end
 
   @doc """
@@ -181,7 +183,7 @@ defmodule PlannerEngine.Escrow do
   end
 
   @impl true
-  def handle_call({:hold, client_id, amount, contract_id}, _from, state) do
+  def handle_call({:hold, client_id, amount, contract_id, operator_id}, _from, state) do
     result =
       :mnesia.transaction(fn ->
         case :mnesia.read(:balances, client_id) do
@@ -191,7 +193,7 @@ defmodule PlannerEngine.Escrow do
             now = DateTime.utc_now()
 
             :mnesia.write(
-              {:escrows, escrow_id, client_id, amount, contract_id, :held, now, nil}
+              {:escrows, escrow_id, client_id, operator_id, amount, contract_id, :held, now, nil}
             )
 
             escrow_id
@@ -223,10 +225,11 @@ defmodule PlannerEngine.Escrow do
     result =
       :mnesia.transaction(fn ->
         case :mnesia.read(:escrows, escrow_id) do
-          [{:escrows, ^escrow_id, client_id, amount, contract_id, status, created_at, settled_at}] ->
+          [{:escrows, ^escrow_id, client_id, operator_id, amount, contract_id, status, created_at, settled_at}] ->
             record = %{
               id: escrow_id,
               client_id: client_id,
+              operator_id: operator_id,
               amount: amount,
               contract_id: contract_id,
               status: status,
@@ -237,7 +240,7 @@ defmodule PlannerEngine.Escrow do
             case f.(record) do
               {:ok, updated} ->
                 :mnesia.write(
-                  {:escrows, updated.id, updated.client_id, updated.amount,
+                  {:escrows, updated.id, updated.client_id, updated.operator_id, updated.amount,
                    updated.contract_id, updated.status, updated.created_at, updated.settled_at}
                 )
 
@@ -263,23 +266,23 @@ defmodule PlannerEngine.Escrow do
     result =
       :mnesia.transaction(fn ->
         case :mnesia.read(:escrows, escrow_id) do
-          [{:escrows, ^escrow_id, client_id, amount, contract_id, :held, created_at, _}] ->
+          [{:escrows, ^escrow_id, client_id, operator_id, amount, contract_id, :held, created_at, _}] ->
             now = DateTime.utc_now()
             new_status = if action == :release, do: :released, else: :refunded
 
             # Update escrow record
             :mnesia.write(
-              {:escrows, escrow_id, client_id, amount, contract_id, new_status, created_at, now}
+              {:escrows, escrow_id, client_id, operator_id, amount, contract_id, new_status, created_at, now}
             )
 
-            # Update balance: reduce held amount
+            # Update client balance: reduce held amount
             case :mnesia.read(:balances, client_id) do
               [{:balances, ^client_id, available, held}] ->
                 if action == :refund do
                   # Refund: move from held back to available
                   :mnesia.write({:balances, client_id, available + amount, held - amount})
                 else
-                  # Release: remove from held (credits go to operator via Market)
+                  # Release: remove from held
                   :mnesia.write({:balances, client_id, available, held - amount})
                 end
 
@@ -287,9 +290,22 @@ defmodule PlannerEngine.Escrow do
                 :mnesia.abort(:no_balance_record)
             end
 
+            # On release, credit the operator's available balance
+            if action == :release do
+              case :mnesia.read(:balances, operator_id) do
+                [{:balances, ^operator_id, op_available, op_held}] ->
+                  :mnesia.write({:balances, operator_id, op_available + amount, op_held})
+
+                [] ->
+                  # Create balance record for operator if none exists
+                  :mnesia.write({:balances, operator_id, amount, 0})
+              end
+            end
+
             %{
               id: escrow_id,
               client_id: client_id,
+              operator_id: operator_id,
               amount: amount,
               contract_id: contract_id,
               status: new_status,
@@ -297,7 +313,7 @@ defmodule PlannerEngine.Escrow do
               settled_at: now
             }
 
-          [{:escrows, ^escrow_id, _, _, _, status, _, _}] when status in [:released, :refunded] ->
+          [{:escrows, ^escrow_id, _, _, _, _, status, _, _}] when status in [:released, :refunded] ->
             :mnesia.abort(:already_settled)
 
           [] ->
@@ -349,10 +365,11 @@ defmodule PlannerEngine.Escrow do
     result =
       :mnesia.transaction(fn ->
         case :mnesia.read(:escrows, escrow_id) do
-          [{:escrows, ^escrow_id, client_id, amount, contract_id, status, created_at, settled_at}] ->
+          [{:escrows, ^escrow_id, client_id, operator_id, amount, contract_id, status, created_at, settled_at}] ->
             %{
               id: escrow_id,
               client_id: client_id,
+              operator_id: operator_id,
               amount: amount,
               contract_id: contract_id,
               status: status,
@@ -384,7 +401,7 @@ defmodule PlannerEngine.Escrow do
     )
 
     :mnesia.create_table(:escrows,
-      attributes: [:id, :client_id, :amount, :contract_id, :status, :created_at, :settled_at],
+      attributes: [:id, :client_id, :operator_id, :amount, :contract_id, :status, :created_at, :settled_at],
       type: :set
     )
 

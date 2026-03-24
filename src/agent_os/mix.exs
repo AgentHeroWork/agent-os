@@ -15,7 +15,7 @@ defmodule AgentOS.MixProject do
 
   def application do
     [
-      extra_applications: [:logger, :mnesia],
+      extra_applications: [:logger, :mnesia, :inets, :ssl],
       mod: {AgentOS.Application, []}
     ]
   end
@@ -26,7 +26,6 @@ defmodule AgentOS.MixProject do
       {:tool_interface, path: "../tool_interface"},
       {:memory_layer, path: "../memory_layer"},
       {:planner_engine, path: "../planner_engine"},
-      {:agent_os_web, path: "../agent_os_web"},
       {:plug_cowboy, "~> 2.7"},
       {:jason, "~> 1.4"},
       {:telemetry, "~> 1.3"}

@@ -1,4 +1,4 @@
-defmodule AgentScheduler.Agents.CompletionHandler do
+defmodule AgentOS.Agents.CompletionHandler do
   @moduledoc """
   Utility toolkit for agent work product generation.
 

@@ -1,4 +1,4 @@
-defmodule AgentScheduler.Agents.NemoClaw do
+defmodule AgentOS.Agents.NemoClaw do
   @moduledoc """
   NemoClaw — NVIDIA-secured agent with restricted tools and policy guardrails.
 
@@ -24,11 +24,11 @@ defmodule AgentScheduler.Agents.NemoClaw do
   - Output validation — All outputs checked against policy before return
   """
 
-  @behaviour AgentScheduler.Agents.AgentType
+  @behaviour AgentOS.Agents.AgentType
 
   require Logger
 
-  alias AgentScheduler.Agents.{CompletionHandler, SelfRepair}
+  alias AgentOS.Agents.{CompletionHandler, SelfRepair}
 
   @approved_domains [
     "cern.ch",
@@ -194,9 +194,9 @@ defmodule AgentScheduler.Agents.NemoClaw do
   defp plan_research(topic, llm_opts) do
     Logger.info("NemoClaw: planning privacy-focused research on '#{topic}'")
 
-    {system, user} = AgentScheduler.ResearchPrompts.plan_prompt(:nemo_claw, topic)
+    {system, user} = AgentOS.ResearchPrompts.plan_prompt(:nemo_claw, topic)
 
-    case AgentScheduler.LLMClient.chat(
+    case AgentOS.LLMClient.chat(
            [%{role: "system", content: system}, %{role: "user", content: user}],
            llm_opts
          ) do
@@ -213,15 +213,15 @@ defmodule AgentScheduler.Agents.NemoClaw do
   defp execute_research(topic, plan, llm_opts) do
     Logger.info("NemoClaw: generating privacy-preserving research on '#{topic}'")
 
-    {system, user} = AgentScheduler.ResearchPrompts.research_prompt(:nemo_claw, topic, plan)
+    {system, user} = AgentOS.ResearchPrompts.research_prompt(:nemo_claw, topic, plan)
 
-    case AgentScheduler.LLMClient.chat(
+    case AgentOS.LLMClient.chat(
            [%{role: "system", content: system}, %{role: "user", content: user}],
            llm_opts
          ) do
       {:ok, research_text} ->
         Logger.info("NemoClaw: research generated (#{String.length(research_text)} chars)")
-        result = AgentScheduler.ResearchPrompts.parse_research_output(research_text)
+        result = AgentOS.ResearchPrompts.parse_research_output(research_text)
         {:ok, Map.put(result, :privacy_routing, true)}
 
       {:error, reason} ->
@@ -234,9 +234,9 @@ defmodule AgentScheduler.Agents.NemoClaw do
     content = Map.get(research, :content, "")
     Logger.info("NemoClaw: reviewing research on '#{topic}'")
 
-    {system, user} = AgentScheduler.ResearchPrompts.review_prompt(topic, content)
+    {system, user} = AgentOS.ResearchPrompts.review_prompt(topic, content)
 
-    case AgentScheduler.LLMClient.chat(
+    case AgentOS.LLMClient.chat(
            [%{role: "system", content: system}, %{role: "user", content: user}],
            llm_opts
          ) do

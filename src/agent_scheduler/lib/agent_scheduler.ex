@@ -8,7 +8,6 @@ defmodule AgentScheduler do
   - **AgentScheduler.Scheduler** — Priority-based, credit-weighted scheduling (analogous to Linux CFS)
   - **AgentScheduler.Supervisor** — DynamicSupervisor for agent pools (analogous to OTP supervision trees)
   - **AgentScheduler.Agent** — Individual agent lifecycle management (analogous to OS processes)
-  - **AgentScheduler.Pipeline** — Streaming pipeline with EventEmitter-style pub/sub
   - **AgentScheduler.Evaluator** — 6-dimensional quality evaluation and reputation computation
 
   ## Supervision Tree
@@ -17,7 +16,6 @@ defmodule AgentScheduler do
       ├── Registry (unique, :agent_registry)
       ├── AgentScheduler.Evaluator
       ├── AgentScheduler.Scheduler
-      ├── AgentScheduler.Pipeline
       └── AgentScheduler.Supervisor (DynamicSupervisor)
           ├── Agent_1
           ├── Agent_2
@@ -46,7 +44,6 @@ defmodule AgentScheduler do
       {AgentScheduler.Agents.Registry, []},
       {AgentScheduler.Evaluator, []},
       {AgentScheduler.Scheduler, []},
-      {AgentScheduler.Pipeline, []},
       {AgentScheduler.Supervisor, []}
     ]
 
@@ -133,40 +130,22 @@ defmodule AgentScheduler do
   end
 
   @doc """
-  Creates a streaming pipeline with the given stages and subscriptions.
-
-  ## Example: Web Testing Pipeline
-
-      AgentScheduler.create_pipeline(:web_testing, [
-        {:recon, publishes: [:page_discovered, :api_found, :sitemap_built]},
-        {:behavior, subscribes: [:page_discovered, :sitemap_built],
-                    publishes: [:test_generated, :flow_mapped]},
-        {:load, subscribes: [:api_found, :flow_mapped],
-                publishes: [:load_result, :perf_metric]},
-        {:observer, subscribes: [:test_generated, :load_result, :perf_metric],
-                    publishes: [:anomaly_detected, :observation_complete]},
-        {:synthesis, subscribes: [:test_generated, :load_result,
-                                  :anomaly_detected, :observation_complete],
-                     publishes: [:final_report]}
-      ])
-  """
-  @spec create_pipeline(atom(), keyword()) :: {:ok, String.t()} | {:error, term()}
-  def create_pipeline(name, stages) do
-    AgentScheduler.Pipeline.create(name, stages)
-  end
-
-  @doc """
   Starts an OpenClaw agent in the supervised pool.
 
   OpenClaw agents have full tool access and default to `:autonomous_escalation` oversight.
   """
   @spec start_openclaw(String.t(), keyword()) :: {:ok, pid()} | {:error, term()}
   def start_openclaw(name, opts \\ []) do
-    profile = AgentScheduler.Agents.OpenClaw.profile()
-    agent_id = "openclaw_#{name}_#{:erlang.unique_integer([:positive])}"
-    oversight = Keyword.get(opts, :oversight, profile.default_oversight)
+    case AgentScheduler.Agents.Registry.lookup(:openclaw) do
+      {:ok, module} ->
+        profile = module.profile()
+        agent_id = "openclaw_#{name}_#{:erlang.unique_integer([:positive])}"
+        oversight = Keyword.get(opts, :oversight, profile.default_oversight)
+        start_agent(agent_id, profile, Keyword.merge(opts, oversight: oversight))
 
-    start_agent(agent_id, profile, Keyword.merge(opts, oversight: oversight))
+      {:error, :not_found} ->
+        {:error, :openclaw_not_registered}
+    end
   end
 
   @doc """
@@ -176,11 +155,16 @@ defmodule AgentScheduler do
   """
   @spec start_nemoclaw(String.t(), keyword()) :: {:ok, pid()} | {:error, term()}
   def start_nemoclaw(name, opts \\ []) do
-    profile = AgentScheduler.Agents.NemoClaw.profile()
-    agent_id = "nemoclaw_#{name}_#{:erlang.unique_integer([:positive])}"
-    oversight = Keyword.get(opts, :oversight, profile.default_oversight)
+    case AgentScheduler.Agents.Registry.lookup(:nemoclaw) do
+      {:ok, module} ->
+        profile = module.profile()
+        agent_id = "nemoclaw_#{name}_#{:erlang.unique_integer([:positive])}"
+        oversight = Keyword.get(opts, :oversight, profile.default_oversight)
+        start_agent(agent_id, profile, Keyword.merge(opts, oversight: oversight))
 
-    start_agent(agent_id, profile, Keyword.merge(opts, oversight: oversight))
+      {:error, :not_found} ->
+        {:error, :nemoclaw_not_registered}
+    end
   end
 
   # -- Private --

@@ -1,4 +1,4 @@
-defmodule AgentScheduler.Agents.OpenClaw do
+defmodule AgentOS.Agents.OpenClaw do
   @moduledoc """
   OpenClaw — Full-capability autonomous research agent.
 
@@ -18,11 +18,11 @@ defmodule AgentScheduler.Agents.OpenClaw do
   7. Push Artifacts — Pushes .tex, .pdf, README.md to repo
   """
 
-  @behaviour AgentScheduler.Agents.AgentType
+  @behaviour AgentOS.Agents.AgentType
 
   require Logger
 
-  alias AgentScheduler.Agents.{CompletionHandler, SelfRepair}
+  alias AgentOS.Agents.{CompletionHandler, SelfRepair}
 
   @impl true
   def profile do
@@ -129,9 +129,9 @@ defmodule AgentScheduler.Agents.OpenClaw do
   defp plan_research(topic, llm_opts) do
     Logger.info("OpenClaw: planning research on '#{topic}'")
 
-    {system, user} = AgentScheduler.ResearchPrompts.plan_prompt(:open_claw, topic)
+    {system, user} = AgentOS.ResearchPrompts.plan_prompt(:open_claw, topic)
 
-    case AgentScheduler.LLMClient.chat(
+    case AgentOS.LLMClient.chat(
            [%{role: "system", content: system}, %{role: "user", content: user}],
            llm_opts
          ) do
@@ -148,15 +148,15 @@ defmodule AgentScheduler.Agents.OpenClaw do
   defp execute_research(topic, plan, llm_opts) do
     Logger.info("OpenClaw: generating research paper on '#{topic}'")
 
-    {system, user} = AgentScheduler.ResearchPrompts.research_prompt(:open_claw, topic, plan)
+    {system, user} = AgentOS.ResearchPrompts.research_prompt(:open_claw, topic, plan)
 
-    case AgentScheduler.LLMClient.chat(
+    case AgentOS.LLMClient.chat(
            [%{role: "system", content: system}, %{role: "user", content: user}],
            llm_opts
          ) do
       {:ok, research_text} ->
         Logger.info("OpenClaw: research generated (#{String.length(research_text)} chars)")
-        result = AgentScheduler.ResearchPrompts.parse_research_output(research_text)
+        result = AgentOS.ResearchPrompts.parse_research_output(research_text)
         {:ok, result}
 
       {:error, reason} ->
@@ -169,9 +169,9 @@ defmodule AgentScheduler.Agents.OpenClaw do
     content = Map.get(research, :content, "")
     Logger.info("OpenClaw: reviewing research on '#{topic}'")
 
-    {system, user} = AgentScheduler.ResearchPrompts.review_prompt(topic, content)
+    {system, user} = AgentOS.ResearchPrompts.review_prompt(topic, content)
 
-    case AgentScheduler.LLMClient.chat(
+    case AgentOS.LLMClient.chat(
            [%{role: "system", content: system}, %{role: "user", content: user}],
            llm_opts
          ) do

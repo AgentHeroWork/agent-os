@@ -151,8 +151,8 @@ defmodule AgentOS.Web.Controllers.AgentController do
     end
   end
 
-  defp agent_profile(:openclaw), do: AgentScheduler.Agents.OpenClaw.profile()
-  defp agent_profile(:nemoclaw), do: AgentScheduler.Agents.NemoClaw.profile()
+  defp agent_profile(:openclaw), do: AgentOS.Agents.OpenClaw.profile()
+  defp agent_profile(:nemoclaw), do: AgentOS.Agents.NemoClaw.profile()
 
   defp parse_oversight(nil), do: :autonomous_escalation
   defp parse_oversight("autonomous"), do: :autonomous

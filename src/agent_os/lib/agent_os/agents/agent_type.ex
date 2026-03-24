@@ -1,4 +1,4 @@
-defmodule AgentScheduler.Agents.AgentType do
+defmodule AgentOS.Agents.AgentType do
   @moduledoc """
   Behaviour defining the contract for agent types.
 

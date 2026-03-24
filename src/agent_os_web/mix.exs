@@ -26,6 +26,7 @@ defmodule AgentOS.Web.MixProject do
     [
       {:plug_cowboy, "~> 2.7"},
       {:jason, "~> 1.4"},
+      {:agent_os, path: "../agent_os"},
       {:agent_scheduler, path: "../agent_scheduler"},
       {:tool_interface, path: "../tool_interface"},
       {:memory_layer, path: "../memory_layer"},

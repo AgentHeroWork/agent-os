@@ -1,4 +1,4 @@
-defmodule AgentScheduler.Agents.SelfRepair do
+defmodule AgentOS.Agents.SelfRepair do
   @moduledoc """
   Shared LLM-powered self-repair for LaTeX compilation.
 
@@ -8,7 +8,7 @@ defmodule AgentScheduler.Agents.SelfRepair do
 
   require Logger
 
-  alias AgentScheduler.Agents.CompletionHandler
+  alias AgentOS.Agents.CompletionHandler
 
   @max_fix_attempts 3
 
@@ -90,7 +90,7 @@ defmodule AgentScheduler.Agents.SelfRepair do
     max_tokens = Keyword.get(llm_opts, :max_tokens, 8192)
     temperature = Keyword.get(llm_opts, :temperature, 0.2)
 
-    AgentScheduler.LLMClient.chat(
+    AgentOS.LLMClient.chat(
       [%{role: "system", content: system}, %{role: "user", content: user}],
       model: model, max_tokens: max_tokens, temperature: temperature
     )

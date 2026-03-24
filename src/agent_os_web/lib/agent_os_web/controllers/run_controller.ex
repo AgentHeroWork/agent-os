@@ -3,20 +3,11 @@ defmodule AgentOS.Web.Controllers.RunController do
   REST controller for agent execution and pipeline runs.
 
   Provides endpoints to run a single agent, execute a multi-stage pipeline,
-  and list available contracts. All calls to AgentOS core modules (AgentSpec,
-  AgentRunner, Pipeline, Contracts.Loader) use runtime dispatch via apply/3
-  since the :agent_os app is not a compile-time dependency of :agent_os_web.
+  and list available contracts. All calls to AgentOS core modules use direct
+  function calls since :agent_os_web depends on :agent_os.
   """
 
   import Plug.Conn
-
-  # Runtime module references — these live in :agent_os, which depends on
-  # :agent_os_web (not the reverse), so we cannot reference them at compile time.
-  @agent_runner AgentOS.AgentRunner
-  @pipeline AgentOS.Pipeline
-  @loader AgentOS.Contracts.Loader
-  @agent_spec AgentOS.AgentSpec
-  @research_contract AgentOS.Contracts.ResearchContract
 
   # ── POST /api/v1/run ─────────────────────────────────────────────
 
@@ -34,12 +25,12 @@ defmodule AgentOS.Web.Controllers.RunController do
          {:ok, topic} <- require_param(body, "topic") do
       agent_id = "api_#{:erlang.unique_integer([:positive])}"
 
-      spec = struct!(@agent_spec, %{
+      spec = %AgentOS.AgentSpec{
         type: type,
         name: "api_#{:erlang.unique_integer([:positive])}",
         oversight: :autonomous_escalation,
         metadata: %{agent_id: agent_id, output_dir: "/tmp/agent-os/artifacts"}
-      })
+      }
 
       spec =
         spec
@@ -49,7 +40,7 @@ defmodule AgentOS.Web.Controllers.RunController do
       contract = resolve_contract(type)
       input = %{input: %{topic: topic}}
 
-      case apply(@agent_runner, :run, [spec, contract, input]) do
+      case AgentOS.AgentRunner.run(spec, contract, input) do
         {:ok, artifacts} ->
           json_resp(conn, 200, %{artifacts: artifacts})
 
@@ -76,12 +67,12 @@ defmodule AgentOS.Web.Controllers.RunController do
 
     with {:ok, contract_name} <- require_param(body, "contract"),
          {:ok, topic} <- require_param(body, "topic"),
-         {:ok, contract_spec} <- apply(@loader, :load, [contract_name]) do
+         {:ok, contract_spec} <- AgentOS.Contracts.Loader.load(contract_name) do
       env = body["env"] || %{}
       opts = %{env: env}
       input = %{topic: topic}
 
-      case apply(@pipeline, :run, [contract_spec, input, opts]) do
+      case AgentOS.Pipeline.run(contract_spec, input, opts) do
         {:ok, artifacts} ->
           stages =
             contract_spec.stages
@@ -105,7 +96,7 @@ defmodule AgentOS.Web.Controllers.RunController do
   """
   @spec list_contracts(Plug.Conn.t()) :: Plug.Conn.t()
   def list_contracts(conn) do
-    contracts = apply(@loader, :list, [])
+    contracts = AgentOS.Contracts.Loader.list()
     json_resp(conn, 200, %{contracts: contracts})
   end
 
@@ -125,9 +116,9 @@ defmodule AgentOS.Web.Controllers.RunController do
     end
   end
 
-  defp resolve_contract(:open_claw), do: @research_contract
-  defp resolve_contract(:nemo_claw), do: @research_contract
-  defp resolve_contract(_), do: @research_contract
+  defp resolve_contract(:open_claw), do: AgentOS.Contracts.ResearchContract
+  defp resolve_contract(:nemo_claw), do: AgentOS.Contracts.ResearchContract
+  defp resolve_contract(_), do: AgentOS.Contracts.ResearchContract
 
   defp maybe_set_model(spec, nil), do: spec
 

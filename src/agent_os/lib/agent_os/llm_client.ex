@@ -1,4 +1,4 @@
-defmodule AgentScheduler.LLMClient do
+defmodule AgentOS.LLMClient do
   @moduledoc """
   LLM API client supporting OpenAI, Anthropic, and Ollama.
 

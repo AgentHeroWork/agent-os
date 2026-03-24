@@ -1,4 +1,4 @@
-defmodule AgentScheduler.Agents.OpenClawAutonomousTest do
+defmodule AgentOS.Agents.OpenClawAutonomousTest do
   @moduledoc """
   Functional test: runs OpenClaw's full autonomous pipeline with real LLM calls.
 
@@ -8,7 +8,7 @@ defmodule AgentScheduler.Agents.OpenClawAutonomousTest do
   """
   use ExUnit.Case, async: false
 
-  alias AgentScheduler.Agents.OpenClaw
+  alias AgentOS.Agents.OpenClaw
 
   @tag :functional
   @tag timeout: 120_000

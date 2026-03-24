@@ -437,7 +437,8 @@ defmodule PlannerEngine.Market do
       PlannerEngine.Escrow.hold(
         demand.client_id,
         proposal.estimated_credits,
-        contract_id
+        contract_id,
+        proposal.agent_id
       )
 
     case escrow_result do

@@ -15,7 +15,7 @@ defmodule AgentOS.Web.Controllers.VMController do
   Proxies an LLM chat request from a microVM agent.
 
   The agent sends messages + model config. This controller calls
-  AgentScheduler.LLMClient.chat/2 with the real API key from the
+  AgentOS.LLMClient.chat/2 with the real API key from the
   host environment. Returns the LLM response to the agent.
 
   Expected body: {"messages": [...], "model": "gpt-4o", "max_tokens": 4096}
@@ -41,7 +41,7 @@ defmodule AgentOS.Web.Controllers.VMController do
 
       Logger.info("VMController: LLM proxy request (#{length(messages)} messages, model: #{body["model"] || "default"})")
 
-      case AgentScheduler.LLMClient.chat(messages, opts) do
+      case AgentOS.LLMClient.chat(messages, opts) do
         {:ok, content} ->
           json_resp(conn, 200, %{content: content})
 

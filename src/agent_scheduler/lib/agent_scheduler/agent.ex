@@ -513,17 +513,13 @@ defmodule AgentScheduler.Agent do
   defp resolve_agent_type(profile) do
     name = Map.get(profile, :name, "")
 
-    case String.downcase(name) do
-      "openclaw" -> AgentScheduler.Agents.OpenClaw
-      "nemoclaw" -> AgentScheduler.Agents.NemoClaw
-      _ ->
-        # Try the Agents.Registry for custom types
-        type_atom = name |> String.downcase() |> String.to_atom()
+    # Resolve agent type via the Agents.Registry — all agent types
+    # (including OpenClaw and NemoClaw) are registered there at init.
+    type_atom = name |> String.downcase() |> String.to_atom()
 
-        case AgentScheduler.Agents.Registry.lookup(type_atom) do
-          {:ok, module} -> module
-          _ -> nil
-        end
+    case AgentScheduler.Agents.Registry.lookup(type_atom) do
+      {:ok, module} -> module
+      _ -> nil
     end
   rescue
     _ -> nil

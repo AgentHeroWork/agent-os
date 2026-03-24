@@ -56,18 +56,6 @@ defmodule AgentOS do
   end
 
   @doc """
-  Submit a job to the AI Operating System.
-
-  The job will be decomposed by the planner, matched to agents via the
-  order book, and executed through the scheduler with tool access and
-  memory persistence.
-  """
-  @spec submit_job(map()) :: {:ok, String.t()} | {:error, term()}
-  def submit_job(job_spec) do
-    PlannerEngine.OrderBook.post_demand(job_spec)
-  end
-
-  @doc """
   Query the current system status across all subsystems.
   """
   @spec status() :: map()

@@ -1,7 +1,7 @@
-defmodule AgentScheduler.Agents.CompletionHandlerTest do
+defmodule AgentOS.Agents.CompletionHandlerTest do
   use ExUnit.Case, async: true
 
-  alias AgentScheduler.Agents.CompletionHandler
+  alias AgentOS.Agents.CompletionHandler
 
   @sample_profile %{
     name: "OpenClaw",

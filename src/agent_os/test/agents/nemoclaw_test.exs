@@ -1,7 +1,7 @@
-defmodule AgentScheduler.Agents.NemoClawTest do
+defmodule AgentOS.Agents.NemoClawTest do
   use ExUnit.Case, async: true
 
-  alias AgentScheduler.Agents.NemoClaw
+  alias AgentOS.Agents.NemoClaw
 
   describe "profile/0" do
     test "returns restricted profile" do

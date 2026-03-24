@@ -106,6 +106,9 @@ defmodule AgentOS.ContextBridge do
           end
         end)
 
+        # Write a summary to MemoryLayer for fast in-BEAM access
+        write_memory_layer_summary(task_id, contract_name, stage_name, agent_id, files)
+
         :ok
 
       {:error, reason} ->
@@ -122,6 +125,30 @@ defmodule AgentOS.ContextBridge do
     File.rm_rf(Path.join(@tmp_base, "context-#{task_id}"))
     File.rm_rf(Path.join(@tmp_base, "output-#{task_id}"))
     :ok
+  end
+
+  defp write_memory_layer_summary(task_id, contract_name, stage_name, agent_id, files) do
+    try do
+      MemoryLayer.Memory.create(%MemoryLayer.Schema.AgentRunData{
+        agent_id: agent_id,
+        task: "Pipeline stage #{stage_name} completed for contract #{contract_name}",
+        status: :completed,
+        output: %{
+          task_id: task_id,
+          contract_name: contract_name,
+          stage_name: stage_name,
+          agent_id: agent_id,
+          files: files
+        },
+        completed_at: DateTime.utc_now()
+      })
+
+      Logger.debug("ContextBridge: wrote working memory summary for #{stage_name}/#{contract_name}")
+    rescue
+      _ -> Logger.debug("ContextBridge: MemoryLayer not available for working memory")
+    catch
+      :exit, _ -> Logger.debug("ContextBridge: MemoryLayer not available for working memory")
+    end
   end
 
   # -- ContextFS CLI Interface --

@@ -142,6 +142,7 @@ defmodule AgentScheduler.Scheduler do
       queue: :gb_trees.empty()
     }
 
+    Process.send_after(self(), :dispatch, 1_000)
     Logger.info("Scheduler started (reference_credits: #{state.reference_credits})")
     {:ok, state}
   end
@@ -251,5 +252,54 @@ defmodule AgentScheduler.Scheduler do
   @impl true
   def handle_call(:queue_size, _from, state) do
     {:reply, :gb_trees.size(state.queue), state}
+  end
+
+  @impl true
+  def handle_info(:dispatch, state) do
+    case :gb_trees.size(state.queue) do
+      0 ->
+        Process.send_after(self(), :dispatch, 1_000)
+        {:noreply, state}
+
+      _ ->
+        {key, entry, queue} = :gb_trees.take_smallest(state.queue)
+        {_tier, _vrt, _seq} = key
+        client_id = entry.client_id
+        job = entry.job
+
+        # Update avruntime for the client
+        agent_cost = Map.get(job, :cost, 1.0)
+        credits = Map.get(state.client_credits, client_id, state.reference_credits)
+        priority = Map.get(state.client_priorities, client_id, :marketplace)
+        weight = Map.get(@priority_weights, priority, 1.0)
+
+        vrt_increment = agent_cost * state.reference_credits / (max(credits, 1) * weight)
+        current_vrt = Map.get(state.vruntimes, client_id, 0.0)
+        new_vrt = current_vrt + vrt_increment
+
+        new_state =
+          state
+          |> Map.put(:queue, queue)
+          |> put_in([Access.key(:vruntimes), client_id], new_vrt)
+          |> Map.update!(:dispatched_count, &(&1 + 1))
+
+        Logger.info("Scheduler: dispatching job #{Map.get(job, :id, "unknown")} for client #{client_id}")
+
+        # TODO: In future, this should trigger Pipeline.run or AgentRunner.run
+        # For now, just log and emit telemetry
+        :telemetry.execute(
+          [:agent_scheduler, :scheduler, :dispatch],
+          %{system_time: System.system_time()},
+          %{client_id: client_id, job_id: Map.get(job, :id, "unknown")}
+        )
+
+        Process.send_after(self(), :dispatch, 100)
+        {:noreply, new_state}
+    end
+  rescue
+    e ->
+      Logger.error("Scheduler: dispatch error — #{Exception.message(e)}")
+      Process.send_after(self(), :dispatch, 1_000)
+      {:noreply, state}
   end
 end

@@ -5,19 +5,16 @@ defmodule AgentOS.Web.Controllers.AuditController do
   - `GET /api/v1/audit/:pipeline_id` — full audit trail for a run
   - `GET /api/v1/audit/:pipeline_id/:stage/proof` — proof record for a stage
 
-  Uses runtime dispatch via `apply/3` since `:agent_os` is not a
-  compile-time dependency of `:agent_os_web`.
+  Uses direct calls to `AgentOS.Audit` since `:agent_os_web` depends on
+  `:agent_os` at compile time.
   """
 
   import Plug.Conn
 
-  # Runtime module reference — AgentOS.Audit lives in :agent_os
-  @audit AgentOS.Audit
-
   @doc "Returns the full audit trail for `pipeline_id`."
   @spec trail(Plug.Conn.t(), String.t()) :: Plug.Conn.t()
   def trail(conn, pipeline_id) do
-    case apply(@audit, :get_audit_trail, [pipeline_id]) do
+    case AgentOS.Audit.get_audit_trail(pipeline_id) do
       {:ok, entries} ->
         json_resp(conn, 200, %{pipeline_id: pipeline_id, entries: entries})
 
@@ -29,7 +26,7 @@ defmodule AgentOS.Web.Controllers.AuditController do
   @doc "Returns the proof record for a specific stage."
   @spec proof(Plug.Conn.t(), String.t(), String.t()) :: Plug.Conn.t()
   def proof(conn, pipeline_id, stage) do
-    case apply(@audit, :get_stage_proof, [pipeline_id, stage]) do
+    case AgentOS.Audit.get_stage_proof(pipeline_id, stage) do
       {:ok, proof_entry} ->
         json_resp(conn, 200, proof_entry)
 

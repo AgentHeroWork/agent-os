@@ -1,4 +1,4 @@
-defmodule AgentScheduler.ResearchPrompts do
+defmodule AgentOS.ResearchPrompts do
   @moduledoc """
   LLM prompt templates for research generation.
 

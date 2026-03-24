@@ -19,6 +19,7 @@ defmodule AgentOS.Pipeline do
 
   alias AgentOS.{MicroVM, ContextBridge, Audit}
   alias AgentOS.Contracts.{ContractSpec, Verify}
+  alias AgentScheduler.Evaluator
 
   @doc """
   Runs a multi-stage pipeline from a ContractSpec.
@@ -46,12 +47,14 @@ defmodule AgentOS.Pipeline do
     topic = Map.get(input, :topic, "research")
     scripts_dir = resolve_scripts_dir()
     run_id = "run_#{:erlang.unique_integer([:positive])}"
+    pipeline_start = System.monotonic_time(:millisecond)
 
     initial_state = %{
       artifacts: %{},
       previous_output_dir: nil,
       run_id: run_id,
-      topic: topic
+      topic: topic,
+      last_proof: %{"all_passed" => true, "checks" => []}
     }
 
     result =
@@ -75,7 +78,13 @@ defmodule AgentOS.Pipeline do
 
         case Verify.check(artifacts, contract.verify) do
           :ok ->
+            duration_ms = System.monotonic_time(:millisecond) - pipeline_start
+            proof = final_state.last_proof
             Logger.info("Pipeline: '#{contract.name}' completed successfully")
+
+            # Evaluate the pipeline run via the 6-dimensional Evaluator
+            evaluate_pipeline_run(run_id, proof, duration_ms)
+
             {:ok, Map.put(artifacts, :run_id, run_id)}
 
           {:retry, reason} ->
@@ -144,7 +153,8 @@ defmodule AgentOS.Pipeline do
 
         {:ok, %{state |
           artifacts: new_artifacts,
-          previous_output_dir: output_dir
+          previous_output_dir: output_dir,
+          last_proof: proof
         }}
 
       {:error, reason} ->
@@ -268,6 +278,55 @@ defmodule AgentOS.Pipeline do
 
       _ ->
         existing
+    end
+  end
+
+  defp evaluate_pipeline_run(run_id, proof, duration_ms) do
+    scores = %{
+      quality: compute_quality_score(proof),
+      adherence: 1.0,
+      speed: compute_speed_score(duration_ms),
+      cost: 1.0,
+      error_rate: compute_error_rate(proof),
+      revision_count: 0
+    }
+
+    try do
+      Evaluator.evaluate(run_id, scores)
+    rescue
+      _ -> Logger.debug("Pipeline: Evaluator not available for scoring run #{run_id}")
+    catch
+      :exit, _ -> Logger.debug("Pipeline: Evaluator not available for scoring run #{run_id}")
+    end
+  end
+
+  defp compute_quality_score(proof) do
+    checks = Map.get(proof, "checks", [])
+
+    if checks == [] do
+      0.8
+    else
+      passed = Enum.count(checks, &(Map.get(&1, "passed", true)))
+      passed / max(length(checks), 1)
+    end
+  end
+
+  defp compute_speed_score(duration_ms) do
+    cond do
+      duration_ms < 60_000 -> 1.0
+      duration_ms < 300_000 -> 0.8
+      true -> 0.5
+    end
+  end
+
+  defp compute_error_rate(proof) do
+    checks = Map.get(proof, "checks", [])
+
+    if checks == [] do
+      0.0
+    else
+      failed = Enum.count(checks, &(!Map.get(&1, "passed", true)))
+      failed / max(length(checks), 1)
     end
   end
 end

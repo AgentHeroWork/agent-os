@@ -9,7 +9,7 @@ defmodule AgentScheduler.Agents.Registry do
 
       iex> {:ok, pid} = AgentScheduler.Agents.Registry.start_link([])
       iex> AgentScheduler.Agents.Registry.lookup(:openclaw)
-      {:ok, AgentScheduler.Agents.OpenClaw}
+      {:ok, AgentOS.Agents.OpenClaw}
 
       iex> AgentScheduler.Agents.Registry.types()
       [:nemoclaw, :openclaw]
@@ -89,8 +89,8 @@ defmodule AgentScheduler.Agents.Registry do
 
     registry =
       registry
-      |> do_register(:openclaw, AgentScheduler.Agents.OpenClaw)
-      |> do_register(:nemoclaw, AgentScheduler.Agents.NemoClaw)
+      |> do_register(:openclaw, AgentOS.Agents.OpenClaw)
+      |> do_register(:nemoclaw, AgentOS.Agents.NemoClaw)
 
     Logger.info("AgentScheduler.Agents.Registry started with #{map_size(registry)} agent types")
 

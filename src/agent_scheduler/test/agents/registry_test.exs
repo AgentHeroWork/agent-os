@@ -8,11 +8,8 @@ defmodule AgentScheduler.Agents.RegistryTest do
     def hello, do: :world
   end
 
-  # A module that implements AgentType — used for custom registration tests.
+  # A module that implements the required callbacks for AgentType.
   defmodule FakeAgent do
-    @behaviour AgentScheduler.Agents.AgentType
-
-    @impl true
     def profile do
       %{
         name: "FakeAgent",
@@ -23,10 +20,8 @@ defmodule AgentScheduler.Agents.RegistryTest do
       }
     end
 
-    @impl true
     def run_autonomous(_input, _context), do: {:ok, %{artifacts: %{}, metadata: %{}}}
 
-    @impl true
     def tool_requirements, do: []
   end
 
@@ -44,18 +39,20 @@ defmodule AgentScheduler.Agents.RegistryTest do
   end
 
   describe "auto-registration on init" do
-    test "OpenClaw is auto-registered", %{registry: reg} do
-      assert {:ok, AgentScheduler.Agents.OpenClaw} = Registry.lookup(:openclaw, reg)
-    end
-
-    test "NemoClaw is auto-registered", %{registry: reg} do
-      assert {:ok, AgentScheduler.Agents.NemoClaw} = Registry.lookup(:nemoclaw, reg)
-    end
-
-    test "both types appear in list", %{registry: reg} do
+    test "auto-registers agent types when modules are available", %{registry: reg} do
+      # When AgentOS.Agents.OpenClaw and NemoClaw are available (loaded via agent_os dep),
+      # they will be auto-registered. When running standalone, they are skipped.
       types = Registry.types(reg)
-      assert :openclaw in types
-      assert :nemoclaw in types
+
+      if Code.ensure_loaded?(AgentOS.Agents.OpenClaw) do
+        assert :openclaw in types
+        assert {:ok, AgentOS.Agents.OpenClaw} = Registry.lookup(:openclaw, reg)
+      end
+
+      if Code.ensure_loaded?(AgentOS.Agents.NemoClaw) do
+        assert :nemoclaw in types
+        assert {:ok, AgentOS.Agents.NemoClaw} = Registry.lookup(:nemoclaw, reg)
+      end
     end
   end
 
@@ -93,8 +90,9 @@ defmodule AgentScheduler.Agents.RegistryTest do
   end
 
   describe "lookup/2" do
-    test "returns {:ok, module} for a known type", %{registry: reg} do
-      assert {:ok, AgentScheduler.Agents.OpenClaw} = Registry.lookup(:openclaw, reg)
+    test "returns {:ok, module} for a registered type", %{registry: reg} do
+      assert :ok = Registry.register(:test_agent, FakeAgent, reg)
+      assert {:ok, FakeAgent} = Registry.lookup(:test_agent, reg)
     end
 
     test "returns {:error, :not_found} for an unknown type", %{registry: reg} do
@@ -103,13 +101,6 @@ defmodule AgentScheduler.Agents.RegistryTest do
   end
 
   describe "list/1" do
-    test "returns all registered types as tuples", %{registry: reg} do
-      list = Registry.list(reg)
-      assert is_list(list)
-      assert {:openclaw, AgentScheduler.Agents.OpenClaw} in list
-      assert {:nemoclaw, AgentScheduler.Agents.NemoClaw} in list
-    end
-
     test "includes newly registered types", %{registry: reg} do
       Registry.register(:fake, FakeAgent, reg)
       list = Registry.list(reg)
