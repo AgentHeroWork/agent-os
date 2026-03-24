@@ -9,7 +9,7 @@ defmodule AgentOS.Web.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       name: "AgentOS.Web",
-      description: "REST API layer for the AI Operating System — Plug/Cowboy HTTP interface",
+      description: "REST API layer for the AI Operating System — Phoenix HTTP interface",
       source_url: "https://github.com/AgentHeroWork/agent-os",
       docs: [main: "AgentOS.Web", extras: []]
     ]
@@ -24,7 +24,10 @@ defmodule AgentOS.Web.MixProject do
 
   defp deps do
     [
+      {:phoenix, "~> 1.7"},
+      {:phoenix_pubsub, "~> 2.1"},
       {:plug_cowboy, "~> 2.7"},
+      {:cors_plug, "~> 3.0"},
       {:jason, "~> 1.4"},
       {:agent_os, path: "../agent_os"},
       {:agent_scheduler, path: "../agent_scheduler"},

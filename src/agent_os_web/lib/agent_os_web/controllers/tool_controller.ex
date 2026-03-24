@@ -6,6 +6,8 @@ defmodule AgentOS.Web.Controllers.ToolController do
   (name, tier, description, input schema) without leaking execute/validate functions.
   """
 
+  use Phoenix.Controller, formats: [:json]
+
   import Plug.Conn
 
   @doc """
@@ -14,9 +16,8 @@ defmodule AgentOS.Web.Controllers.ToolController do
   Supported tiers: `builtin`, `sandbox`, `external`.
   Returns a JSON array of tool specification maps.
   """
-  @spec index(Plug.Conn.t()) :: Plug.Conn.t()
-  def index(conn) do
-    params = Plug.Conn.fetch_query_params(conn).query_params
+  @spec index(Plug.Conn.t(), map()) :: Plug.Conn.t()
+  def index(conn, params) do
     tier = parse_tier(params["tier"])
 
     tools =

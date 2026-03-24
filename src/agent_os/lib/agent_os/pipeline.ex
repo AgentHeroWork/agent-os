@@ -85,14 +85,19 @@ defmodule AgentOS.Pipeline do
             # Evaluate the pipeline run via the 6-dimensional Evaluator
             evaluate_pipeline_run(run_id, proof, duration_ms)
 
+            # Broadcast pipeline completion via PubSub for SSE consumers
+            broadcast_pipeline_complete(run_id)
+
             {:ok, Map.put(artifacts, :run_id, run_id)}
 
           {:retry, reason} ->
             Logger.warning("Pipeline: verification failed — #{reason}")
+            broadcast_pipeline_error(run_id, {:verification_failed, reason})
             {:error, {:verification_failed, reason}}
         end
 
       {:error, _} = err ->
+        broadcast_pipeline_error(run_id, err)
         err
     end
   end
@@ -140,6 +145,9 @@ defmodule AgentOS.Pipeline do
 
         Audit.log_stage_complete(state.run_id, stage.name, proof, duration_ms)
         ingest_agent_audit(state.run_id, stage.name, audit_data)
+
+        # Broadcast stage completion via PubSub for SSE consumers
+        broadcast_stage_complete(state.run_id, stage.name, proof)
 
         # 6. Ingest output into ContextFS with contract/stage tags
         ContextBridge.ingest_output(
@@ -327,6 +335,50 @@ defmodule AgentOS.Pipeline do
     else
       failed = Enum.count(checks, &(!Map.get(&1, "passed", true)))
       failed / max(length(checks), 1)
+    end
+  end
+
+  # ── PubSub Broadcasting ──────────────────────────────────────────
+
+  defp broadcast_stage_complete(run_id, stage_name, proof) do
+    try do
+      Phoenix.PubSub.broadcast(
+        AgentOS.Web.PubSub,
+        "pipeline:#{run_id}",
+        {:stage_complete, stage_name, proof}
+      )
+    rescue
+      _ -> :ok
+    catch
+      :exit, _ -> :ok
+    end
+  end
+
+  defp broadcast_pipeline_complete(run_id) do
+    try do
+      Phoenix.PubSub.broadcast(
+        AgentOS.Web.PubSub,
+        "pipeline:#{run_id}",
+        {:pipeline_complete, run_id}
+      )
+    rescue
+      _ -> :ok
+    catch
+      :exit, _ -> :ok
+    end
+  end
+
+  defp broadcast_pipeline_error(run_id, reason) do
+    try do
+      Phoenix.PubSub.broadcast(
+        AgentOS.Web.PubSub,
+        "pipeline:#{run_id}",
+        {:pipeline_error, run_id, reason}
+      )
+    rescue
+      _ -> :ok
+    catch
+      :exit, _ -> :ok
     end
   end
 end

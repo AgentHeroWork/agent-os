@@ -28,7 +28,9 @@ defmodule AgentOS.MixProject do
       {:planner_engine, path: "../planner_engine"},
       {:plug_cowboy, "~> 2.7"},
       {:jason, "~> 1.4"},
-      {:telemetry, "~> 1.3"}
+      {:telemetry, "~> 1.3"},
+      {:yaml_elixir, "~> 2.11"},
+      {:phoenix_pubsub, "~> 2.1"}
     ]
   end
 

@@ -5,6 +5,8 @@ defmodule AgentOS.Web.Controllers.HealthController do
   Returns server status, version, and uptime in milliseconds.
   """
 
+  use Phoenix.Controller, formats: [:json]
+
   import Plug.Conn
 
   @version "0.1.0"
@@ -12,8 +14,8 @@ defmodule AgentOS.Web.Controllers.HealthController do
   @doc """
   Returns a 200 JSON response with status, version, and uptime.
   """
-  @spec call(Plug.Conn.t()) :: Plug.Conn.t()
-  def call(conn) do
+  @spec check(Plug.Conn.t(), map()) :: Plug.Conn.t()
+  def check(conn, _params) do
     uptime_ms = System.monotonic_time(:millisecond) - start_time()
 
     body =

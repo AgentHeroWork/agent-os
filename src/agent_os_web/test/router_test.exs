@@ -1,9 +1,9 @@
 defmodule AgentOS.Web.RouterTest do
   use ExUnit.Case, async: false
 
-  alias AgentOS.Web.Router
+  alias AgentOS.Web.Endpoint
 
-  @opts Router.init([])
+  @opts Endpoint.init([])
 
   setup_all do
     # Ensure dependent applications are started for integration testing.
@@ -62,7 +62,7 @@ defmodule AgentOS.Web.RouterTest do
     assert body["error"] =~ "type"
   end
 
-  test "GET /api/v1/agents returns 200 with list" do
+  test "GET /api/v1/agents returns 200 with agents" do
     # Ensure at least one agent exists
     call(:post, "/api/v1/agents", %{
       "type" => "nemoclaw",
@@ -73,7 +73,8 @@ defmodule AgentOS.Web.RouterTest do
 
     assert conn.status == 200
     body = Jason.decode!(conn.resp_body)
-    assert is_list(body)
+    assert is_map(body)
+    assert is_list(body["agents"])
   end
 
   # ── Tools ───────────────────────────────────────────────────────────
@@ -141,6 +142,6 @@ defmodule AgentOS.Web.RouterTest do
         Plug.Test.conn(method, path)
       end
 
-    Router.call(conn, @opts)
+    Endpoint.call(conn, @opts)
   end
 end

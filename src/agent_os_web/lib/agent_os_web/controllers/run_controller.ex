@@ -7,6 +7,8 @@ defmodule AgentOS.Web.Controllers.RunController do
   function calls since :agent_os_web depends on :agent_os.
   """
 
+  use Phoenix.Controller, formats: [:json]
+
   import Plug.Conn
 
   # ── POST /api/v1/run ─────────────────────────────────────────────
@@ -17,8 +19,8 @@ defmodule AgentOS.Web.Controllers.RunController do
   Expects JSON body with `type`, `topic`, and optional `model`, `provider`.
   Builds an AgentSpec, resolves the contract, and delegates to AgentRunner.
   """
-  @spec run_single(Plug.Conn.t()) :: Plug.Conn.t()
-  def run_single(conn) do
+  @spec run_single(Plug.Conn.t(), map()) :: Plug.Conn.t()
+  def run_single(conn, _params) do
     body = conn.body_params
 
     with {:ok, type} <- parse_type(body["type"]),
@@ -61,8 +63,8 @@ defmodule AgentOS.Web.Controllers.RunController do
   Expects JSON body with `contract` (name), `topic`, and optional `env`.
   Loads the contract spec from priv/contracts/ and delegates to Pipeline.
   """
-  @spec run_pipeline(Plug.Conn.t()) :: Plug.Conn.t()
-  def run_pipeline(conn) do
+  @spec run_pipeline(Plug.Conn.t(), map()) :: Plug.Conn.t()
+  def run_pipeline(conn, _params) do
     body = conn.body_params
 
     with {:ok, contract_name} <- require_param(body, "contract"),
@@ -94,8 +96,8 @@ defmodule AgentOS.Web.Controllers.RunController do
   @doc """
   Lists all available contract names.
   """
-  @spec list_contracts(Plug.Conn.t()) :: Plug.Conn.t()
-  def list_contracts(conn) do
+  @spec list_contracts(Plug.Conn.t(), map()) :: Plug.Conn.t()
+  def list_contracts(conn, _params) do
     contracts = AgentOS.Contracts.Loader.list()
     json_resp(conn, 200, %{contracts: contracts})
   end

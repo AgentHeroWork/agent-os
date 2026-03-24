@@ -6,6 +6,8 @@ defmodule AgentOS.Web.Controllers.JobController do
   scheduling, agent assignment, execution, and evaluation.
   """
 
+  use Phoenix.Controller, formats: [:json]
+
   import Plug.Conn
 
   @doc """
@@ -14,8 +16,8 @@ defmodule AgentOS.Web.Controllers.JobController do
   Expects JSON body with `client_id`, `task`, and `input`.
   Returns 201 with the assigned job ID on success.
   """
-  @spec create(Plug.Conn.t()) :: Plug.Conn.t()
-  def create(conn) do
+  @spec create(Plug.Conn.t(), map()) :: Plug.Conn.t()
+  def create(conn, _params) do
     body = conn.body_params
 
     with {:ok, client_id} <- require_param(body, "client_id"),
@@ -48,12 +50,18 @@ defmodule AgentOS.Web.Controllers.JobController do
   @doc """
   Shows the status of a job by ID.
 
-  This is currently a placeholder that returns the job ID and a pending status.
-  Full job tracking will be added when durable execution state is persisted.
+  Looks up the job in the ETS-based `AgentOS.JobTracker` registry.
+  Returns 404 if the job ID is not found.
   """
-  @spec show(Plug.Conn.t(), String.t()) :: Plug.Conn.t()
-  def show(conn, id) do
-    json_resp(conn, 200, %{job_id: id, status: "pending"})
+  @spec show(Plug.Conn.t(), map()) :: Plug.Conn.t()
+  def show(conn, %{"id" => id}) do
+    case AgentOS.JobTracker.get(id) do
+      {:ok, job} ->
+        json_resp(conn, 200, %{job_id: job.id, status: job.status, created_at: job.created_at})
+
+      {:error, :not_found} ->
+        json_resp(conn, 404, %{error: "job_not_found", job_id: id})
+    end
   end
 
   # ── Private ───────────────────────────────────────────────────────

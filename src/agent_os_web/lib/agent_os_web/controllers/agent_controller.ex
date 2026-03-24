@@ -6,6 +6,8 @@ defmodule AgentOS.Web.Controllers.AgentController do
   retrieve logs for AI agents running under the `AgentScheduler` supervision tree.
   """
 
+  use Phoenix.Controller, formats: [:json]
+
   import Plug.Conn
 
   @doc """
@@ -14,8 +16,8 @@ defmodule AgentOS.Web.Controllers.AgentController do
   Expects JSON body with `type` ("openclaw" or "nemoclaw"), `name`, and optional `oversight`.
   Returns 201 with the new agent ID on success.
   """
-  @spec create(Plug.Conn.t()) :: Plug.Conn.t()
-  def create(conn) do
+  @spec create(Plug.Conn.t(), map()) :: Plug.Conn.t()
+  def create(conn, _params) do
     body = conn.body_params
 
     with {:ok, type} <- parse_type(body["type"]),
@@ -44,11 +46,20 @@ defmodule AgentOS.Web.Controllers.AgentController do
 
   @doc """
   Lists all running agents with their current state.
+
+  Supports pagination via `limit` and `offset` query params (defaults: limit=20, offset=0).
   """
-  @spec index(Plug.Conn.t()) :: Plug.Conn.t()
-  def index(conn) do
+  @spec index(Plug.Conn.t(), map()) :: Plug.Conn.t()
+  def index(conn, _params) do
+    limit = get_int_param(conn, "limit", 20)
+    offset = get_int_param(conn, "offset", 0)
+
+    all_agents = AgentScheduler.Supervisor.list_agents()
+
     agents =
-      AgentScheduler.Supervisor.list_agents()
+      all_agents
+      |> Enum.drop(offset)
+      |> Enum.take(limit)
       |> Enum.map(fn {id, _pid} ->
         state =
           case AgentScheduler.Agent.get_state(id) do
@@ -59,14 +70,14 @@ defmodule AgentOS.Web.Controllers.AgentController do
         Map.put(state, :id, id)
       end)
 
-    json_resp(conn, 200, agents)
+    json_resp(conn, 200, %{agents: agents, total: length(all_agents), limit: limit, offset: offset})
   end
 
   @doc """
   Shows a single agent by ID.
   """
-  @spec show(Plug.Conn.t(), String.t()) :: Plug.Conn.t()
-  def show(conn, id) do
+  @spec show(Plug.Conn.t(), map()) :: Plug.Conn.t()
+  def show(conn, %{"id" => id}) do
     case AgentScheduler.Agent.get_state(id) do
       {:ok, state} ->
         json_resp(conn, 200, Map.put(summarize_state(state), :id, id))
@@ -84,8 +95,8 @@ defmodule AgentOS.Web.Controllers.AgentController do
 
   Expects JSON body with `job_spec` map.
   """
-  @spec start(Plug.Conn.t(), String.t()) :: Plug.Conn.t()
-  def start(conn, id) do
+  @spec start(Plug.Conn.t(), map()) :: Plug.Conn.t()
+  def start(conn, %{"id" => id}) do
     job_spec = conn.body_params["job_spec"] || %{}
 
     case AgentScheduler.Agent.assign_job(id, job_spec) do
@@ -106,8 +117,8 @@ defmodule AgentOS.Web.Controllers.AgentController do
   @doc """
   Stops an agent.
   """
-  @spec stop(Plug.Conn.t(), String.t()) :: Plug.Conn.t()
-  def stop(conn, id) do
+  @spec stop(Plug.Conn.t(), map()) :: Plug.Conn.t()
+  def stop(conn, %{"id" => id}) do
     case AgentScheduler.Supervisor.stop_agent(id) do
       :ok ->
         json_resp(conn, 200, %{agent_id: id, status: "stopped"})
@@ -123,8 +134,8 @@ defmodule AgentOS.Web.Controllers.AgentController do
   @doc """
   Returns agent metrics and state as logs.
   """
-  @spec logs(Plug.Conn.t(), String.t()) :: Plug.Conn.t()
-  def logs(conn, id) do
+  @spec logs(Plug.Conn.t(), map()) :: Plug.Conn.t()
+  def logs(conn, %{"id" => id}) do
     case AgentScheduler.Agent.get_state(id) do
       {:ok, state} ->
         json_resp(conn, 200, %{agent_id: id, logs: summarize_state(state)})
@@ -138,6 +149,17 @@ defmodule AgentOS.Web.Controllers.AgentController do
   end
 
   # ── Private ───────────────────────────────────────────────────────
+
+  defp get_int_param(conn, key, default) do
+    case conn.query_params[key] do
+      nil -> default
+      val ->
+        case Integer.parse(val) do
+          {n, _} when n >= 0 -> n
+          _ -> default
+        end
+    end
+  end
 
   defp parse_type("openclaw"), do: {:ok, :openclaw}
   defp parse_type("nemoclaw"), do: {:ok, :nemoclaw}

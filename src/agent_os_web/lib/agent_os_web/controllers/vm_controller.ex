@@ -4,8 +4,10 @@ defmodule AgentOS.Web.Controllers.VMController do
 
   microVM agents call these endpoints to access services on the host
   that require secrets (LLM API keys) or shared state (memory).
-  API keys never enter the VM — the proxy makes the call on behalf of the agent.
+  API keys never enter the VM -- the proxy makes the call on behalf of the agent.
   """
+
+  use Phoenix.Controller, formats: [:json]
 
   import Plug.Conn
 
@@ -21,7 +23,8 @@ defmodule AgentOS.Web.Controllers.VMController do
   Expected body: {"messages": [...], "model": "gpt-4o", "max_tokens": 4096}
   Returns: {"content": "..."} or {"error": "..."}
   """
-  def llm_chat(conn) do
+  @spec llm_chat(Plug.Conn.t(), map()) :: Plug.Conn.t()
+  def llm_chat(conn, _params) do
     body = conn.body_params
 
     messages =
@@ -46,7 +49,7 @@ defmodule AgentOS.Web.Controllers.VMController do
           json_resp(conn, 200, %{content: content})
 
         {:error, reason} ->
-          Logger.error("VMController: LLM proxy failed — #{inspect(reason)}")
+          Logger.error("VMController: LLM proxy failed -- #{inspect(reason)}")
           json_resp(conn, 502, %{error: "llm_request_failed", detail: inspect(reason)})
       end
     end

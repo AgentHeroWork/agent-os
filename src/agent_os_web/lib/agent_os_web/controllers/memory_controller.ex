@@ -6,6 +6,8 @@ defmodule AgentOS.Web.Controllers.MemoryController do
   through the `MemoryLayer.Storage` interface.
   """
 
+  use Phoenix.Controller, formats: [:json]
+
   import Plug.Conn
 
   @doc """
@@ -14,8 +16,8 @@ defmodule AgentOS.Web.Controllers.MemoryController do
   Expects JSON body with `schema_type` and `data`.
   Returns 201 with the saved memory metadata on success.
   """
-  @spec create(Plug.Conn.t()) :: Plug.Conn.t()
-  def create(conn) do
+  @spec create(Plug.Conn.t(), map()) :: Plug.Conn.t()
+  def create(conn, _params) do
     body = conn.body_params
 
     with {:ok, schema_type} <- require_param(body, "schema_type"),
@@ -51,9 +53,8 @@ defmodule AgentOS.Web.Controllers.MemoryController do
   Uses the `q` query parameter for the search term. Supports optional
   `limit` and `offset` query parameters.
   """
-  @spec search(Plug.Conn.t()) :: Plug.Conn.t()
-  def search(conn) do
-    params = Plug.Conn.fetch_query_params(conn).query_params
+  @spec search(Plug.Conn.t(), map()) :: Plug.Conn.t()
+  def search(conn, params) do
     query = params["q"] || ""
 
     opts =
@@ -73,8 +74,8 @@ defmodule AgentOS.Web.Controllers.MemoryController do
   @doc """
   Recalls a single memory by ID.
   """
-  @spec show(Plug.Conn.t(), String.t()) :: Plug.Conn.t()
-  def show(conn, id) do
+  @spec show(Plug.Conn.t(), map()) :: Plug.Conn.t()
+  def show(conn, %{"id" => id}) do
     case MemoryLayer.Storage.recall(id) do
       {:ok, memory} ->
         json_resp(conn, 200, memory)

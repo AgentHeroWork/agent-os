@@ -1,132 +1,68 @@
 defmodule AgentOS.Web.Router do
   @moduledoc """
-  HTTP router for the Agent OS REST API.
+  Phoenix router for the Agent OS REST API.
 
   All routes are namespaced under `/api/v1` and return JSON responses.
-  Bearer token authentication is enforced via `AgentOS.Web.Plugs.Auth`.
+  Bearer token authentication is enforced via `AgentOS.Web.Plugs.Auth`
+  on all routes except the VM proxy scope.
   """
 
-  use Plug.Router
+  use Phoenix.Router
 
-  alias AgentOS.Web.Controllers.{
-    HealthController,
-    AgentController,
-    JobController,
-    ToolController,
-    MemoryController,
-    VMController,
-    RunController,
-    AuditController
-  }
+  import Plug.Conn
 
-  plug Plug.Logger
-  plug AgentOS.Web.Plugs.Auth
-
-  plug Plug.Parsers,
-    parsers: [:json],
-    pass: ["application/json"],
-    json_decoder: Jason
-
-  plug :match
-  plug :dispatch
-
-  # ── Health ──────────────────────────────────────────────────────────
-
-  get "/api/v1/health" do
-    HealthController.call(conn)
+  pipeline :api do
+    plug :accepts, ["json"]
+    plug AgentOS.Web.Plugs.Auth
   end
 
-  # ── Agents ──────────────────────────────────────────────────────────
-
-  post "/api/v1/agents" do
-    AgentController.create(conn)
+  pipeline :vm do
+    plug :accepts, ["json"]
+    # No auth — VM routes are exempt (microVM agents use JOB_TOKEN)
   end
 
-  get "/api/v1/agents" do
-    AgentController.index(conn)
+  scope "/api/v1", AgentOS.Web.Controllers do
+    pipe_through :api
+
+    # Health
+    get "/health", HealthController, :check
+
+    # Agents
+    post "/agents", AgentController, :create
+    get "/agents", AgentController, :index
+    get "/agents/:id", AgentController, :show
+    post "/agents/:id/start", AgentController, :start
+    post "/agents/:id/stop", AgentController, :stop
+    get "/agents/:id/logs", AgentController, :logs
+
+    # Jobs
+    post "/jobs", JobController, :create
+    get "/jobs/:id", JobController, :show
+
+    # Tools
+    get "/tools", ToolController, :index
+
+    # Memory
+    post "/memory", MemoryController, :create
+    get "/memory/search", MemoryController, :search
+    get "/memory/:id", MemoryController, :show
+
+    # Run / Pipeline
+    post "/run", RunController, :run_single
+    post "/pipeline/run", RunController, :run_pipeline
+    get "/contracts", RunController, :list_contracts
+
+    # Audit
+    get "/audit/:pipeline_id", AuditController, :trail
+    get "/audit/:pipeline_id/:stage/proof", AuditController, :proof
+
+    # SSE Events
+    get "/events/:run_id", EventsController, :stream
   end
 
-  get "/api/v1/agents/:id" do
-    AgentController.show(conn, id)
-  end
+  scope "/api/v1/vm", AgentOS.Web.Controllers do
+    pipe_through :vm
 
-  post "/api/v1/agents/:id/start" do
-    AgentController.start(conn, id)
-  end
-
-  post "/api/v1/agents/:id/stop" do
-    AgentController.stop(conn, id)
-  end
-
-  get "/api/v1/agents/:id/logs" do
-    AgentController.logs(conn, id)
-  end
-
-  # ── Jobs ────────────────────────────────────────────────────────────
-
-  post "/api/v1/jobs" do
-    JobController.create(conn)
-  end
-
-  get "/api/v1/jobs/:id" do
-    JobController.show(conn, id)
-  end
-
-  # ── Tools ───────────────────────────────────────────────────────────
-
-  get "/api/v1/tools" do
-    ToolController.index(conn)
-  end
-
-  # ── Memory ──────────────────────────────────────────────────────────
-
-  post "/api/v1/memory" do
-    MemoryController.create(conn)
-  end
-
-  get "/api/v1/memory/search" do
-    MemoryController.search(conn)
-  end
-
-  get "/api/v1/memory/:id" do
-    MemoryController.show(conn, id)
-  end
-
-  # ── Run / Pipeline ────────────────────────────────────────────────
-
-  post "/api/v1/run" do
-    RunController.run_single(conn)
-  end
-
-  post "/api/v1/pipeline/run" do
-    RunController.run_pipeline(conn)
-  end
-
-  get "/api/v1/contracts" do
-    RunController.list_contracts(conn)
-  end
-
-  # ── Audit ─────────────────────────────────────────────────────────
-
-  get "/api/v1/audit/:pipeline_id" do
-    AuditController.trail(conn, pipeline_id)
-  end
-
-  get "/api/v1/audit/:pipeline_id/:stage/proof" do
-    AuditController.proof(conn, pipeline_id, stage)
-  end
-
-  # ── VM Proxy (called by agents inside microVMs) ────────────────
-
-  post "/api/v1/vm/llm/chat" do
-    VMController.llm_chat(conn)
-  end
-
-  # ── Catch-all ───────────────────────────────────────────────────────
-
-  match _ do
-    conn
-    |> put_resp_content_type("application/json")
-    |> send_resp(404, Jason.encode!(%{error: "not_found"}))
+    post "/llm/chat", VMController, :llm_chat
   end
 end
