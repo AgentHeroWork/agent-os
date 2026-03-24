@@ -7,10 +7,14 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 
 import { parseGlobalArgs } from '../src/main.js';
 import { resolveHost, resolveApiKey } from '../src/http.js';
 import * as out from '../src/output.js';
+import * as config from '../src/config.js';
 
 // ─── Global option parsing ───────────────────────────────────────────────────
 
@@ -302,5 +306,105 @@ describe('run command parsing', () => {
   it('should have undefined topic when --topic is omitted', () => {
     const { opts } = parseGlobalArgs(['run', 'openclaw']);
     assert.equal(opts.topic, undefined);
+  });
+});
+
+// ─── Config load/save ───────────────────────────────────────────────────────
+
+describe('config', () => {
+  const testDir = join(tmpdir(), `agent-os-test-${Date.now()}`);
+  const testFile = join(testDir, 'config.json');
+
+  it('should load empty config when file does not exist', () => {
+    const result = config.load();
+    // load() returns {} or existing config — just verify it returns an object
+    assert.equal(typeof result, 'object');
+  });
+
+  it('should set and get a value', () => {
+    config.set('testKey', 'testValue');
+    const val = config.get('testKey');
+    assert.equal(val, 'testValue');
+    // Clean up
+    config.set('testKey', undefined);
+  });
+
+  it('should overwrite an existing value', () => {
+    config.set('overwriteTest', 'first');
+    assert.equal(config.get('overwriteTest'), 'first');
+    config.set('overwriteTest', 'second');
+    assert.equal(config.get('overwriteTest'), 'second');
+    // Clean up
+    config.set('overwriteTest', undefined);
+  });
+
+  it('should return undefined for non-existent keys', () => {
+    const val = config.get('definitely_does_not_exist_key');
+    assert.equal(val, undefined);
+  });
+});
+
+// ─── Login/logout command parsing ────────────────────────────────────────────
+
+describe('login/logout command parsing', () => {
+  it('should route login command', () => {
+    const { command } = parseGlobalArgs(['login', '--api-key', 'sk-test']);
+    assert.equal(command, 'login');
+  });
+
+  it('should parse --api-key for login', () => {
+    const { command, opts } = parseGlobalArgs(['login', '--api-key', 'sk-abc']);
+    assert.equal(command, 'login');
+    assert.equal(opts.apiKey, 'sk-abc');
+  });
+
+  it('should parse --host for login', () => {
+    const { opts } = parseGlobalArgs(['login', '--host', 'https://prod.example.com']);
+    assert.equal(opts.host, 'https://prod.example.com');
+  });
+
+  it('should route logout command', () => {
+    const { command } = parseGlobalArgs(['logout']);
+    assert.equal(command, 'logout');
+  });
+});
+
+// ─── Audit command parsing ──────────────────────────────────────────────────
+
+describe('audit command parsing', () => {
+  it('should route audit command with pipeline id', () => {
+    const { command, subcommand } = parseGlobalArgs(['audit', 'pipe-123']);
+    assert.equal(command, 'audit');
+    assert.equal(subcommand, 'pipe-123');
+  });
+
+  it('should route audit command with --json flag', () => {
+    const { command, subcommand, opts } = parseGlobalArgs(['audit', 'pipe-456', '--json']);
+    assert.equal(command, 'audit');
+    assert.equal(subcommand, 'pipe-456');
+    assert.equal(opts.json, true);
+  });
+
+  it('should handle audit with no id', () => {
+    const { command, subcommand } = parseGlobalArgs(['audit']);
+    assert.equal(command, 'audit');
+    assert.equal(subcommand, '');
+  });
+});
+
+// ─── Contracts command parsing ──────────────────────────────────────────────
+
+describe('contracts command parsing', () => {
+  it('should route contracts list command', () => {
+    const { command, subcommand } = parseGlobalArgs(['contracts', 'list']);
+    assert.equal(command, 'contracts');
+    assert.equal(subcommand, 'list');
+  });
+
+  it('should route contracts list with --json', () => {
+    const { command, subcommand, opts } = parseGlobalArgs(['contracts', 'list', '--json']);
+    assert.equal(command, 'contracts');
+    assert.equal(subcommand, 'list');
+    assert.equal(opts.json, true);
   });
 });

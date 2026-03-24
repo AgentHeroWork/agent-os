@@ -13,6 +13,9 @@ import * as jobCmd from './commands/job.js';
 import * as memoryCmd from './commands/memory.js';
 import * as deployCmd from './commands/deploy.js';
 import * as runCmd from './commands/run.js';
+import * as authCmd from './commands/auth.js';
+import * as auditCmd from './commands/audit.js';
+import * as contractsCmd from './commands/contracts.js';
 import * as http from './http.js';
 import * as out from './output.js';
 
@@ -23,6 +26,9 @@ USAGE
   agent-os <command> <subcommand> [options]
 
 COMMANDS
+  login           Store API key          [--api-key <key>] [--host <url>]
+  logout          Clear stored API key
+
   agent create    Create an agent        --type <type> --name <name> [--oversight <level>]
   agent list      List agents
   agent start     Start an agent         <id> --job '<json>'
@@ -37,6 +43,9 @@ COMMANDS
 
   run <type>      Run a single agent     --topic <topic> [--model <m>] [--provider <p>]
   run pipeline    Run a pipeline         --contract <name> --topic <topic>
+
+  contracts list  List available contracts
+  audit           Show audit trail       <pipeline-id>
 
   deploy docker   Deploy with Docker
   deploy fly      Deploy to Fly.io       [--region <region>] [--app <name>]
@@ -146,6 +155,29 @@ export async function main(argv) {
     switch (command) {
       case 'version':
         out.info(`agent-os v${getVersion()}`);
+        break;
+
+      case 'login':
+        await authCmd.login(args, opts);
+        break;
+
+      case 'logout':
+        await authCmd.logout(args, opts);
+        break;
+
+      case 'audit':
+        // subcommand becomes the first positional arg for audit
+        await auditCmd.trail(subcommand ? [subcommand, ...args] : args, opts);
+        break;
+
+      case 'contracts':
+        switch (subcommand) {
+          case 'list': await contractsCmd.listContracts(args, opts); break;
+          default:
+            out.error(`Unknown contracts command: ${subcommand}`);
+            out.info('Available: list');
+            process.exit(1);
+        }
         break;
 
       case 'health': {

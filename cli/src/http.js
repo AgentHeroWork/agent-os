@@ -3,25 +3,27 @@
  * Uses Node.js built-in fetch() (Node 18+).
  */
 
+import * as config from './config.js';
+
 /**
  * Resolve the API host URL.
- * Priority: opts.host → AGENT_OS_HOST env → default.
+ * Priority: opts.host → AGENT_OS_HOST env → config → default.
  * @param {object} opts - Global CLI options
  * @returns {string} Base URL without trailing slash
  */
 function resolveHost(opts = {}) {
-  const host = opts.host || process.env.AGENT_OS_HOST || 'http://localhost:4000';
+  const host = opts.host || process.env.AGENT_OS_HOST || config.get('host') || 'http://localhost:4000';
   return host.replace(/\/+$/, '');
 }
 
 /**
  * Resolve the API key.
- * Priority: opts.apiKey → AGENT_OS_API_KEY env → undefined.
+ * Priority: opts.apiKey → AGENT_OS_API_KEY env → config → undefined.
  * @param {object} opts - Global CLI options
  * @returns {string|undefined}
  */
 function resolveApiKey(opts = {}) {
-  return opts.apiKey || process.env.AGENT_OS_API_KEY || undefined;
+  return opts.apiKey || process.env.AGENT_OS_API_KEY || config.get('apiKey') || undefined;
 }
 
 /**

@@ -34,7 +34,17 @@ export async function runSingle(args, opts) {
   if (opts.model) body.model = opts.model;
   if (opts.provider) body.provider = opts.provider;
 
-  const result = await http.post('/api/v1/run', body, opts);
+  const spinner = setInterval(() => process.stdout.write('.'), 1000);
+  let result;
+  try {
+    result = await http.post('/api/v1/run', body, opts);
+    clearInterval(spinner);
+    console.log(''); // newline after dots
+  } catch (e) {
+    clearInterval(spinner);
+    console.log('');
+    throw e;
+  }
 
   out.success('Pipeline completed!');
 
@@ -68,10 +78,20 @@ export async function runPipeline(args, opts) {
   out.info(`Running pipeline '${opts.contract}'...`);
   out.info(`Topic: ${opts.topic}`);
 
-  const result = await http.post('/api/v1/pipeline/run', {
-    contract: opts.contract,
-    topic: opts.topic,
-  }, opts);
+  const spinner = setInterval(() => process.stdout.write('.'), 1000);
+  let result;
+  try {
+    result = await http.post('/api/v1/pipeline/run', {
+      contract: opts.contract,
+      topic: opts.topic,
+    }, opts);
+    clearInterval(spinner);
+    console.log(''); // newline after dots
+  } catch (e) {
+    clearInterval(spinner);
+    console.log('');
+    throw e;
+  }
 
   out.success('Pipeline completed!');
 

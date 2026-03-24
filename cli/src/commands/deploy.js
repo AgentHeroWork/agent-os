@@ -38,7 +38,7 @@ export async function docker(args, opts) {
   run('docker', ['build', '-t', 'agent-os', '.'], root);
 
   out.info('Starting containers...');
-  run('docker-compose', ['up', '-d'], root);
+  run('docker', ['compose', 'up', '-d'], root);
 
   out.info('Checking health...');
   try {

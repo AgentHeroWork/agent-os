@@ -22,7 +22,7 @@ defmodule AgentOS.Application do
   def start(_type, _args) do
     check_llm_config()
 
-    children = [AgentOS.Audit]
+    children = [AgentOS.Audit, AgentOS.JobTracker]
 
     opts = [strategy: :one_for_one, name: AgentOS.Supervisor]
     Supervisor.start_link(children, opts)
