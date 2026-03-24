@@ -1,349 +1,291 @@
-# Agent-OS Source Architecture
+# Agent-OS
 
-An AI Operating System built on Erlang/OTP. Agents are managed like OS processes — with lifecycle supervision, typed memory, capability-based tool access, credit-weighted scheduling, and contract-driven autonomous execution.
-
-## How It Works Today
-
-Agents (OpenClaw, NemoClaw) run autonomously through contracts. The OS monitors execution, validates outputs, and handles escalation. Here's what a real run looks like:
-
-```
-$ agent-os run openclaw --topic "Quantum chromodynamics at the LHC"
-
-OpenClaw: planning research on 'Quantum chromodynamics at the LHC'
-OpenClaw: plan generated (4976 chars)
-OpenClaw: generating research paper
-OpenClaw: research generated (8617 chars)
-OpenClaw: reviewing research
-OpenClaw: review complete
-Wrote LaTeX to /tmp/agent-os/artifacts/cli_1159/quantum-chromodynamics.tex
-Created repo: https://github.com/AgentHeroWork/openclaw-quantum-chromodynamics-research
-Pushed artifacts to repo
-OK: Pipeline completed successfully!
-  .tex: /tmp/agent-os/artifacts/cli_1159/quantum-chromodynamics.tex
-  .pdf: /tmp/agent-os/artifacts/cli_1159/quantum-chromodynamics.pdf
-  repo: https://github.com/AgentHeroWork/openclaw-quantum-chromodynamics-research
-```
-
-The agent owns the entire pipeline. Agent-OS only validates artifacts against the contract and handles escalation if the agent gets stuck.
+An AI Operating System built on Erlang/OTP + Phoenix. Agents run in microsandbox microVMs with hardware-level isolation. Contracts (YAML) define what agents produce. The LLM decides which tools to use. ContextFS provides long-term memory.
 
 ## Quick Start
 
 ### Prerequisites
 
 - Elixir 1.17+ / OTP 27+
-- `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` environment variable
-- `pdflatex` (MacTeX) or `tectonic` for PDF compilation
-- `gh` CLI authenticated with AgentHeroWork org access
-- `git` with user.name/user.email configured
+- Node.js 18+ (CLI)
+- `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` env var
+- `gh` CLI authenticated (for GitHub operations)
+- `pdflatex` or `tectonic` (for PDF compilation)
+- `msb` (microsandbox) for pipeline execution: `curl -sSL https://get.microsandbox.dev | sh`
 
-### Run an Agent
-
-```bash
-cd src/agent_os_cli
-
-# Direct execution (no server needed)
-mix run -e 'AgentOS.CLI.main(["run", "openclaw", "--topic", "your research topic"])'
-mix run -e 'AgentOS.CLI.main(["run", "nemoclaw", "--topic", "your research topic"])'
-
-# With provider/model options
-mix run -e 'AgentOS.CLI.main(["run", "openclaw", "--topic", "topic", "--provider", "anthropic"])'
-mix run -e 'AgentOS.CLI.main(["run", "openclaw", "--topic", "topic", "--provider", "ollama", "--model", "llama3"])'
-```
-
-### Run the Server
+### Start the Server
 
 ```bash
-cd src/agent_os
+cd src/agent_os_web
 mix deps.get
 mix run --no-halt
 # Server starts on http://localhost:4000
 ```
 
-### Use the API
+**Important:** Start from `src/agent_os_web/`, not `src/agent_os/`. The web app brings in all dependencies.
+
+### Start the Web Dashboard
 
 ```bash
-# Health check
+cd web
+npm install
+npm run dev
+# Dashboard at http://localhost:3000
+```
+
+### Verify
+
+```bash
 curl http://localhost:4000/api/v1/health
-
-# Create an agent
-curl -X POST http://localhost:4000/api/v1/agents \
-  -H "Content-Type: application/json" \
-  -d '{"type": "openclaw", "name": "researcher-1"}'
-
-# Start it with a job (triggers autonomous execution)
-curl -X POST http://localhost:4000/api/v1/agents/openclaw_researcher-1_42/start \
-  -H "Content-Type: application/json" \
-  -d '{"job_spec": {"topic": "particle physics"}}'
-
-# List agents
-curl http://localhost:4000/api/v1/agents
-
-# List tools
-curl http://localhost:4000/api/v1/tools
+# {"status":"ok","version":"0.1.0","uptime_ms":...}
 ```
 
-### Docker
+## CLI Reference (Verified Working)
+
+The CLI is a Node.js HTTP client at `cli/`. All commands talk to the server at localhost:4000.
+
+### Working Commands
 
 ```bash
-docker-compose up -d
-# or
-docker build -t agent-os .
-docker run -p 4000:4000 -e OPENAI_API_KEY=$OPENAI_API_KEY agent-os
+# Health & version
+agent-os health                                    # GET /api/v1/health
+agent-os version                                   # reads package.json
+
+# Auth (stores in ~/.agent-os/config.json)
+agent-os login --api-key <key>                     # saves API key locally
+agent-os logout                                    # clears saved key
+
+# Single agent run (requires: LLM key, gh, pdflatex)
+agent-os run openclaw --topic "your topic"         # POST /api/v1/run
+agent-os run nemoclaw --topic "your topic"         # POST /api/v1/run
+
+# Multi-agent pipeline (requires: msb server, LLM key)
+agent-os run pipeline --contract research-report --topic "your topic"
+agent-os run pipeline --contract market-dashboard --topic "your topic"
+
+# Agent lifecycle
+agent-os agent create --type openclaw --name my-agent
+agent-os agent list
+agent-os agent start <id> --job '{"topic":"test"}'
+agent-os agent stop <id>
+agent-os agent logs <id>                           # returns state snapshot
+
+# Contracts
+agent-os contracts list                            # GET /api/v1/contracts
+
+# Audit
+agent-os audit <pipeline-id>                       # GET /api/v1/audit/:id
+
+# Job submission
+agent-os job submit --task test --input '{"x":1}'  # POST /api/v1/jobs
+
+# Deploy
+agent-os deploy docker                             # builds + docker compose up
+agent-os deploy fly --region iad                   # fly deploy
 ```
+
+### Known Limitations
+
+- `agent-os run openclaw` requires `OPENAI_API_KEY` + `gh` auth + `pdflatex` on the host
+- `agent-os run pipeline` requires `msb server start --dev` running
+- `agent-os agent logs --follow` flag is accepted but does not stream (single fetch)
+- `agent-os job status <id>` returns 404 (JobTracker not wired to submission path)
+- Pipeline runs block the HTTP connection with no streaming — CLI shows dots until completion
+
+## Two Execution Paths
+
+### Path 1: Single Agent (`POST /api/v1/run`)
+
+Runs entirely in the BEAM process. No microVM. Agent calls LLM directly.
+
+```
+CLI → HTTP → RunController → AgentRunner → OpenClaw.run_autonomous
+  → LLMClient (plan → research → review)
+  → CompletionHandler (LaTeX → PDF → GitHub)
+  → Contract validates artifacts
+```
+
+### Path 2: Multi-Agent Pipeline (`POST /api/v1/pipeline/run`)
+
+Each stage runs in an isolated microsandbox microVM. LLM decides which tools to use.
+
+```
+CLI → HTTP → RunController → Loader.load(YAML) → Pipeline.run
+  → For each stage:
+    ContextBridge.prepare_context (ContextFS → .md files)
+    MicroVM.run_agent (Alpine microVM, mounts /context/ + /shared/output/)
+    agent-runtime.sh (LLM plans tools → executes → self-repairs → proof-of-work)
+    ContextBridge.ingest_output (saves to ContextFS with contract/stage tags)
+  → Verify.check(artifacts) → return results
+```
+
+## The Harness
+
+The harness is everything between the user's intent and the agent's output. Agent-OS provides 6 layers:
+
+| Layer | What It Does | Configurable? |
+|-------|-------------|---------------|
+| **System Prompts** | Shape agent persona and output format | No — hardcoded in research_prompts.ex and agent-runtime.sh |
+| **Tool Selection** | BEAM path: fixed pipeline. MicroVM path: LLM chooses tools dynamically | MicroVM: yes (LLM decides). BEAM: no |
+| **Self-Repair** | LaTeX: 3 LLM fix attempts + aggressive sanitize. MicroVM: 1 fix per failed step | Max attempts hardcoded |
+| **Proof-of-Work** | Per-file validation: JSON validity, HTML structure, MD size, URL reachability | Auto in microVM, configurable via contract verify rules |
+| **Context Injection** | ContextFS queries rendered as .md files in /context/ | Scoped by contract tags. load_past_runs configurable |
+| **Escalation** | compilation_stuck → retry. infrastructure_failure → fail. guardrail_violation → fail | Escalation types hardcoded |
+
+### What's Configurable via Environment
+
+| Variable | Effect |
+|----------|--------|
+| `OPENAI_API_KEY` | Uses OpenAI (gpt-4o default) |
+| `ANTHROPIC_API_KEY` | Uses Anthropic (claude-sonnet-4 default) |
+| `OLLAMA_HOST` | Uses local Ollama (llama3 default) |
+| `AGENT_OS_API_KEY` | Enables bearer token auth (unset = dev mode) |
+| `AGENT_OS_PORT` | Server port (default 4000) |
+| `VERCEL_TOKEN` | Injected into microVMs for deployment |
+| `GH_TOKEN` / `gh auth` | Injected into microVMs for GitHub operations |
+
+### What's Configurable via CLI Flags
+
+```bash
+agent-os run openclaw --topic "..." --model claude-opus-4-5 --provider anthropic
+```
+
+`--model` and `--provider` work for single-agent runs only. Pipeline runs use the env var provider but hardcode `gpt-4o` as the model name in agent-runtime.sh.
+
+### What Requires Code Changes
+
+- Adding new agent types (need Elixir module + RunController whitelist update)
+- Changing system prompts (hardcoded in research_prompts.ex)
+- Changing the GitHub org for repos (hardcoded `"AgentHeroWork"` in completion_handler.ex)
+- Adding custom verification rules beyond file_exists/min_bytes/key_present
+- Changing NemoClaw guardrail lists (PII keywords, approved domains)
+
+## Creating Custom Contracts
+
+Drop a YAML file in `src/agent_os/priv/contracts/`. It's immediately available via `agent-os contracts list` and `agent-os run pipeline --contract <name>`.
+
+```yaml
+name: code-review
+description: Multi-agent code review pipeline
+stages:
+  - name: analyzer
+    instructions: |
+      Analyze the codebase for bugs, security issues, and style problems.
+      Write findings to /shared/output/analysis.md
+    output:
+      - analysis.md
+  - name: reviewer
+    instructions: |
+      Read /context/analysis.md. Write a final review report with severity ratings.
+      Write to /shared/output/review.md
+    input_from: analyzer
+    output:
+      - review.md
+required_artifacts:
+  - analysis_md
+  - review_md
+verify:
+  - file_exists: analysis.md
+  - min_bytes:
+      file: review.md
+      size: 200
+credentials:
+  - github_token
+memory:
+  load_past_runs: 3
+  knowledge_base: false
+max_retries: 1
+```
+
+Each stage runs in a separate microVM. The agent-runtime.sh reads `/context/brief.md` (your instructions), asks the LLM to plan shell commands, executes them, validates output, and writes `_proof.json` + `_audit.json`.
+
+## Web Dashboard
+
+The Next.js dashboard at `web/` connects to localhost:4000 and provides:
+
+| Page | What It Shows |
+|------|--------------|
+| **Dashboard** | Server health, agent count, recent runs |
+| **Agents** | Table of agents with status, type, oversight (auto-refreshes) |
+| **Pipelines** | Contract selector + topic input → run pipeline |
+| **Contracts** | List of available contract templates with stages |
+| **Audit** | Pipeline audit trail timeline (enter pipeline ID) |
+| **Settings** | Server config, registered tools |
+
+**Known issue:** Contracts page expects object data but API returns strings. Contract details won't display until the API or page is fixed.
+
+## REST API
+
+```
+GET    /api/v1/health                         Health check
+POST   /api/v1/run                            Single agent execution
+POST   /api/v1/pipeline/run                   Multi-stage pipeline
+GET    /api/v1/contracts                      List contract templates
+POST   /api/v1/agents                         Create agent
+GET    /api/v1/agents                         List agents (paginated: ?limit=&offset=)
+GET    /api/v1/agents/:id                     Agent detail
+POST   /api/v1/agents/:id/start              Assign job → triggers execution
+POST   /api/v1/agents/:id/stop               Stop agent
+GET    /api/v1/agents/:id/logs               Agent state snapshot
+POST   /api/v1/jobs                           Submit job to scheduler
+GET    /api/v1/jobs/:id                       Job status (currently broken)
+GET    /api/v1/tools                          List registered tools
+GET    /api/v1/audit/:pipeline_id             Pipeline audit trail
+GET    /api/v1/audit/:pipeline_id/:stage/proof Stage proof report
+GET    /api/v1/events/:run_id                 SSE pipeline events (real-time)
+POST   /api/v1/vm/llm/chat                   LLM proxy for microVMs (no auth)
+```
+
+Auth: Bearer token via `AGENT_OS_API_KEY`. Unset = dev mode. VM routes (`/api/v1/vm/*`) exempt.
 
 ## Architecture
 
 ```
 src/
-├── agent_os/              # Core OS — contracts, providers, agent runner
-│   ├── agent_runner.ex    # Thin monitor: calls run_autonomous, validates, escalates
-│   ├── agent_spec.ex      # Agent specification (type, credentials, resources)
-│   ├── contracts/         # What agents must produce (not how)
-│   │   ├── contract.ex    # Behaviour: required_artifacts, verify, max_retries
-│   │   └── research_contract.ex  # Requires: .tex, .pdf, repo_url
-│   ├── providers/         # Where agents run
-│   │   ├── local.ex       # GenServer on local BEAM node
-│   │   ├── fly.ex         # Fly.io Machines API
-│   │   └── resolver.ex    # Routes :local/:fly to provider module
-│   └── credentials.ex     # Resolves API keys from env/config/gh
+├── agent_os/              # Core: pipeline, agents, contracts, memory, audit
+│   ├── agents/            # OpenClaw, NemoClaw, CompletionHandler, SelfRepair
+│   ├── contracts/         # ContractSpec, Loader (yaml_elixir), Verify
+│   ├── providers/         # Local, Fly.io deployment
+│   ├── pipeline.ex        # Multi-stage orchestrator (MicroVM + ContextBridge)
+│   ├── agent_runner.ex    # Single-agent monitor
+│   ├── micro_vm.ex        # microsandbox CLI wrapper
+│   ├── context_bridge.ex  # ContextFS ↔ filesystem translation
+│   ├── llm_client.ex      # OpenAI/Anthropic/Ollama HTTP client
+│   └── audit.ex           # Mnesia audit log
 │
-├── agent_scheduler/       # Process management (the "kernel")
-│   ├── agent.ex           # GenServer per agent — lifecycle state machine
-│   ├── supervisor.ex      # DynamicSupervisor — fault isolation
-│   ├── scheduler.ex       # CFS-style credit-weighted fair scheduling
-│   ├── pipeline.ex        # Pub/sub event streaming between agents
-│   ├── evaluator.ex       # 6-dimensional quality scoring
-│   └── agents/
-│       ├── agent_type.ex  # Behaviour: profile, run_autonomous, tool_requirements
-│       ├── registry.ex    # GenServer mapping type atoms to modules
-│       ├── openclaw.ex    # Full-capability autonomous research agent
-│       ├── nemoclaw.ex    # Privacy-guarded agent with NeMo Guardrails
-│       ├── completion_handler.ex  # Toolkit: write_latex, compile_pdf, ensure_repo, push
-│       ├── self_repair.ex # LLM-powered LaTeX compilation fix loop
-│       ├── llm_client.ex  # HTTP client for OpenAI/Anthropic/Ollama
-│       └── research_prompts.ex  # Prompt templates + structured output parser
+├── agent_os_web/          # Phoenix API (port 4000)
+│   ├── router.ex          # Phoenix.Router with :api and :vm pipelines
+│   ├── endpoint.ex        # Phoenix.Endpoint with CORS
+│   └── controllers/       # 8 controllers + SSE EventsController
 │
-├── memory_layer/          # Typed persistent memory
-│   ├── memory.ex          # GenServer per memory — create, evolve, merge
-│   ├── storage.ex         # ETS (working) + Mnesia (persistent) backends
-│   ├── graph.ex           # 9-typed-edge knowledge graph
-│   ├── version.ex         # Causal versioning with vector clocks
-│   └── schema.ex          # 24 memory types (8 registered: fact, decision, etc.)
+├── agent_scheduler/       # Process management
+│   ├── agent.ex           # GenServer per agent (lifecycle state machine)
+│   ├── supervisor.ex      # DynamicSupervisor
+│   ├── scheduler.ex       # CFS-style credit-weighted queue with dispatch loop
+│   └── evaluator.ex       # 6-dimensional quality scoring
 │
-├── tool_interface/        # Capability-based tool access
-│   ├── registry.ex        # 3-tier tool registry (builtin/sandbox/mcp)
-│   ├── capability.ex      # HMAC-SHA256 signed capability tokens
-│   ├── sandbox.ex         # BEAM process isolation with timeouts
-│   └── audit.ex           # Tool usage audit trail
+├── memory_layer/          # Typed persistent memory (ETS + Mnesia)
+├── planner_engine/        # OrderBook, Escrow, Market, Decomposer, Reputation
+├── tool_interface/        # Registry, Capability tokens, Sandbox
 │
-├── planner_engine/        # Market-based orchestration
-│   ├── order_book.ex      # Proposal/demand matching (price-time priority)
-│   ├── escrow.ex          # Credit escrow with Mnesia transactions
-│   └── decomposer.ex     # Task decomposition (Kahn's topological sort)
-│
-├── agent_os_web/          # REST API layer
-│   ├── router.ex          # All /api/v1/* routes
-│   └── controllers/       # Agent, Job, Tool, Health controllers
-│
-└── agent_os_cli/          # CLI (escript)
-    └── commands/          # run, agent, job, memory, deploy
+web/                       # Next.js 15 operator dashboard
+cli/                       # Node.js CLI (HTTP client)
+sandbox/scripts/           # agent-runtime.sh (universal LLM-driven VM runtime)
 ```
-
-## Agent Execution Model
-
-Agents are autonomous. They own their full pipeline. The OS is a thin monitor.
-
-```
-AgentRunner.run(spec, contract, job)
-  │
-  ├── Call agent_module.run_autonomous(input, context)
-  │     │
-  │     ├── Agent plans research (LLM)
-  │     ├── Agent generates paper (LLM)
-  │     ├── Agent reviews paper (LLM)
-  │     ├── Agent writes .tex
-  │     ├── Agent compiles PDF (self-repair via LLM if errors)
-  │     ├── Agent creates GitHub repo
-  │     ├── Agent pushes artifacts
-  │     └── Returns {:ok, %{artifacts: ...}} or {:escalate, %{reason, message}}
-  │
-  ├── Validate artifacts against contract.required_artifacts()
-  ├── contract.verify(artifacts)
-  ├── If {:retry, reason} → call agent again (up to max_retries)
-  └── If {:escalate, detail} → handle by reason:
-        ├── :compilation_stuck → retry with guidance
-        ├── :infrastructure_failure → fail gracefully
-        └── :guardrail_violation → fail (security)
-```
-
-## Agent Types
-
-| Agent | Oversight | Capabilities | Guardrails |
-|-------|-----------|-------------|------------|
-| **OpenClaw** | autonomous_escalation | web_search, browser, filesystem, shell, memory | None — full access |
-| **NemoClaw** | supervised | web_search, memory | PII detection, domain allowlist, output sanitization |
-
-## Contracts
-
-Contracts define WHAT agents must produce, not HOW.
-
-```elixir
-# ResearchContract
-required_artifacts() -> [:tex_path, :pdf_path, :repo_url]
-verify(artifacts)    -> checks file exists, content > 500 chars
-max_retries()        -> 3
-```
-
-To create a new contract, implement the `AgentOS.Contracts.Contract` behaviour:
-
-```elixir
-defmodule MyContract do
-  @behaviour AgentOS.Contracts.Contract
-
-  @impl true
-  def required_artifacts, do: [:output_file, :summary]
-
-  @impl true
-  def verify(artifacts) do
-    if File.exists?(artifacts[:output_file]), do: :ok, else: {:retry, "missing output"}
-  end
-
-  @impl true
-  def max_retries, do: 2
-end
-```
-
-## REST API
-
-| Method | Path | Description | Status |
-|--------|------|-------------|--------|
-| GET | `/api/v1/health` | Health check | Working |
-| POST | `/api/v1/agents` | Create agent (`type`, `name`, `oversight`) | Working |
-| GET | `/api/v1/agents` | List all agents | Working |
-| GET | `/api/v1/agents/:id` | Get agent state | Working |
-| POST | `/api/v1/agents/:id/start` | Assign job → triggers autonomous execution | Working |
-| POST | `/api/v1/agents/:id/stop` | Stop agent | Working |
-| GET | `/api/v1/agents/:id/logs` | Agent metrics/state | Working |
-| POST | `/api/v1/jobs` | Submit job to scheduler queue | Working |
-| GET | `/api/v1/jobs/:id` | Job status | Stub |
-| GET | `/api/v1/tools` | List registered tools | Working |
-
-Auth: Set `AGENT_OS_API_KEY` env on the server. Pass `Authorization: Bearer <key>` header. Unset = dev mode (no auth).
-
-## CLI Reference
-
-```
-agent-os run <type> --topic <topic> [--provider openai|anthropic|ollama] [--model <model>]
-agent-os agent create --type <type> --name <name> [--oversight <level>]
-agent-os agent list
-agent-os agent start <id> --job '{"topic": "..."}'
-agent-os agent stop <id>
-agent-os agent logs <id>
-agent-os job submit --task <task> --input '{"key": "value"}'
-agent-os deploy docker
-agent-os deploy fly [--region <region>]
-agent-os health
-agent-os version
-
-Global: --host <url> --api-key <key> --target <local|fly> --json
-```
-
-## OTP Supervision Tree
-
-```
-AgentScheduler.AppSupervisor (rest_for_one)
-├── Registry (OTP, unique keys)
-├── AgentScheduler.Agents.Registry (maps :openclaw → OpenClaw module)
-├── AgentScheduler.Evaluator (6-dim quality scoring)
-├── AgentScheduler.Scheduler (CFS credit-weighted queue)
-├── AgentScheduler.Pipeline (pub/sub event streaming)
-└── AgentScheduler.Supervisor (DynamicSupervisor)
-    ├── Agent "openclaw_researcher_1" (GenServer)
-    ├── Agent "nemoclaw_privacy_2" (GenServer)
-    └── ... (spawned on demand, fault-isolated)
-```
-
-## LLM Providers
-
-The system auto-detects providers from environment variables:
-
-| Priority | Env Var | Provider |
-|----------|---------|----------|
-| 1 | `OPENAI_API_KEY` | OpenAI (gpt-4o default) |
-| 2 | `ANTHROPIC_API_KEY` | Anthropic (claude-sonnet-4-20250514 default) |
-| 3 | `OLLAMA_HOST` or fallback | Ollama (llama3 default, localhost:11434) |
-
-Override per-run: `--provider anthropic --model claude-opus-4-20250514`
-
-## Deployment
-
-### Local (default)
-
-Agents run as GenServer processes on the local BEAM node. No containers needed. Erlang provides process isolation — one agent crash doesn't affect others.
-
-### Docker
-
-```bash
-docker-compose up -d
-# Includes tectonic (LaTeX), git, health checks
-# Mnesia data persisted in named volume
-```
-
-### Fly.io
-
-```bash
-fly deploy
-# shared-cpu-1x, 512MB, region: iad
-# Auto-stop/start, min 1 machine running
-# Mnesia volume for persistent memory
-```
-
-## Environment Variables
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `OPENAI_API_KEY` | Yes (or ANTHROPIC) | LLM API key for agent research |
-| `ANTHROPIC_API_KEY` | Alternative | Anthropic API key |
-| `OLLAMA_HOST` | No | Ollama endpoint (default: localhost:11434) |
-| `AGENT_OS_API_KEY` | No | API auth key (unset = dev mode) |
-| `AGENT_OS_HOST` | No | CLI target host (default: localhost:4000) |
-| `AGENT_OS_TARGET` | No | Provider: `local` or `fly` |
-| `FLY_API_TOKEN` | For Fly | Fly.io deploy token |
-| `GITHUB_TOKEN` | For repos | GitHub token (or use `gh auth login`) |
-
-## What's Working vs Stub
-
-| Component | Status |
-|-----------|--------|
-| Agent lifecycle (create/run/stop/crash recovery) | Working |
-| Autonomous agent execution (OpenClaw, NemoClaw) | Working |
-| Contract validation (ResearchContract) | Working |
-| LLM integration (OpenAI, Anthropic, Ollama) | Working |
-| LaTeX generation + PDF compilation + self-repair | Working |
-| GitHub repo creation + artifact push | Working |
-| REST API (agents, jobs, tools, health) | Working |
-| CLI (run, agent, job, deploy) | Working |
-| Memory layer (ETS + Mnesia, graph, versioning) | Working |
-| Credit-weighted scheduling (CFS) | Working |
-| Escrow + order book matching | Working |
-| Task decomposition (topological sort) | Working |
-| Capability tokens (HMAC-SHA256) | Working |
-| Process sandbox (BEAM isolation) | Working |
-| Docker + Fly.io deployment | Working |
-| Tool execute functions (12 tools) | Stub — registry works, execute returns empty |
-| Semantic/graph memory backends | Stub — falls through to Mnesia |
-| Job status tracking | Stub |
-| Memory REST endpoints | Missing controller |
-| PlannerEngine.Reputation/Market | Missing modules |
 
 ## Tests
 
 ```bash
-# All apps (from each src/<app>/ directory)
-mix test
+# Elixir (from each src/<app>/ directory)
+cd src/agent_scheduler && mix test    # 29 tests
+cd src/agent_os && mix test           # 90 tests
+cd src/agent_os_web && mix test       # 8 tests
+cd src/memory_layer && mix test       # 7 tests
+cd src/planner_engine && mix test     # 8 tests
+cd src/tool_interface && mix test     # 7 tests
 
-# CLI tests
-node --test cli/test/
+# CLI
+node --test cli/test/                 # 47 tests
 
-# Current: 159 Elixir tests + 30 CLI tests = 189 total, 0 failures
+# Total: 196 tests, 0 failures
 ```

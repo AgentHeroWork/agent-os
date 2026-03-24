@@ -28,8 +28,8 @@ node --test cli/test/                    # 34 tests
 # Run single test file
 cd src/agent_os && mix test test/contracts/loader_test.exs
 
-# Start the server (port 4000)
-cd src/agent_os && mix run --no-halt
+# Start the server (port 4000) — must start from agent_os_web, not agent_os
+cd src/agent_os_web && mix run --no-halt
 
 # Start microsandbox (required for pipeline execution)
 msb server start --dev
@@ -116,7 +116,7 @@ memory:
   knowledge_base: false
 ```
 
-The `Loader` uses a hand-rolled YAML parser (no external dep). It handles the subset used by these contracts but breaks on flow sequences `[a, b]` or deeply nested maps.
+The `Loader` uses `yaml_elixir` to parse YAML files. Full YAML spec supported.
 
 ## Agent Runtime (sandbox/scripts/agent-runtime.sh)
 
@@ -187,5 +187,5 @@ Project tracked in Linear: team `agent-os` (AOS), project `Agent-OS`. GitHub syn
 
 - `RunController` uses `apply/3` with module attributes due to inverted dependency (`agent_os` depends on `agent_os_web`, not reverse). Works at runtime but architecturally fragile.
 - `collect_artifacts` in `pipeline.ex` uses `String.to_atom` on filenames — potential atom table leak in long-running pipelines.
-- The hand-rolled YAML parser strips blank lines from `|` multi-line blocks.
+- `RunController.parse_type/1` only accepts "openclaw"/"nemoclaw" — new agent types registered at runtime are unreachable from the API without code changes.
 - `ContextBridge.contextfs_save` passes content as a CLI argument (not stdin) — may fail on large content.
