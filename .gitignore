@@ -2,3 +2,7 @@ _build/
 deps/
 mix.lock
 erl_crash.dump
+
+# Web dashboard
+web/node_modules/
+web/.next/
